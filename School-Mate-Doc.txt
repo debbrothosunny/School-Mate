@@ -1,0 +1,273 @@
+1. Introduction
+School-Mate is a modern, web-based School Management System designed to streamline administrative tasks and enhance communication within educational institutions. Built with cutting-edge web technologies, School-Mate provides distinct dashboards and functionalities tailored for various user roles, ensuring efficient management of teachers, classes, students, and accounts.
+
+Purpose: To offer a robust, role-based platform that simplifies daily operations for school administrators, teachers, and accounts staff, fostering a more organized and accessible educational environment.
+
+
+2. Key Features 2.1 Dashboard Overview
+Each primary user role (Admin, Teacher, Accounts) has a dedicated dashboard providing relevant information and quick access to their specific tools. A general "Unassigned User" dashboard is also provided for newly registered users.
+
+Admin Dashboard:
+
+Displays key performance indicators  via cards:
+
+Total Teachers
+
+Total Sections
+
+Total Students
+
+Total Active Classes
+
+Total Present (Students - Monthly)
+
+Total Absent (Students - Monthly)
+
+Total Late (Students - Monthly)
+
+Includes a Pie Chart displaying monthly student attendance statistics (Present, Absent, Late).
+
+
+
+Teacher Dashboard:
+
+A personalized dashboard displaying only their assigned classes.
+
+
+
+Accounts Dashboard:
+
+Provides a financial overview.
+
+Includes quick stats cards for:
+
+Total Registered Students (for financial context)
+
+Pending Fee Payments (placeholder for future calculation)
+
+Total Revenue (This Month - placeholder)
+
+Outlines sections for future implementation: Recent Transactions, Fee Collection Status, Expense Tracking, Reporting Tools, Student Accounts Management.
+
+Unassigned User Dashboard (Default for New Registrations):
+
+Displays a welcome message and informs the user that their account is awaiting role assignment based on their registration email.
+
+
+
+
+
+
+
+
+2.2 User Authentication & Role Management
+Registration Page:
+
+Collects: Name, Email, Contact Info, Password, Confirm Password.
+
+ Role Assignment: Upon registration, the system  assigns a role (student, teacher, or accounts) based on predefined patterns found in the user's email address (e.g., "teacher" in email gets "teacher" role, "accounts" gets "accounts" role). If no pattern matches, a default 'no role' role is assigned.
+
+The admin role is never assigned automatically for security reasons.
+
+Role-Based Access Control:
+
+Admin Role: Has full access to all features and panels, including User Management to manually assign/change roles for any user.
+
+Accounts Role: Access is restricted to the Accounts Sidebar and the Accounts-specific Dashboard.
+
+Teacher Role: Access is restricted to their Teacher Dashboard (showing only their assigned classes) and the Class Sidebar for their specific teaching responsibilities.
+
+User Management (Admin Panel):
+
+Allows administrators to view all registered users.
+
+Provides functionality to manually change or assign roles to any user from a list of available roles (admin, teacher, accounts, student).
+
+2.3 Teacher Panel
+Add Teacher Form:
+
+Fields: Teacher Name, Teacher Image , Subject Taught.
+
+2.4 Class Management
+Add Class:
+
+A form to add new classes.
+
+Includes a dropdown to select an existing Teacher (populated from the Teacher List).
+
+Automatically displays the selected Teacher's subject.
+
+Input Fields: Class Time, Student's Attendance (integration point), Section Name.
+
+"Add Button" to insert class data.
+
+Update Class:
+
+A separate page for editing/updating existing class information.
+
+2.5 Accounts Panel
+Add Student:
+
+Form fields: Student Name, Class, Age, Session, Group, Parent's Name, Address, Contact.
+
+"Add Button" to insert student data.
+
+Update Student:
+
+Option available for editing existing student details
+
+
+3. Technologies Used
+Backend Framework: Laravel 12 (PHP)
+
+Frontend Framework: Vue.js
+
+Inertia.js: A bridge between Laravel and Vue.js, allowing you to build single-page applications using classic server-side routing and controllers.
+
+Database: MySQL
+
+Styling: Tailwind CSS (for rapid UI development and responsiveness)
+
+Role & Permission Management: Spatie/laravel-permission package
+
+Alerts/Modals: SweetAlert2 (via CDN)
+
+Charting: Chart.js (for attendance pie chart on Admin Dashboard)
+
+Composer: PHP dependency manager
+
+NPM / Yarn: JavaScript package manager.
+
+
+
+
+
+4. Installation & Setup
+Follow these steps to get School-Mate up and running on your local machine.
+
+4.1 Prerequisites
+
+Ensure you have the following installed on your system:
+
+PHP (8.2 or higher, compatible with Laravel 12)
+
+Composer
+
+Node.js & npm (or Yarn)
+
+MySQL Database server
+
+Git
+
+
+4.2 Project Setup
+
+1. Clone the Repository:
+
+git clone https://github.com/debbrothosunny/School-Mate school-mate
+cd school-mate
+
+
+2. Install PHP Dependencies:
+
+3. Install JavaScript Dependencies:
+
+4.Open .env and configure your database connection:
+
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=school_mate 
+DB_USERNAME=root          
+DB_PASSWORD=  
+
+
+4.3 Run Migrations:
+
+php artisan migrate
+
+
+4.4 Running the Application
+
+1.Start the Laravel Development Server:
+
+php artisan serve
+
+
+2 Compile Frontend Assets:
+In a separate terminal, while php artisan serve is running, compile your Vue.js assets:
+
+npm run dev
+
+
+
+5. Usage Guide
+5.1 Registration
+Navigate to the registration page (/register).
+
+Fill in Name, Email, Password, Confirm Password, and Contact Info.
+
+Role Assignment: The system will automatically assign a role based on keywords in your email.
+
+Emails containing "teacher" (e.g., john.teacher@school.com) will be assigned the teacher role.
+
+Emails containing "accounts" (e.g., jane.accounts@school.com) will be assigned the accounts role.
+
+All other emails will be assigned the UnassignedUserDashboard.vue role by default.
+
+The admin role can only be assigned manually by an existing administrator.
+
+5.2 Logging In
+Admin: Log in with the admin user created during setup (admin@example.com). You will be redirected to the full Admin Dashboard.
+
+Teacher: Register with an email containing "smithteacher@gmail.com". Log in to see the Teacher Dashboard.
+
+Accounts: Register with an email containing "accountant@gmail.com". Log in to see the Accounts Dashboard.
+
+General User: Register with any other email. Log in to see the "Unassigned User Dashboard".
+
+5.3 Admin Actions
+As an Admin:
+
+User Management: Navigate to "User Management" from the sidebar. Here you can:
+
+View all registered users.
+
+Edit roles for any user.
+
+Assign or re-assign admin, teacher, accounts, roles as needed.
+
+
+
+6. Future Enhancements
+Based on the project plan, potential future enhancements include:
+
+Detailed student portal features (e.g., viewing grades, assignments, schedules for individual students).
+
+Comprehensive student attendance logging and reporting functionality for teachers within their classes.
+
+Advanced financial reporting and expense tracking within the Accounts Panel.
+
+Teacher profile management (beyond just adding basic teacher data).
+
+Assignment and grade management system.
+
+Communication tools (e.g., announcements, messaging).
+
+Class Cancellation with Reason: Teachers can cancel an assigned class and provide a mandatory reason for the cancellation, which should be visible to relevant parties (e.g., students, admin).
+
+Parent Portal: A dedicated portal for parents to view their child's attendance, grades, assignments, announcements, and communicate with teachers/administration.
+
+Online Fee Payment Integration: Secure integration with payment gateways to allow parents to pay school fees directly through the platform.
+
+Automated Report Card Generation: Generate printable report cards with comprehensive academic records, attendance summaries, and teacher comments.
+
+Customizable Notification System: Allow users (students, teachers, parents, admin) to set preferences for receiving notifications (email, in-app, SMS) for various events (new assignment, class cancellation, due date, etc.).
+
+Event Management Module: A system for creating, managing, and notifying about school events (e.g., sports days, parent-teacher meetings, holidays).
+
+Resource Management: Functionality to manage school resources like library books, laboratory equipment, or classrooms, including booking systems and inventory tracking.
+
+Online Admission/Enrollment: A streamlined process for new student applications, including form submission, document uploads, and tracking admission status.
+
+Digital Library Integration: Integration with a digital library platform for students and teachers to access e-books, journals, and other educational resources.
