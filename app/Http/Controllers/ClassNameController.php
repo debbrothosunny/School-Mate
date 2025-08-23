@@ -2,11 +2,11 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\ClassName;
-use App\Models\Teacher;
-use App\Models\Section;
+use App\Models\ClassName; // Make sure this is imported
+use App\Models\Group; // Make sure this is imported
 use Illuminate\Http\Request;
-use Inertia\Inertia;
+use Inertia\Inertia; // Assuming you're using Inertia.js
+use Illuminate\Validation\Rule;
 
 class ClassNameController extends Controller
 {
@@ -15,7 +15,8 @@ class ClassNameController extends Controller
      */
     public function index()
     {
-        $classes = ClassName::with(['teacher', 'section'])->paginate(10);
+        // Fetch all classes without any relationships
+        $classes = ClassName::paginate(10);
 
         return Inertia::render('ClassNames/Index', [
             'classes' => $classes,
@@ -28,15 +29,8 @@ class ClassNameController extends Controller
      */
     public function create()
     {
-        // Get active teachers (for dropdown and subject auto-display)
-        $teachers = Teacher::where('status', 0)->get(['id', 'name', 'subject_taught']);
-        // Get active sections (for dropdown)
-        $sections = Section::where('status', 0)->get(['id', 'name']);
-
-        return Inertia::render('ClassNames/Create', [
-            'teachers' => $teachers,
-            'sections' => $sections,
-        ]);
+        // No need to fetch teachers or sections as they are not directly linked to ClassName
+        return Inertia::render('ClassNames/Create');
     }
 
     /**
@@ -45,23 +39,15 @@ class ClassNameController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'teacher_id' => 'required|exists:teachers,id',
-            'section_id' => 'required|exists:sections,id',
-            'name' => 'required|string|max:255',
-            'class_time' => 'required|string|max:255',
-            'day' => 'required|string|max:255', 
-            'room_number' => 'required|string|max:20',
-            'status' => 'required|integer|in:0,1', // 0 or 1
+            'class_name' => 'required|string|max:255|unique:class_names,class_name', // Added unique rule
+            'status' => 'required|integer|in:0,1',
+            'total_classes' => 'required|integer|min:0', // Added validation for total_classes
         ]);
 
         ClassName::create([
-            'teacher_id' => $request->teacher_id,
-            'section_id' => $request->section_id,
-            'name' => $request->name,
-            'class_time' => $request->class_time,
-            'day' => $request->day, 
-            'room_number' => $request->room_number, 
+            'class_name' => $request->class_name,
             'status' => $request->status,
+            'total_classes' => $request->total_classes, // Store total_classes
         ]);
 
         return redirect()->route('class-names.index')->with('flash', [
@@ -73,19 +59,21 @@ class ClassNameController extends Controller
     /**
      * Display the specified resource.
      */
- 
+    public function show(ClassName $className)
+    {
+        // This method was empty in your provided code, and remains so.
+        // If you need to display a single class, you can implement it here.
+    }
+
 
     /**
      * Show the form for editing the specified resource.
      */
     public function edit(ClassName $className)
     {
-        $teachers = Teacher::where('status', 0)->get(['id', 'name', 'subject_taught']);
-        $sections = Section::where('status', 0)->get(['id', 'name']);
+        // No need to fetch teachers or sections as they are not directly linked to ClassName
         return Inertia::render('ClassNames/Edit', [
-            'className' => $className->load(['teacher', 'section']),
-            'teachers' => $teachers,
-            'sections' => $sections,
+            'className' => $className,
         ]);
         
     }
@@ -96,23 +84,21 @@ class ClassNameController extends Controller
     public function update(Request $request, ClassName $className)
     {
         $request->validate([
-            'teacher_id' => 'required|exists:teachers,id',
-            'section_id' => 'required|exists:sections,id',
-            'name' => 'required|string|max:255',
-            'class_time' => 'required|string|max:255',
-            'day' => 'required|string|max:255', 
-            'room_number' => 'required|string|max:20', 
+            // Added unique rule ignoring the current class_name's ID
+            'class_name' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('class_names', 'class_name')->ignore($className->id),
+            ],
             'status' => 'required|integer|in:0,1',
+            'total_classes' => 'required|integer|min:0', // Added validation for total_classes
         ]);
 
         $className->update([
-            'teacher_id' => $request->teacher_id,
-            'section_id' => $request->section_id,
-            'name' => $request->name,
-            'class_time' => $request->class_time,
-            'day' => $request->day, 
-            'room_number' => $request->room_number, 
+            'class_name' => $request->class_name,
             'status' => $request->status,
+            'total_classes' => $request->total_classes, // Update total_classes
         ]);
 
         return redirect()->route('class-names.index')->with('flash', [
@@ -123,12 +109,97 @@ class ClassNameController extends Controller
 
     /**
      * Remove the specified resource from storage.
-     */
+    */
     public function destroy(ClassName $className)
     {
-        $className->delete();
-        return redirect()->route('class-names.index')->with('flash', [
-            'message' => 'Class deleted successfully!',
+        try {
+            $className->delete();
+            return redirect()->back()->with('flash', ['message' => 'Class deleted successfully!', 'type' => 'success']);
+        } catch (\Exception $e) {
+            return redirect()->back()->with('flash', ['message' => 'Error deleting class: ' . $e->getMessage(), 'type' => 'error']);
+        }
+    }
+
+
+
+    // Group Functions
+
+    public function groupIndex()
+    {
+        $groups = Group::orderBy('name')->paginate(10);
+        return Inertia::render('Groups/Index', [
+            'groups' => $groups,
+            'flash' => session('flash'),
+        ]);
+    }
+
+
+
+     public function groupCreate()
+    {
+        // Pass the allowed group types to the frontend for dropdowns/checkboxes
+        return Inertia::render('Groups/Create', [
+            'groupTypes' => Group::GROUP_TYPES,
+        ]);
+    }
+
+
+    /**
+     * Store a newly created resource in storage.
+     */
+    public function groupStore(Request $request)
+    {
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255', 'unique:groups,name', Rule::in(Group::GROUP_TYPES)], // Enforce allowed names
+            'status' => 'required|boolean',
+        ]);
+
+        Group::create($validated);
+
+        return redirect()->route('groups.index')->with('flash', [
+            'message' => 'Group created successfully.',
+            'type' => 'success'
+        ]);
+    }
+
+    /**
+     * Show the form for editing the specified resource.
+     */
+    public function groupEdit(Group $group)
+    {
+        return Inertia::render('Groups/Edit', [
+            'group' => $group,
+            'groupTypes' => Group::GROUP_TYPES, // Pass allowed types for editing
+        ]);
+    }
+
+    /**
+     * Update the specified resource in storage.
+    */
+    public function groupUpdate(Request $request, Group $group)
+    {
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255', Rule::unique('groups', 'name')->ignore($group->id), Rule::in(Group::GROUP_TYPES)], // Enforce allowed names
+            'status' => 'required|boolean',
+        ]);
+
+        $group->update($validated);
+
+        return redirect()->route('groups.index')->with('flash', [
+            'message' => 'Group updated successfully.',
+            'type' => 'success'
+        ]);
+    }
+
+    /**
+     * Remove the specified resource from storage.
+     */
+    public function groupDestroy(Group $group)
+    {
+        // Add logic here to prevent deletion if group is associated with students
+        $group->delete();
+        return redirect()->route('groups.index')->with('flash', [
+            'message' => 'Group deleted successfully.',
             'type' => 'success'
         ]);
     }

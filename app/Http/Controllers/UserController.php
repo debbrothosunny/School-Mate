@@ -34,7 +34,7 @@ class UserController extends Controller
 
     /**
      * Assign/update a role for a specific user.
-     */
+    */
     public function assignRole(Request $request, User $user)
     {
         $request->validate([

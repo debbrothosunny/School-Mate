@@ -20,4 +20,6 @@ class Section extends Model
     {
         return $this->hasMany(ClassName::class, 'section_id'); // Use Class_
     }
+
+
 }

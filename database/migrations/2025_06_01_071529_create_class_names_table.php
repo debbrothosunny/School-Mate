@@ -13,13 +13,9 @@ return new class extends Migration
     {
         Schema::create('class_names', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('teacher_id')->constrained()->onDelete('cascade'); // Link to teachers table
-            $table->foreignId('section_id')->constrained()->onDelete('cascade'); // Link to sections table
-            $table->string('name'); // e.g., "Math Grade 10 A" or "Chemistry Lab"
-            $table->string('class_time');
-            $table->string('day'); // Added 'day' column for the class day(s)
-            $table->string('room_number'); // Added 'room_number' column for the class room
+            $table->string('class_name'); 
             $table->tinyInteger('status')->default(0); //0 means active 1 means inactive
+            $table->unsignedSmallInteger('total_classes')->default(0);
             $table->timestamps();
         });
     }

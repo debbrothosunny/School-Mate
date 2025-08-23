@@ -30,12 +30,14 @@ class Teacher extends Model
     {
         return $this->hasMany(ClassName::class, 'teacher_id'); // Use Class_ or SchoolClass if 'Class' causes issues
     }
-
+   
     public function classNames()
     {
-        // One Teacher has Many ClassNames (because class_names table has teacher_id)
-        return $this->hasMany(ClassName::class);
+        // The 'class_subjects' table is the pivot table.
+        // 'teacher_id' is the foreign key on the pivot table for this model.
+        // 'class_name_id' is the foreign key on the pivot table for the related model (ClassName).
+        return $this->belongsToMany(ClassName::class, 'class_subjects', 'teacher_id', 'class_name_id')
+                    ->withPivot('subject_id', 'session_id', 'section_id', 'status'); // Include pivot data if you need it
     }
-
     
 }

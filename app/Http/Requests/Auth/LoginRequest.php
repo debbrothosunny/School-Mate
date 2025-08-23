@@ -8,6 +8,10 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Facades\Hash;
+use App\Models\User;
+use Illuminate\Support\Facades\LOG;
+use App\Models\Student;
 
 class LoginRequest extends FormRequest
 {
@@ -27,7 +31,7 @@ class LoginRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'email' => ['required', 'string', 'email'],
+            'login_field' => ['required', 'string'],
             'password' => ['required', 'string'],
         ];
     }
@@ -36,21 +40,51 @@ class LoginRequest extends FormRequest
      * Attempt to authenticate the request's credentials.
      *
      * @throws \Illuminate\Validation\ValidationException
-     */
+    */
+
+    
     public function authenticate(): void
     {
         $this->ensureIsNotRateLimited();
 
-        if (! Auth::attempt($this->only('email', 'password'), $this->boolean('remember'))) {
-            RateLimiter::hit($this->throttleKey());
+        $user = User::where('email', $this->login_field)
+                    ->orWhere('contact_info', $this->login_field)
+                    ->first();
 
+        // DEBUG LOG
+        Log::info('Login attempt', [
+            'login_field' => $this->login_field,
+            'user_role'   => $user->role ?? 'null',
+            'student'     => optional($user->student)->toArray(),
+        ]);
+
+        if (! $user) {
+            RateLimiter::hit($this->throttleKey());
             throw ValidationException::withMessages([
-                'email' => trans('auth.failed'),
+                'login_field' => trans('auth.failed'),
             ]);
         }
 
+        // Deactivate if student→status == 1
+        if ($user->student && (int) $user->student->status === 1) {
+            RateLimiter::hit($this->throttleKey());
+            throw ValidationException::withMessages([
+                'login_field' => 'Your account has been deactivated please contact your ADMINISTRATOR.',
+            ]);
+        }
+
+        if (! Hash::check($this->password, $user->password)) {
+            RateLimiter::hit($this->throttleKey());
+            throw ValidationException::withMessages([
+                'login_field' => trans('auth.failed'),
+            ]);
+        }
+
+        Auth::login($user, $this->boolean('remember'));
         RateLimiter::clear($this->throttleKey());
     }
+
+
 
     /**
      * Ensure the login request is not rate limited.
@@ -68,7 +102,7 @@ class LoginRequest extends FormRequest
         $seconds = RateLimiter::availableIn($this->throttleKey());
 
         throw ValidationException::withMessages([
-            'email' => trans('auth.throttle', [
+            'login_field' => trans('auth.throttle', [
                 'seconds' => $seconds,
                 'minutes' => ceil($seconds / 60),
             ]),
@@ -76,10 +110,10 @@ class LoginRequest extends FormRequest
     }
 
     /**
-     * Get the rate limiting throttle key for the request.
-     */
+     * Get the throttle key for the request.
+    */
     public function throttleKey(): string
     {
-        return Str::transliterate(Str::lower($this->string('email')).'|'.$this->ip());
+        return Str::transliterate(Str::lower($this->input('login_field') . '|' . $this->ip()));
     }
 }

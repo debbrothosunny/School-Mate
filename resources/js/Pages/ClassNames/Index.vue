@@ -1,8 +1,8 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { Head, Link, useForm, usePage } from '@inertiajs/vue3';
-import { ref, computed } from 'vue'; // Import ref and computed
-import TextInput from '@/Components/TextInput.vue'; // Import TextInput for the search bar
+import { ref, computed } from 'vue';
+import TextInput from '@/Components/TextInput.vue';
 
 const props = defineProps({
     classes: Object, // This will be the paginated data from Laravel
@@ -22,22 +22,15 @@ const searchQuery = ref('');
 // Computed property for filtered classes
 const filteredClasses = computed(() => {
     if (!searchQuery.value) {
-        // If no search query, return the original data.
-        // We ensure a fresh copy to avoid direct mutation issues if filtering impacts display later.
         return [...props.classes.data];
     }
     const lowerCaseQuery = searchQuery.value.toLowerCase();
     return props.classes.data.filter(classItem => {
-        // Check multiple fields for a match
+        // Include 'total_classes' in search if it's a string, or convert to string for search
         return (
-            (classItem.name && classItem.name.toLowerCase().includes(lowerCaseQuery)) ||
-            (classItem.class_time && classItem.class_time.toLowerCase().includes(lowerCaseQuery)) ||
-            (classItem.day && classItem.day.toLowerCase().includes(lowerCaseQuery)) ||
-            (classItem.room_number && classItem.room_number.toLowerCase().includes(lowerCaseQuery)) ||
-            (classItem.teacher?.name && classItem.teacher.name.toLowerCase().includes(lowerCaseQuery)) ||
-            (classItem.teacher?.subject_taught && classItem.teacher.subject_taught.toLowerCase().includes(lowerCaseQuery)) ||
-            (classItem.section?.name && classItem.section.name.toLowerCase().includes(lowerCaseQuery)) ||
-            getStatusText(classItem.status).toLowerCase().includes(lowerCaseQuery)
+            (classItem.class_name && classItem.class_name.toLowerCase().includes(lowerCaseQuery)) ||
+            getStatusText(classItem.status).toLowerCase().includes(lowerCaseQuery) ||
+            (classItem.total_classes !== null && String(classItem.total_classes).includes(lowerCaseQuery)) // Added total_classes to search
         );
     });
 });
@@ -61,7 +54,6 @@ const displayTo = computed(() => {
     return props.classes.to;
 });
 
-
 const confirmClassDeletion = (classItem) => {
     classToDelete.value = classItem;
     showDeleteModal.value = true;
@@ -73,8 +65,7 @@ const deleteClass = () => {
             preserveScroll: true,
             onSuccess: () => {
                 closeDeleteModal();
-                // Optionally, refresh the page or update the classes prop if needed
-                // router.reload({ only: ['classes'] });
+                // Inertia will automatically re-render the page due to the redirect from the controller
             },
             onError: (errors) => {
                 console.error("Error deleting class:", errors);
@@ -110,14 +101,14 @@ const closeDeleteModal = () => {
                     </Link>
                 </div>
 
-                <!-- Search Input - Added here! -->
+                <!-- Search Input -->
                 <div class="mb-6">
                     <TextInput
                         id="search"
                         type="text"
                         class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                         v-model="searchQuery"
-                        placeholder="Search classes by name, teacher, subject, time, day, room, or section..."
+                        placeholder="Search classes by name, status, or total classes..."
                     />
                 </div>
 
@@ -129,27 +120,17 @@ const closeDeleteModal = () => {
                     <table class="min-w-full divide-y divide-gray-200">
                         <thead class="bg-gray-50">
                             <tr>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Teacher</th>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Subject</th>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Day</th>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Room Number</th>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Section</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Class Name</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Classes</th> <!-- New Header -->
                                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
+                                <th scope="col" class="relative px-4 py-3"><span class="sr-only">Actions</span></th>
                             </tr>
                         </thead>
 
                         <tbody v-if="filteredClasses.length" class="bg-white divide-y divide-gray-200">
                             <tr v-for="classItem in filteredClasses" :key="classItem.id">
-                                <td class="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ classItem.name }}</td>
-                                <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-500">{{ classItem.teacher?.name || 'N/A' }}</td>
-                                <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-500">{{ classItem.teacher?.subject_taught || 'N/A' }}</td>
-                                <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-500">{{ classItem.class_time }}</td>
-                                <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-500">{{ classItem.day || 'N/A' }}</td>
-                                <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-500">{{ classItem.room_number || 'N/A' }}</td>
-                                <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-500">{{ classItem.section?.name || 'N/A' }}</td>
+                                <td class="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ classItem.class_name }}</td>
+                                <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-500">{{ classItem.total_classes }}</td> <!-- New Data Cell -->
                                 <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
                                     <span
                                         :class="{
@@ -175,7 +156,7 @@ const closeDeleteModal = () => {
 
                         <tbody v-else>
                             <tr>
-                                <td colspan="9" class="px-4 py-4 text-center text-sm text-gray-500">No classes found.</td>
+                                <td colspan="4" class="px-4 py-4 text-center text-sm text-gray-500">No classes found.</td> <!-- Updated colspan -->
                             </tr>
                         </tbody>
                     </table>
@@ -187,7 +168,7 @@ const closeDeleteModal = () => {
                     </span>
                     <span v-else class="text-sm text-gray-700">No results found</span>
 
-                    <div class="flex" v-if="!searchQuery"> <!-- Only show pagination links if no search is active -->
+                    <div class="flex" v-if="!searchQuery">
                         <Link
                             v-for="link in classes.links"
                             :key="link.label"
@@ -209,7 +190,7 @@ const closeDeleteModal = () => {
             <div class="bg-white p-6 rounded-lg shadow-xl w-96">
                 <h3 class="text-lg font-semibold mb-4">Confirm Deletion</h3>
                 <p class="mb-4">
-                    Are you sure you want to delete class: <span class="font-bold">{{ classToDelete ? classToDelete.name : '' }}</span>?
+                    Are you sure you want to delete class: <span class="font-bold">{{ classToDelete ? classToDelete.class_name : '' }}</span>?
                 </p>
                 <div class="flex justify-end space-x-4">
                     <button @click="closeDeleteModal" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">Cancel</button>

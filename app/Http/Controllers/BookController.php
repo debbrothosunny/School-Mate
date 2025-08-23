@@ -1,0 +1,558 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use Illuminate\Http\Request;
+use App\Models\Book;
+use App\Models\BorrowBook;
+use App\Models\Student;
+use App\Models\Invoice;
+use Inertia\Inertia;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\LOG;
+use Carbon\Carbon; // Import Carbon for date handling
+use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\Storage; // For file storage operations
+
+class BookController extends Controller
+{
+    /**
+     * Display a listing of the books.
+     */
+    public function index(Request $request)
+    {
+        $query = Book::query();
+
+        // Apply search filter
+        if ($request->has('search') && $request->input('search')) {
+            $search = $request->input('search');
+            $query->where('title', 'like', '%' . $search . '%')
+                ->orWhere('author', 'like', '%' . $search . '%')
+                ->orWhere('isbn', 'like', '%' . $search . '%');
+        }
+
+        // Apply status filter (expecting '0' or '1' string from frontend)
+        if ($request->has('status')) {
+            $status = $request->input('status');
+            // Convert '0'/'1' string to boolean for database query
+            $query->where('status', (bool) $status);
+        }
+
+        $books = $query->paginate(10) // Adjust pagination limit as needed
+            ->withQueryString(); // Keep filters in pagination links
+
+        return Inertia::render('Books/Index', [
+            'books' => $books,
+            'filters' => $request->only(['search', 'status']),
+            'flash' => session('flash'), // Ensure flash messages are passed
+        ]);
+
+    }
+
+
+    /**
+     * Show the form for creating a new book.
+     */
+    public function create()
+    {
+        // Render the create subject form
+        return Inertia::render('Books/Create');
+    }
+
+
+    /* Store a newly created book in storage.
+     */
+    public function store(Request $request)
+    {
+        $validated = $request->validate([
+            'title' => 'required|string|max:255',
+            'author' => 'required|string|max:255',
+            'publisher' => 'nullable|string|max:255',
+            'publication_date' => 'nullable|date',
+            'isbn' => 'nullable|string|max:20|unique:books,isbn',
+            'quantity' => 'required|integer|min:0',
+            'genre' => 'nullable|string|max:100',
+            'cover_image' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048', // Max 2MB
+            'status' => 'required|integer|in:0,1',
+        ]);
+
+        // Handle file upload for cover image
+        $imagePath = null;
+        if ($request->hasFile('cover_image')) {
+            $imagePath = $request->file('cover_image')->store('book_covers', 'public');
+        }
+
+        $book = Book::create([
+            'title' => $validated['title'],
+            'author' => $validated['author'],
+            'publisher' => $validated['publisher'],
+            'publication_date' => $validated['publication_date'],
+            'isbn' => $validated['isbn'],
+            'quantity' => $validated['quantity'],
+            'available_quantity' => $validated['quantity'], // Initially, all copies are available
+            'genre' => $validated['genre'],
+            'cover_image_path' => $imagePath,
+            'status' => $validated['status'],
+        ]);
+
+        return redirect()->route('books.index')->with('flash', [
+            'message' => 'Book "' . $book->title . '" added successfully!',
+            'type' => 'success'
+        ]);
+    }
+
+
+    /**
+     * Show the form for editing the specified book.
+    */
+    public function edit(Book $book)
+    {
+        return Inertia::render('Books/Edit', [
+            'book' => $book,
+            'flash' => session('flash'),
+            'errors' => session('errors') ? session('errors')->getBag('default')->getMessages() : (object)[],
+        ]);
+    }
+
+
+    /**
+     * Update the specified book in storage.
+    */
+    public function update(Request $request, Book $book)
+    {
+        $validated = $request->validate([
+            'title' => 'required|string|max:255',
+            'author' => 'required|string|max:255',
+            'publisher' => 'nullable|string|max:255',
+            'publication_date' => 'nullable|date',
+            'isbn' => ['nullable', 'string', 'max:20', Rule::unique('books', 'isbn')->ignore($book->id)],
+            'quantity' => 'required|integer|min:0',
+            'genre' => 'nullable|string|max:100',
+            'cover_image' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048', // Max 2MB
+            'status' => 'required|integer|in:0,1',
+        ]);
+
+
+        // dd($request->all());
+        // Calculate the change in quantity to update available_quantity
+        $oldQuantity = $book->quantity;
+        $newQuantity = $validated['quantity'];
+        $quantityDifference = $newQuantity - $oldQuantity;
+
+        // Update available_quantity based on the change in total quantity
+        $book->available_quantity += $quantityDifference;
+        // Ensure available_quantity doesn't go below zero (if you reduce total quantity below borrowed count)
+        $book->available_quantity = max(0, $book->available_quantity);
+
+
+        // Handle file upload for cover image
+        $imagePath = $book->cover_image_path;
+        if ($request->hasFile('cover_image')) {
+            // Delete old image if it exists
+            if ($imagePath && Storage::disk('public')->exists($imagePath)) {
+                Storage::disk('public')->delete($imagePath);
+            }
+            $imagePath = $request->file('cover_image')->store('book_covers', 'public');
+        } elseif ($request->boolean('remove_cover_image')) { // Handle explicit removal
+            if ($imagePath && Storage::disk('public')->exists($imagePath)) {
+                Storage::disk('public')->delete($imagePath);
+            }
+            $imagePath = null;
+        }
+
+        $book->update([
+            'title' => $validated['title'],
+            'author' => $validated['author'],
+            'publisher' => $validated['publisher'],
+            'publication_date' => $validated['publication_date'],
+            'isbn' => $validated['isbn'],
+            'quantity' => $validated['quantity'],
+            'available_quantity' => $book->available_quantity, // Use the adjusted value
+            'genre' => $validated['genre'],
+            'cover_image_path' => $imagePath,
+            'status' => $validated['status'],
+        ]);
+
+        return redirect()->route('books.index')->with('flash', [
+            'message' => 'Book "' . $book->title . '" updated successfully!',
+            'type' => 'success'
+        ]);
+    }
+
+    /**
+     * Remove the specified book from storage.
+     */
+    public function destroy(Book $book)
+    {
+        // Before deleting the book, ensure no active borrow records exist for it
+        if ($book->borrowRecords()->whereIn('status', [0, 4])->exists()) { // Check for 'borrowed' or 'return requested'
+            return redirect()->back()->with('flash', [
+                'message' => 'Cannot delete book "' . $book->title . '" because it has active borrow records.',
+                'type' => 'error'
+            ]);
+        }
+
+
+        // Delete associated cover image if it exists
+        if ($book->cover_image_path && Storage::disk('public')->exists($book->cover_image_path)) {
+            Storage::disk('public')->delete($book->cover_image_path);
+        }
+
+        $book->delete();
+
+        return redirect()->back()->with('flash', [
+            'message' => 'Book "' . $book->title . '" deleted successfully!',
+            'type' => 'success'
+        ]);
+    }
+
+
+
+
+    /**
+     * Display a listing of all borrow records for admin.
+     */
+    public function adminBorrowRecordsIndex(Request $request)
+    {
+        $query = BorrowBook::with(['book', 'student.user']); // Eager load book and student with user
+
+        // Filtering
+        if ($request->filled('search')) {
+            $searchTerm = '%' . $request->search . '%';
+            $query->where(function ($q) use ($searchTerm) {
+                // Search by book title or student name
+                $q->whereHas('book', function ($bookQuery) use ($searchTerm) {
+                    $bookQuery->where('title', 'like', $searchTerm);
+                })->orWhereHas('student.user', function ($userQuery) use ($searchTerm) {
+                    $userQuery->where('name', 'like', $searchTerm);
+                });
+            });
+        }
+
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
+
+        $borrowRecords = $query->orderBy('borrow_date', 'desc')->paginate(10);
+
+        return Inertia::render('BorrowRecords/Index', [ // Adjusted path for admin view
+            'borrowRecords' => $borrowRecords,
+            'filters' => $request->only(['search', 'status']),
+            'flash' => session('flash'),
+        ]);
+    }
+
+    /**
+     * Admin action to approve a return request.
+     */
+    public function approveReturn(BorrowBook $borrowBook) // Renamed from returnBook
+    {
+        // Only allow approval if the status is 'Return Requested' (4) or 'Borrowed' (0) if admin can directly return
+        if (!in_array($borrowBook->status, [0, 4])) {
+            return redirect()->back()->with('flash', [
+                'message' => 'This book is not in a state that can be approved for return.',
+                'type' => 'error'
+            ]);
+        }
+
+        DB::beginTransaction();
+        try {
+            $book = Book::lockForUpdate()->find($borrowBook->book_id);
+
+            $borrowBook->update([
+                'return_date' => Carbon::today(), // Set actual return date
+                'status' => 1, // Change status to 'Returned'
+            ]);
+
+            // Increment available quantity of the book
+            if ($book) {
+                $book->increment('available_quantity');
+            }
+
+            DB::commit();
+            return redirect()->back()->with('flash', [
+                'message' => 'Book "' . $borrowBook->book->title . '" return approved successfully!',
+                'type' => 'success'
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Admin approve return failed: ' . $e->getMessage());
+            return redirect()->back()->with('flash', [
+                'message' => 'An error occurred while approving the return. Please try again.',
+                'type' => 'error'
+            ]);
+        }
+    }
+
+    /**
+     * Admin action to mark a borrowed book as lost.
+     */
+    public function markAsLost(BorrowBook $borrowBook)
+    {
+        // Only allow marking as lost if the status is 'Borrowed' (0) or 'Return Requested' (4)
+        if (!in_array($borrowBook->status, [0, 4])) {
+            return redirect()->back()->with('flash', [
+                'message' => 'This book is not in a state to be marked as lost.',
+                'type' => 'error'
+            ]);
+        }
+
+        DB::beginTransaction();
+        try {
+            $book = Book::lockForUpdate()->find($borrowBook->book_id);
+
+            $borrowBook->update([
+                'status' => 3, // Change status to 'Lost'
+                'return_date' => Carbon::today(), // Set return_date to today for lost books
+            ]);
+
+            // Decrement available quantity as the book is lost
+            if ($book && $book->available_quantity > 0) {
+                $book->decrement('available_quantity');
+            }
+
+            DB::commit();
+            return redirect()->back()->with('flash', [
+                'message' => 'Book "' . $borrowBook->book->title . '" marked as lost.',
+                'type' => 'success'
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Admin mark as lost failed: ' . $e->getMessage());
+            return redirect()->back()->with('flash', [
+                'message' => 'An error occurred while marking the book as lost.',
+                'type' => 'error'
+            ]);
+        }
+    }
+
+
+
+    // Student Side Borrow Book
+
+
+    /**
+     * Display a listing of available books for students to borrow.
+     */
+    public function studentIndex()
+    {
+        // Fetch only active books with available quantity greater than 0
+        $books = Book::where('status', 0) // 0 for active
+            ->where('available_quantity', '>', 0)
+            ->orderBy('title')
+            ->paginate(10);
+
+        return Inertia::render('StudentBooks/BookIndex', [
+            'books' => $books,
+            'flash' => session('flash'),
+        ]);
+    }
+
+
+    /**
+     * Store a newly created borrow record.
+    */
+
+
+    public function borrow(Request $request)
+    {
+        // Validate the incoming request data
+        $validated = $request->validate([
+            'book_id' => 'required|exists:books,id',
+            'borrow_date' => 'required|date|before_or_equal:today',
+            'return_date' => 'required|date|after_or_equal:borrow_date',
+        ]);
+
+        // Get the authenticated user's ID
+        $userId = Auth::id();
+
+        // Find the student record associated with the authenticated user
+        $student = Student::where('user_id', $userId)->first();
+
+        // If no student record is found for the authenticated user, prevent borrowing
+        if (!$student) {
+            return redirect()->back()->with('flash', [
+                'message' => 'Your student profile could not be found. Please contact support.',
+                'type' => 'error'
+            ]);
+        }
+
+        // --- UPDATED LOGIC: Check for any outstanding library fee invoices ---
+        // A student cannot borrow a book if they have an invoice that is pending, partially paid, pending_payment_approval, or overdue.
+        $hasOutstandingFees = Invoice::where('student_id', $student->id)
+                                     ->whereIn('status', ['pending_payment_approval', 'pending', 'partially_paid', 'overdue'])
+                                     ->exists(); // `exists()` is more efficient than `first()`
+
+        if ($hasOutstandingFees) {
+            return redirect()->back()->with('flash', [
+                'message' => 'Your library fees are pending. Please complete the payment so you can borrow this book.',
+                'type'    => 'error',
+            ]);
+        }
+
+        // --- END UPDATED LOGIC ---
+
+        $studentId = $student->id; // Use the actual student ID
+
+        DB::beginTransaction();
+
+        try {
+            $book = Book::lockForUpdate()->find($validated['book_id']); // Lock the book row for update
+
+            // Check if the book is still available
+            if (!$book || $book->available_quantity <= 0) {
+                DB::rollBack();
+                return redirect()->back()->with('flash', [
+                    'message' => 'The selected book is no longer available for borrowing.',
+                    'type' => 'error'
+                ]);
+            }
+
+            // Check if the student has already borrowed this specific book and not yet returned it
+            // Using integer status: 0 for 'borrowed', 4 for 'return requested'
+            $existingBorrow = BorrowBook::where('book_id', $validated['book_id'])
+                ->where('student_id', $studentId)
+                ->whereIn('status', [0, 4]) // Check if status is 0 (borrowed) or 4 (return requested)
+                ->first();
+
+            if ($existingBorrow) {
+                DB::rollBack();
+                return redirect()->back()->with('flash', [
+                    'message' => 'You have already borrowed this book or have a pending return request for it.',
+                    'type' => 'error'
+                ]);
+            }
+
+            // Create a new borrow record
+            BorrowBook::create([
+                'book_id' => $validated['book_id'],
+                'student_id' => $studentId, // Use the correct student ID
+                'borrow_date' => $validated['borrow_date'],
+                'return_date' => $validated['return_date'], // Use the user-provided expected return date
+                'status' => 0, // Set status to 0 for 'borrowed'
+            ]);
+
+            // Decrement the available quantity of the book
+            $book->decrement('available_quantity');
+
+            DB::commit();
+
+            return redirect()->back()->with('flash', [
+                'message' => 'Book "' . $book->title . '" borrowed successfully! Expected return by ' . Carbon::parse($validated['return_date'])->format('M d, Y') . '.',
+                'type' => 'success'
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Book borrowing failed: ' . $e->getMessage()); // Log the error
+            return redirect()->back()->with('flash', [
+                'message' => 'An error occurred while trying to borrow the book. Please try again.',
+                'type' => 'error'
+            ]);
+        }
+    }
+
+
+
+
+
+    /**
+     * Display a listing of books borrowed by the authenticated student.
+     */
+    public function myBorrowedBooks()
+    {
+        $userId = Auth::id();
+        Log::info('myBorrowedBooks: Authenticated User ID: ' . $userId);
+
+        $student = Student::where('user_id', $userId)->first();
+
+        // Initialize borrowedBooks as an empty paginator-like object
+        // This ensures the frontend always receives an object with 'data' and 'links' properties
+        $borrowedBooks = (object)['data' => [], 'links' => (object)['first' => null, 'last' => null, 'prev' => null, 'next' => null]];
+
+
+        if (!$student) {
+            Log::warning('myBorrowedBooks: No student profile found for User ID: ' . $userId);
+            return Inertia::render('StudentBooks/MyBorrowedBooks', [
+                'borrowedBooks' => $borrowedBooks, // Pass the empty paginator-like object
+                'flash' => ['message' => 'Your student profile could not be found.', 'type' => 'error'],
+            ]);
+        }
+
+        $studentId = $student->id;
+        Log::info('myBorrowedBooks: Found Student ID: ' . $studentId . ' for User ID: ' . $userId);
+
+
+        // Fetch books borrowed by the current student that are still 'borrowed' or 'return requested'
+        // Using integer status: 0 for 'borrowed', 4 for 'return requested'
+        $borrowedBooks = BorrowBook::with('book') // Eager load the related book
+            ->where('student_id', $studentId)
+            ->whereIn('status', [0, 4]) // Filter by status 0 (borrowed) or 4 (return requested)
+            ->orderBy('return_date') // Order by expected return date
+            ->paginate(10);
+
+        Log::info('myBorrowedBooks: Fetched ' . $borrowedBooks->count() . ' borrowed records for Student ID: ' . $studentId);
+
+        return Inertia::render('StudentBooks/MyBorrowedBooks', [
+            'borrowedBooks' => $borrowedBooks,
+            'flash' => session('flash'),
+        ]);
+    }
+
+    /**
+     * Handle a student's request to return a borrowed book.
+    */
+    public function requestReturn(Request $request, BorrowBook $borrowBook)
+    {
+        $userId = Auth::id();
+        $student = Student::where('user_id', $userId)->first();
+
+        if (!$student) {
+            return redirect()->back()->with('flash', [
+                'message' => 'Your student profile could not be found. Cannot process return request.',
+                'type' => 'error'
+            ]);
+        }
+
+        // Ensure the borrowed book belongs to the authenticated student
+        if ($borrowBook->student_id !== $student->id) {
+            return redirect()->back()->with('flash', [
+                'message' => 'You are not authorized to request return for this book.',
+                'type' => 'error'
+            ]);
+        }
+ 
+        // Only allow requesting return if the book is currently borrowed (status 0)
+        if ($borrowBook->status !== 0) {
+            return redirect()->back()->with('flash', [
+                'message' => 'This book is not currently in a state to be returned.',
+                'type' => 'error'
+            ]);
+        }
+
+        DB::beginTransaction();
+
+        try {
+            // Update the borrow record status to 'Return Requested' (e.g., status 4)
+            $borrowBook->update([
+                'status' => 4, // Set status to 4 for 'Return Requested'
+            ]);
+
+            DB::commit();
+
+            return redirect()->back()->with('flash', [
+                'message' => 'Return request for "' . $borrowBook->book->title . '" submitted successfully! An admin will review it.',
+                'type' => 'success'
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Return request failed: ' . $e->getMessage());
+            return redirect()->back()->with('flash', [
+                'message' => 'An error occurred while trying to submit the return request. Please try again.',
+                'type' => 'error'
+            ]);
+        }
+    }
+}

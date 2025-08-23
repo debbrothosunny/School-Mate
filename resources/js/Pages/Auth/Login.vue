@@ -20,9 +20,9 @@ defineProps({
 // Reactive state to toggle between login and register forms
 const showRegisterForm = ref(false);
 
-// Form for Login
+// Form for Login - Now uses 'login_field' for dynamic authentication
 const loginForm = useForm({
-    email: '',
+    login_field: '', // This will accept email, or contact_info
     password: '',
     remember: false,
 });
@@ -33,7 +33,7 @@ const registerForm = useForm({
     email: '',
     password: '',
     password_confirmation: '',
-    contact_info: '', 
+    contact_info: '',
 });
 
 // Submit function for Login
@@ -50,10 +50,9 @@ const submitRegister = () => {
     });
 };
 
-// Function to toggle between forms
+// Function to toggle between forms and reset fields
 const toggleForm = () => {
     showRegisterForm.value = !showRegisterForm.value;
-    // Optionally reset forms when switching
     loginForm.reset();
     registerForm.reset();
 };
@@ -124,17 +123,19 @@ const toggleForm = () => {
                 <!-- Login Form -->
                 <form v-if="!showRegisterForm" @submit.prevent="submitLogin" key="login-form" class="p-4">
                     <div>
-                        <InputLabel for="email" value="Email" />
+                        <InputLabel for="login_field" value="Email OR Contact Number" />
+                        <!-- Changed from 'email' to 'login_field' for dynamic login -->
                         <TextInput
-                            id="email"
-                            type="email"
+                            id="login_field"
+                            type="text"
                             class="mt-1 block w-full"
-                            v-model="loginForm.email"
+                            v-model="loginForm.login_field"
                             required
                             autofocus
                             autocomplete="username"
+                            placeholder="Enter your email or contact info"
                         />
-                        <InputError class="mt-2" :message="loginForm.errors.email" />
+                        <InputError class="mt-2" :message="loginForm.errors.login_field" />
                     </div>
 
                     <div class="mt-4">
@@ -201,7 +202,7 @@ const toggleForm = () => {
                             v-model="registerForm.email"
                             required
                             autocomplete="username"
-                            placeholder="john.teacher@gmail.com" 
+                            placeholder="john.teacher@example.com"
                         />
                         <InputError class="mt-2" :message="registerForm.errors.email" />
                     </div>
@@ -232,7 +233,7 @@ const toggleForm = () => {
                         <InputError class="mt-2" :message="registerForm.errors.password_confirmation" />
                     </div>
 
-                    <!-- New: Contact Info Field -->
+                    <!-- Contact Info Field -->
                     <div class="mt-4">
                         <InputLabel for="contact_info" value="Contact Info" />
                         <TextInput

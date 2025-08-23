@@ -16,6 +16,7 @@ class Attendance extends Model
         'session_id', 
         'section_id',
         'group_id',
+        'subject_id',  
         'date',
         'status',
     ];

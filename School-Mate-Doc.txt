@@ -254,7 +254,7 @@ Assignment and grade management system.
 
 Communication tools (e.g., announcements, messaging).
 
-Class Cancellation with Reason: Teachers can cancel an assigned class and provide a mandatory reason for the cancellation, which should be visible to relevant parties (e.g., students, admin).
+
 
 Parent Portal: A dedicated portal for parents to view their child's attendance, grades, assignments, announcements, and communicate with teachers/administration.
 
@@ -271,3 +271,22 @@ Resource Management: Functionality to manage school resources like library books
 Online Admission/Enrollment: A streamlined process for new student applications, including form submission, document uploads, and tracking admission status.
 
 Digital Library Integration: Integration with a digital library platform for students and teachers to access e-books, journals, and other educational resources.
+
+*Seat Plan For Exam.
+
+
+
+=======================15-07-2025========================================
+
+***Academic Risk Prediction: If a student's grades are consistently dropping in a particular subject, combined with signs of disengagement, the system could flag them as "at academic risk" and suggest early intervention strategies for teachers and parents.
+
+
+
+Do you want to start by focusing on setting up the fee_types table and then the student_fee_assignments, or would you prefer to dive into the logic for the automated invoice generation first?
+
+
+
+git init 
+git add .
+git commit -m "12-02-2025 Last Update"
+PS C:\xampp\htdocs\trip_planner> git push -u origin master

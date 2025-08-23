@@ -15,22 +15,36 @@ return new class extends Migration
         Schema::create('students', function (Blueprint $table) {
             $table->id();
             $table->string('name');
-            $table->unsignedBigInteger('class_id'); // Can be null if assigned later
+            $table->unsignedBigInteger('class_id');
+            $table->foreign('class_id')->references('id')->on('class_names')->onDelete('cascade');
+            $table->date('date_of_birth');
+            $table->string('gender');
+            $table->date('admission_date');
             $table->integer('age');
             $table->unsignedBigInteger('session_id');
-            $table->foreignId('section_id')->constrained()->onDelete('cascade'); // Link to sections table
+            $table->foreign('session_id')->references('id')->on('class_sessions')->onDelete('cascade');
+            $table->foreignId('section_id')->references('id')->on('sections')->onDelete('cascade');
             $table->unsignedBigInteger('group_id');
+            $table->foreign('group_id')->references('id')->on('groups')->onDelete('cascade');
+            $table->foreignId('user_id');
+            $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
+
+            // Existing student details
+            $table->string('admission_number')->unique();
+            $table->integer('roll_number')->unique();
             $table->string('parent_name');
             $table->string('address');
-            $table->string('contact'); // Changed to string for phone numbers
-            $table->string('image')->nullable(); // Added image column for student images
-            $table->boolean('status')->default(0)->comment('0: Active, 1: Inactive'); // 0 for active and 1 inactive
-            $table->timestamps();
+            $table->string('contact');
+            $table->string('image')->nullable();
+            $table->tinyInteger('status')->default(0)->comment('0: Active (Enrolled), 1: Inactive (Left/Graduated)');
+            $table->string('enrollment_status')->default('applied')->comment('e.g., applied, under_review, admitted, enrolled, rejected, waitlisted');
+    
+            // Admission fee and payment details
+            $table->integer('admission_fee_amount')->nullable(); 
+            $table->boolean('admission_fee_paid')->default(false);    // Tracks if it's paid
+            $table->string('payment_method')->nullable();             // e.g., 'Cash', 'bKash', 'Bank Transfer'             // e.g., 'Cash', 'bKash', 'Bank Transfer'
 
-            // Foreign key constraints
-            $table->foreign('class_id')->references('id')->on('class_names')->onDelete('cascade'); // Keeping onDelete('set null') for class_id as per your provided input
-            $table->foreign('session_id')->references('id')->on('class_sessions')->onDelete('cascade'); // Changed to onDelete('cascade')
-            $table->foreign('group_id')->references('id')->on('groups')->onDelete('cascade'); // Changed to onDelete('cascade')
+            $table->timestamps();
         });
     }
 

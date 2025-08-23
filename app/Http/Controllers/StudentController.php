@@ -7,6 +7,8 @@ use App\Models\ClassName;
 use App\Models\ClassSession;
 use App\Models\Section;
 use App\Models\Group;
+use App\Models\User; 
+use Illuminate\Validation\Rule;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Storage;
@@ -18,52 +20,68 @@ class StudentController extends Controller
      */
     public function index()
     {
-        // Eager load relations and paginate the students
-        // Inertia automatically serializes the model attributes and loaded relationships
-        $students = Student::with(['className', 'session', 'group', 'section'])->latest()->paginate(10);
+        // Eager load relations including 'user' and paginate the students
+        $students = Student::with(['className', 'session', 'group', 'section', 'user'])->latest()->paginate(10);
 
         return Inertia::render('Students/Index', [
             'students' => $students,
         ]);
     }
 
-
     /**
      * Show the form for creating a new student.
      */
-
     public function create()
     {
-        $classes = ClassName::where('status', 0)->get(['id', 'name']);
+        $classes = ClassName::where('status', 0)->get(['id', 'class_name']);
         $sessions = ClassSession::where('status', 0)->get(['id', 'name']);
         $groups = Group::where('status', 0)->get(['id', 'name']);
-        $sections = Section::where('status', 0)->get(['id', 'name']); // <--- Fetch sections
+        $sections = Section::where('status', 0)->get(['id', 'name']);
+        // Fetch users who are not yet linked to any student or teacher,
+        // or just all users if you want more flexibility in linking.
+        // For simplicity, fetching all users here.
+        $availableUsers = User::doesntHave('student')
+                                ->doesntHave('teacher')
+                                ->get(['id', 'name', 'email']);
 
         return Inertia::render('Students/Create', [
             'classes' => $classes,
             'sessions' => $sessions,
             'groups' => $groups,
-            'sections' => $sections, // <--- Pass sections to the view
+            'sections' => $sections,
+            'availableUsers' => $availableUsers, // Pass available users to the view
         ]);
     }
-
+   
     /**
      * Store a newly created student in storage.
-     */
+    */
     public function store(Request $request)
     {
         $validatedData = $request->validate([
             'name' => 'required|string|max:255',
-            'class_id' => 'nullable|exists:class_names,id',
-            'age' => 'nullable|integer|min:0',
-            'session_id' => 'nullable|exists:class_sessions,id',
-            'group_id' => 'nullable|exists:groups,id',
-            'section_id' => 'nullable|exists:sections,id',
-            'parent_name' => 'nullable|string|max:255',
-            'address' => 'nullable|string|max:255',
-            'contact' => 'nullable|string|max:20',
-            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048', // Image validation: nullable, image file, specific mimes, max 2MB
+            'class_id' => 'required|exists:class_names,id',
+            'age' => 'required|integer|min:0',
+            'date_of_birth' => 'required|date',
+            'gender' => ['required', Rule::in(['Male', 'Female', 'Other'])],
+            'admission_date' => 'required|date',
+            'session_id' => 'required|exists:class_sessions,id',
+            'group_id' => 'required|exists:groups,id',
+            'section_id' => 'required|exists:sections,id',
+            'user_id' => 'required|exists:users,id|unique:students,user_id',
+            'parent_name' => 'required|string|max:255',
+            'address' => 'required|string|max:255',
+            'contact' => 'required|string|max:20',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
             'status' => 'required|integer|in:0,1',
+            'enrollment_status' => ['required', 'string', Rule::in(['applied', 'under_review', 'admitted', 'enrolled', 'rejected', 'waitlisted', 'withdrawn'])],
+            'admission_number' => 'required|string|max:255|unique:students,admission_number',
+            'roll_number' => 'required|integer|unique:students,roll_number',
+
+            // New validation rules for admission fee and payment details
+            'admission_fee_amount' => 'nullable|numeric|min:0', // Use numeric for decimal input
+            'admission_fee_paid' => 'boolean', // Expects 0 or 1 from checkbox/toggle
+            'payment_method' => ['nullable', 'string', Rule::in(['Cash', 'bKash', 'Bank Transfer'])], // Add your expected methods
         ]);
 
         // Handle image upload
@@ -74,52 +92,109 @@ class StudentController extends Controller
             $validatedData['image'] = null; // Ensure image is null if no file is uploaded
         }
 
-        Student::create($validatedData); // Use $validatedData for creation
+        // --- Handle admission_fee_amount conversion ---
+        // If admission_fee_amount is provided, convert it to the smallest unit (paisa).
+        // Assuming input is in BDT (e.g., 5000), convert to paisa (500000).
+        if (isset($validatedData['admission_fee_amount']) && $validatedData['admission_fee_amount'] !== null) {
+            $validatedData['admission_fee_amount'] = (int)($validatedData['admission_fee_amount'] * 100);
+        } else {
+            // Ensure it's null if no amount is provided, matching nullable() in migration
+            $validatedData['admission_fee_amount'] = null;
+        }
 
-        return redirect()->route('students.index')->with('flash', [
-            'message' => 'Student added successfully!',
-            'type' => 'success'
-        ]);
+        // Set default for admission_fee_paid if not present (e.g., checkbox not checked)
+        if (!isset($validatedData['admission_fee_paid'])) {
+            $validatedData['admission_fee_paid'] = false;
+        }
+
+        // Create the student using the validated data
+        $student = Student::create($validatedData);
+
+        // Redirect back to the index page without a flash message
+        return redirect()->route('students.index')->with('success', 'Student added successfully!');
     }
 
-
-
     /**
-     * Show the form for editing the specified resource.
-     */
-     public function edit(Student $student)
+     * Show the form for editing the specified student.
+    */
+    public function edit(Student $student)
     {
-        $classes = ClassName::where('status', 0)->get(['id', 'name']);
-        $sessions = ClassSession::where('status', 0)->get(['id', 'name']); // Changed to ClassSession
+        $classes = ClassName::where('status', 0)->get(['id', 'class_name']);
+        $sessions = ClassSession::where('status', 0)->get(['id', 'name']);
         $groups = Group::where('status', 0)->get(['id', 'name']);
         $sections = Section::where('status', 0)->get(['id', 'name']);
 
+        // Fetch users who are not yet linked to any student or teacher,
+        // OR the user currently linked to this student (to allow re-selecting the same user).
+        $availableUsers = User::where(function ($query) {
+                                $query->whereDoesntHave('student')
+                                      ->whereDoesntHave('teacher');
+                            })
+                            ->orWhere('id', $student->user_id) // Include the student's current user
+                            ->get(['id', 'name', 'email']);
+
+        // Eager load relationships for the student being edited
+        $student->load(['className', 'session', 'group', 'section', 'user']);
+
         return Inertia::render('Students/Edit', [
-            'student' => $student->load(['className', 'session', 'group', 'section']),
+            'student' => $student,
             'classes' => $classes,
             'sessions' => $sessions,
             'groups' => $groups,
             'sections' => $sections,
+            'availableUsers' => $availableUsers, // Pass available users to the view
+            'flash' => session('flash'), // Ensure flash messages are passed
+            'errors' => session('errors') ? session('errors')->getBag('default')->getMessages() : (object)[], // Ensure errors are passed
         ]);
     }
 
     /**
-     * Update the specified resource in storage.
-     */
+     * Update the specified student in storage.
+    */
     public function update(Request $request, Student $student)
     {
         $validatedData = $request->validate([
             'name' => 'required|string|max:255',
-            'class_id' => 'nullable|exists:class_names,id',
-            'age' => 'nullable|integer|min:0',
-            'session_id' => 'nullable|exists:class_sessions,id',
-            'group_id' => 'nullable|exists:groups,id',
-            'section_id' => 'nullable|exists:sections,id',
-            'parent_name' => 'nullable|string|max:255',
-            'address' => 'nullable|string|max:255',
-            'contact' => 'nullable|string|max:20',
-            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048', // Image validation for update
+            'class_id' => 'required|exists:class_names,id',
+            'age' => 'required|integer|min:0',
+            'date_of_birth' => 'required|date',
+            'gender' => ['required', Rule::in(['Male', 'Female', 'Other'])],
+            'admission_date' => 'required|date',
+            'session_id' => 'required|exists:class_sessions,id',
+            'group_id' => 'required|exists:groups,id',
+            'section_id' => 'required|exists:sections,id',
+
+            // user_id unique rule should ignore the current student's user_id
+            'user_id' => [
+                'required',
+                'exists:users,id',
+                Rule::unique('students', 'user_id')->ignore($student->id),
+            ],
+
+            'parent_name' => 'required|string|max:255',
+            'address' => 'required|string|max:255',
+            'contact' => 'required|string|max:20',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
             'status' => 'required|integer|in:0,1',
+            'enrollment_status' => ['required', 'string', Rule::in(['applied', 'under_review', 'admitted', 'enrolled', 'rejected', 'waitlisted', 'withdrawn'])],
+
+            // --- Validation for admission_number and roll_number ---
+            'admission_number' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('students', 'admission_number')->ignore($student->id),
+            ],
+            'roll_number' => [
+                'required',
+                'integer',
+                Rule::unique('students', 'roll_number')->ignore($student->id),
+            ],
+
+            // New validation rules for admission fee and payment details
+            'admission_fee_amount' => 'nullable|numeric|min:0',
+            'admission_fee_paid' => 'boolean',
+            'payment_method' => ['nullable', 'string', Rule::in(['Cash', 'bKash', 'Bank Transfer'])],
         ]);
 
         // Handle image update
@@ -130,33 +205,51 @@ class StudentController extends Controller
             }
             $imagePath = $request->file('image')->store('students', 'public');
             $validatedData['image'] = $imagePath;
-        } elseif (isset($validatedData['image']) && $validatedData['image'] === null) {
-            // If image field is explicitly set to null (e.g., user removed existing image)
+        } elseif ($request->input('image') === null) {
+            // If the image field is explicitly set to null in the request payload
+            // This happens if you have a "clear image" button or similar functionality.
             if ($student->image) {
                 Storage::disk('public')->delete($student->image);
             }
             $validatedData['image'] = null;
         } else {
-            // If no new image is uploaded and it's not explicitly set to null, keep existing image
-            $validatedData['image'] = $student->image;
+            // If no new image is uploaded and it's not explicitly set to null, keep the existing image
+            // We don't need to do anything here since $validatedData does not contain 'image' in this case,
+            // so the model will keep the old value if not updated.
+            // If you want to explicitly ensure the old image path is preserved if no new upload,
+            // you can do: $validatedData['image'] = $student->image;
+            unset($validatedData['image']); // Remove image from validatedData if no new file and not nulling
+                                            // This prevents overwriting with null if nothing changed.
         }
 
-        $student->update($validatedData); // Use $validatedData for update
+        // --- Handle admission_fee_amount conversion for update ---
+        // If admission_fee_amount is provided, convert it to the smallest unit (paisa).
+        if (isset($validatedData['admission_fee_amount']) && $validatedData['admission_fee_amount'] !== null) {
+            $validatedData['admission_fee_amount'] = (int)($validatedData['admission_fee_amount'] * 100);
+        } else {
+            // Ensure it's null if no amount is provided, matching nullable() in migration
+            $validatedData['admission_fee_amount'] = null;
+        }
 
-        return redirect()->route('students.index')->with('flash', [
-            'message' => 'Student updated successfully!',
-            'type' => 'success'
-        ]);
+        // Set default for admission_fee_paid if not present (e.g., checkbox not checked)
+        if (!isset($validatedData['admission_fee_paid'])) {
+            $validatedData['admission_fee_paid'] = false;
+        }
+
+        $student->update($validatedData);
+
+        // Redirect back to the index page without a flash message
+        return redirect()->route('students.index')->with('success', 'Student updated successfully!');
     }
 
     /**
      * Remove the specified resource from storage.
-     */
+    */
     public function destroy(Student $student)
     {
         $student->delete();
 
-        return redirect()->route('students.index')->with('flash', [
+        return redirect()->route(route: 'students.index')->with('flash', [
             'message' => 'Student deleted successfully!',
             'type' => 'success'
         ]);

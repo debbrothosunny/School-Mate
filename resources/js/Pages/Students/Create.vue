@@ -4,31 +4,49 @@ import InputError from '@/Components/InputError.vue';
 import InputLabel from '@/Components/InputLabel.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
-import { Head, Link, useForm } from '@inertiajs/vue3';
-import { ref } from 'vue'; // Import ref for reactive variables
+import { Head, Link, useForm, usePage } from '@inertiajs/vue3';
+import { ref, computed, watchEffect } from 'vue';
 
 const props = defineProps({
     classes: Array,
     sessions: Array,
     groups: Array,
-    sections: Array, // <--- Add sections to props
+    sections: Array,
+    availableUsers: Array, // Prop for available users to link (from StudentController)
 });
 
+// Access flash messages from Inertia's page props
+const flash = computed(() => usePage().props.flash || {});
+
+// Reactive variable for image preview
+const imagePreviewUrl = ref(null);
+
+// Form for adding a new student, including all new fields
 const form = useForm({
     name: '',
+    admission_number: '',
+    roll_number: '',
     class_id: '',
     age: '',
+    date_of_birth: '',
+    gender: '',
+    admission_date: '',
     session_id: '',
     group_id: '',
-    section_id: '', // <--- Add section_id to form
+    section_id: '',
+    user_id: '',
     parent_name: '',
     address: '',
     contact: '',
-    image: null, // Add image field for file upload
-    status: 0,
-});
+    image: null,
+    status: 0, // Default to Active
+    enrollment_status: 'applied', // New field, default to 'applied'
 
-const imagePreviewUrl = ref(null); // Reactive variable for image preview
+    // New fields for admission fees and payment
+    admission_fee_amount: null, // Will be numeric input
+    admission_fee_paid: false, // Default to false (unchecked checkbox)
+    payment_method: '', // Will be a select input
+});
 
 const handleImageChange = (event) => {
     const file = event.target.files[0];
@@ -45,15 +63,39 @@ const handleImageChange = (event) => {
     }
 };
 
-
 const submit = () => {
+    // Convert empty string for user_id to null if not selected, for backend compatibility.
+    // Also, ensure admission_fee_amount is a number or null
+    const dataToSend = { ...form.data() };
+    dataToSend.user_id = dataToSend.user_id === '' ? null : dataToSend.user_id;
+
+    // Convert admission_fee_amount to a number, or null if empty
+    dataToSend.admission_fee_amount = dataToSend.admission_fee_amount === '' ? null : parseFloat(dataToSend.admission_fee_amount);
+
     form.post(route('students.store'), {
+        data: dataToSend, // Pass the modified data
         onFinish: () => {
             form.reset(); // Clear form fields after successful submission
             imagePreviewUrl.value = null; // Clear image preview as well
         },
     });
 };
+
+// Watch for flash messages and display SweetAlert
+watchEffect(() => {
+    if (typeof Swal !== 'undefined' && flash.value && flash.value.message) {
+        Swal.fire({
+            icon: flash.value.type === 'success' ? 'success' : 'error',
+            title: flash.value.type === 'success' ? 'Success!' : 'Error!',
+            text: flash.value.message,
+            toast: true,
+            position: 'top-end',
+            showConfirmButton: false,
+            timer: 3000,
+            timerProgressBar: true,
+        });
+    }
+});
 </script>
 
 <template>
@@ -64,59 +106,91 @@ const submit = () => {
             <h2 class="font-semibold text-xl text-gray-800 leading-tight">Add New Student</h2>
         </template>
 
-        <!-- Removed the redundant py-12 as AuthenticatedLayout now provides the main padding. -->
-        <!-- Changed max-w-xl to max-w-3xl to increase the width of the form, and removed mx-auto for left alignment. -->
-        <div class="max-w-3xl sm:px-0 lg:px-0">
-            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
-                <!-- Adjusted inner padding from p-6 to p-4 for a more compact internal layout -->
-                <div class="p-4 text-gray-900">
+        <div class="container-fluid py-4">
+            <div class="card shadow-sm rounded-lg">
+                <div class="card-body p-4">
                     <form @submit.prevent="submit" enctype="multipart/form-data">
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div>
-                                <InputLabel for="name" value="Student Name" />
-                                <TextInput id="name" type="text" class="mt-1 block w-full" v-model="form.name" required autofocus />
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <InputLabel for="name" value="Student Name" class="form-label" />
+                                <TextInput id="name" type="text" class="form-control" v-model="form.name" required autofocus />
                                 <InputError class="mt-2" :message="form.errors.name" />
                             </div>
 
-                            <div>
-                                <InputLabel for="class_id" value="Class" />
-                                <select id="class_id" class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm" v-model="form.class_id">
-                                    <option value="">-- Select Class --</option>
-                                    <option v-for="classItem in classes" :key="classItem.id" :value="classItem.id">{{ classItem.name }}</option>
+                            <div class="col-md-6">
+                                <InputLabel for="admission_number" value="Admission Number" class="form-label" />
+                                <TextInput id="admission_number" type="text" class="form-control" v-model="form.admission_number" required />
+                                <InputError class="mt-2" :message="form.errors.admission_number" />
+                            </div>
+
+                            <div class="col-md-6">
+                                <InputLabel for="roll_number" value="Roll Number" class="form-label" />
+                                <TextInput id="roll_number" type="number" class="form-control" v-model.number="form.roll_number" required />
+                                <InputError class="mt-2" :message="form.errors.roll_number" />
+                            </div>
+                            <div class="col-md-6">
+                                <InputLabel for="class_id" value="Class" class="form-label" />
+                                <select id="class_id" class="form-select" v-model="form.class_id" required>
+                                    <option value="" disabled>-- Select Class --</option>
+                                    <option v-for="classItem in classes" :key="classItem.id" :value="classItem.id">{{ classItem.class_name }}</option>
                                 </select>
                                 <InputError class="mt-2" :message="form.errors.class_id" />
                             </div>
 
-                            <div>
-                                <InputLabel for="age" value="Age" />
-                                <TextInput id="age" type="number" class="mt-1 block w-full" v-model="form.age" min="0" />
+                            <div class="col-md-6">
+                                <InputLabel for="date_of_birth" value="Date of Birth" class="form-label" />
+                                <TextInput id="date_of_birth" type="date" class="form-control" v-model="form.date_of_birth" required />
+                                <InputError class="mt-2" :message="form.errors.date_of_birth" />
+                            </div>
+
+                            <div class="col-md-6">
+                                <InputLabel for="age" value="Age" class="form-label" />
+                                <TextInput id="age" type="number" class="form-control" v-model.number="form.age" min="0" required />
                                 <InputError class="mt-2" :message="form.errors.age" />
                             </div>
 
-                            <div>
-                                <InputLabel for="session_id" value="Session" />
-                                <select id="session_id" class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm" v-model="form.session_id">
+                            <div class="col-md-6">
+                                <InputLabel for="gender" value="Gender" class="form-label" />
+                                <select id="gender" class="form-select" v-model="form.gender" required>
+                                    <option value="" disabled>-- Select Gender --</option>
+                                    <option value="Male">Male</option>
+                                    <option value="Female">Female</option>
+                                    <option value="Other">Other</option>
+                                </select>
+                                <InputError class="mt-2" :message="form.errors.gender" />
+                            </div>
+
+                            <div class="col-md-6">
+                                <InputLabel for="admission_date" value="Admission Date" class="form-label" />
+                                <TextInput id="admission_date" type="date" class="form-control" v-model="form.admission_date" required />
+                                <InputError class="mt-2" :message="form.errors.admission_date" />
+                            </div>
+
+                            <div class="col-md-6">
+                                <InputLabel for="session_id" value="Session" class="form-label" />
+                                <select id="session_id" class="form-select" v-model="form.session_id" required>
                                     <option value="">-- Select Session --</option>
                                     <option v-for="session in sessions" :key="session.id" :value="session.id">{{ session.name }}</option>
                                 </select>
                                 <InputError class="mt-2" :message="form.errors.session_id" />
                             </div>
 
-                            <div>
-                                <InputLabel for="group_id" value="Group" />
-                                <select id="group_id" class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm" v-model="form.group_id">
+                            <div class="col-md-6">
+                                <InputLabel for="group_id" value="Group" class="form-label" />
+                                <select id="group_id" class="form-select" v-model="form.group_id" required>
                                     <option value="">-- Select Group --</option>
                                     <option v-for="group in groups" :key="group.id" :value="group.id">{{ group.name }}</option>
                                 </select>
                                 <InputError class="mt-2" :message="form.errors.group_id" />
                             </div>
 
-                            <div>
-                                <InputLabel for="section_id" value="Section" />
+                            <div class="col-md-6">
+                                <InputLabel for="section_id" value="Section" class="form-label" />
                                 <select
                                     id="section_id"
-                                    class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm"
+                                    class="form-select"
                                     v-model="form.section_id"
+                                    required
                                 >
                                     <option value="">-- Select Section --</option>
                                     <option v-for="section in sections" :key="section.id" :value="section.id">
@@ -126,52 +200,111 @@ const submit = () => {
                                 <InputError class="mt-2" :message="form.errors.section_id" />
                             </div>
 
-                            <div>
-                                <InputLabel for="parent_name" value="Parent's Name" />
-                                <TextInput id="parent_name" type="text" class="mt-1 block w-full" v-model="form.parent_name" />
+                            <div class="col-md-6">
+                                <InputLabel for="user_id" value="Link to User Account" class="form-label" />
+                                <select
+                                    id="user_id"
+                                    class="form-select"
+                                    v-model="form.user_id"
+                                    required
+                                >
+                                    <option value="" disabled>-- Select User --</option>
+                                    <option v-for="user in availableUsers" :key="user.id" :value="user.id">
+                                        {{ user.name }} ({{ user.email }})
+                                    </option>
+                                </select>
+                                <InputError class="mt-2" :message="form.errors.user_id" />
+                            </div>
+
+                            <div class="col-md-6">
+                                <InputLabel for="parent_name" value="Parent's Name" class="form-label" />
+                                <TextInput id="parent_name" type="text" class="form-control" v-model="form.parent_name" required />
                                 <InputError class="mt-2" :message="form.errors.parent_name" />
                             </div>
 
-                            <div>
-                                <InputLabel for="address" value="Address" />
-                                <TextInput id="address" type="text" class="mt-1 block w-full" v-model="form.address" />
+                            <div class="col-md-6">
+                                <InputLabel for="address" value="Address" class="form-label" />
+                                <TextInput id="address" type="text" class="form-control" v-model="form.address" required />
                                 <InputError class="mt-2" :message="form.errors.address" />
                             </div>
 
-                            <div>
-                                <InputLabel for="contact" value="Contact" />
-                                <TextInput id="contact" type="text" class="mt-1 block w-full" v-model="form.contact" />
+                            <div class="col-md-6">
+                                <InputLabel for="contact" value="Contact" class="form-label" />
+                                <TextInput id="contact" type="text" class="form-control" v-model="form.contact" required />
                                 <InputError class="mt-2" :message="form.errors.contact" />
                             </div>
 
-                            <div>
-                                <InputLabel for="image" value="Student Image" />
+                            <div class="col-md-6">
+                                <InputLabel for="image" value="Student Image (Optional) Max 2MB " class="form-label" />
                                 <input
                                     type="file"
                                     id="image"
                                     @change="handleImageChange"
-                                    class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
+                                    class="form-control"
                                     accept="image/*"
                                 />
                                 <InputError class="mt-2" :message="form.errors.image" />
                                 <div v-if="imagePreviewUrl" class="mt-2">
-                                    <img :src="imagePreviewUrl" alt="Image Preview" class="w-32 h-32 object-cover rounded-md" />
+                                    <img :src="imagePreviewUrl" alt="Image Preview" class="img-thumbnail" style="width: 128px; height: 128px; object-fit: cover;" />
                                 </div>
                             </div>
 
-                            <div>
-                                <InputLabel for="status" value="Status" />
-                                <select id="status" class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm" v-model="form.status" required>
+                            <div class="col-md-6">
+                                <InputLabel for="status" value="Active Status" class="form-label" />
+                                <select id="status" class="form-select" v-model.number="form.status" required>
                                     <option :value="0">Active</option>
                                     <option :value="1">Inactive</option>
                                 </select>
                                 <InputError class="mt-2" :message="form.errors.status" />
                             </div>
+
+                            <div class="col-md-6">
+                                <InputLabel for="enrollment_status" value="Enrollment Status" class="form-label" />
+                                <select id="enrollment_status" class="form-select" v-model="form.enrollment_status" required>
+                                    <option value="" disabled>-- Select Status --</option>
+                                    <option value="applied">Applied</option>
+                                    <option value="under_review">Under Review</option>
+                                    <option value="admitted">Admitted</option>
+                                    <option value="enrolled">Enrolled</option>
+                                    <option value="rejected">Rejected</option>
+                                    <option value="waitlisted">Waitlisted</option>
+                                    <option value="withdrawn">Withdrawn</option>
+                                </select>
+                                <InputError class="mt-2" :message="form.errors.enrollment_status" />
+                            </div>
+
+                            <div class="col-md-6">
+                                <InputLabel for="admission_fee_amount" value="Admission Fee Amount (BDT)" class="form-label" />
+                                <TextInput id="admission_fee_amount" type="number" step="0.01" class="form-control" v-model="form.admission_fee_amount" />
+                                <InputError class="mt-2" :message="form.errors.admission_fee_amount" />
+                            </div>
+
+                            <div class="col-md-6">
+                                <InputLabel for="payment_method" value="Payment Method" class="form-label" />
+                                <select id="payment_method" class="form-select" v-model="form.payment_method">
+                                    <option value="">-- Select Payment Method (Optional) --</option>
+                                    <option value="Cash">Cash</option>
+                                    <option value="bKash">bKash</option>
+                                    <option value="Bank Transfer">Bank Transfer</option>
+                                    </select>
+                                <InputError class="mt-2" :message="form.errors.payment_method" />
+                            </div>
+
+                            <div class="col-md-12">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="admission_fee_paid" v-model="form.admission_fee_paid">
+                                    <label class="form-check-label" for="admission_fee_paid">
+                                        Admission Fee Paid
+                                    </label>
+                                    <InputError class="mt-2" :message="form.errors.admission_fee_paid" />
+                                </div>
+                            </div>
+
                         </div>
 
-                        <div class="flex items-center justify-end mt-4">
-                            <Link :href="route('students.index')" class="text-gray-600 hover:text-gray-900 mr-4">Cancel</Link>
-                            <PrimaryButton :class="{ 'opacity-25': form.processing }" :disabled="form.processing">
+                        <div class="d-flex justify-content-end mt-4">
+                            <Link :href="route('students.index')" class="btn btn-secondary me-3">Cancel</Link>
+                            <PrimaryButton :class="{ 'opacity-75': form.processing }" :disabled="form.processing" class="btn btn-primary">
                                 Add Student
                             </PrimaryButton>
                         </div>
@@ -181,3 +314,7 @@ const submit = () => {
         </div>
     </AuthenticatedLayout>
 </template>
+
+<style scoped>
+/* No specific styles needed here, as Bootstrap provides styling */
+</style>

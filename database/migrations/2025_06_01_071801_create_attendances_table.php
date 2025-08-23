@@ -18,6 +18,7 @@ return new class extends Migration
             $table->foreignId('session_id')->constrained('class_sessions')->onDelete('cascade'); // Added session_id
             $table->foreignId('section_id')->constrained('sections')->onDelete('cascade'); // Added section_id
             $table->foreignId('group_id')->constrained('groups')->onDelete('cascade');
+            $table->foreignId('subject_id')->constrained('subjects')->onDelete('cascade');
             $table->date('date');
             $table->enum('status', ['present', 'absent', 'late'])->default('present');
             $table->timestamps();
@@ -31,7 +32,7 @@ return new class extends Migration
 
     /**
      * Reverse the migrations.
-     */
+    */
     public function down(): void
     {
         Schema::dropIfExists('attendances');

@@ -59,4 +59,14 @@ class User extends Authenticatable
     {
         return $this->hasOne(Teacher::class);
     }
+
+     /**
+     * Get the student profile associated with the user.
+     * This assumes a one-to-one relationship where a user can have one student record.
+     * This is crucial for User::doesntHave('student') to work.
+     */
+     public function student(): HasOne
+    {
+        return $this->hasOne(Student::class);
+    }
 }

@@ -29,6 +29,7 @@ class HandleInertiaRequests extends Middleware
      */
     public function share(Request $request): array
     {
+        // Always call the parent share method first to merge existing props
         return array_merge(parent::share($request), [
             'auth' => [
                 'user' => $request->user() ? [
@@ -36,10 +37,16 @@ class HandleInertiaRequests extends Middleware
                     'name' => $request->user()->name,
                     'email' => $request->user()->email,
                     'contact_info' => $request->user()->contact_info,
-                    'roles' => $request->user()->getRoleNames(), // Assuming getRoleNames() exists on your User model
+                    'roles' => $request->user()->getRoleNames(),
                 ] : null,
             ],
-            
+            'flash' => [
+                'message' => fn () => $request->session()->get('message'),
+            ],
+            // --- NEW: Add the unread notifications count here ---
+            'unreadNotificationsCount' => fn () => $request->user() ? $request->user()->unreadNotifications()->count() : 0,
+            // --- Optional: Share all unread notifications if you want to display them immediately ---
+            'unreadNotifications' => fn () => $request->user() ? $request->user()->unreadNotifications : collect([]),
         ]);
     }
 }
