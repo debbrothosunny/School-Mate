@@ -39,7 +39,7 @@ class UserController extends Controller
     public function assignRole(Request $request, User $user)
     {
         $request->validate([
-            'role' => ['required', 'string', 'exists:roles,name'], // Validate selected role
+            'role' => ['nullable', 'string', 'exists:roles,name'], // Validate selected role
         ]);
 
         // Remove all current roles and assign the new one

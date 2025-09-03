@@ -7,16 +7,12 @@ use App\Models\ClassName;
 use App\Models\ClassSession;
 use App\Models\Section;
 use App\Models\Group;
-use App\Models\Invoice;
-use App\Models\StudentAcademicRecord;
-
-use App\Models\ClassFeeStructure;
 use App\Models\User; 
 use App\Models\ExamResult; 
 use Illuminate\Validation\Rule;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
-use Illuminate\Support\Facades\Log; // For logging
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
 class StudentController extends Controller
@@ -504,7 +500,8 @@ class StudentController extends Controller
 
 
 
-    
+    // New method to show a specific student's exam and invoice history
+
     public function showStudentHistory($student_id)
     {
         // Find the student and eager-load their relationships.
@@ -551,6 +548,120 @@ class StudentController extends Controller
             'invoiceHistory' => $student->invoices,
         ]);
     }
+
+
+
+
+
+     /**
+     * Display a list of all students who passed the final exam.
+     */
+
+    public function show(string $id)
+    {
+        // Find the student with their related class, session, and section data
+        $student = Student::with(['className', 'session', 'section'])->find($id);
+
+        // 1. Check if the student object is found
+        // dd($student);
+
+        if (!$student) {
+            return Inertia::render('Result/PassedStudents', [
+                'student' => null
+            ]);
+        }
+
+        return Inertia::render('Result/PassedStudents', [
+            'student' => $student,
+        ]);
+    }
+
+    public function passedStudents()
+    {
+        // Fetch exam results with a 'Pass' status, eager loading the related student, class name, and session.
+        $passedStudents = ExamResult::with(['student.className', 'student.section', 'student.session'])
+            ->where('overall_status', 'Pass')
+            ->get()
+            ->map(function ($result) {
+                // Map the results to a more convenient format for the frontend.
+                return [
+                    'id' => $result->student_id,
+                    'name' => $result->student->name,
+                    'className' => $result->student->className,
+                    'session' => $result->student->session,
+                    'section' => $result->student->section,
+                    'overall_status' => $result->overall_status,
+                ];
+            });
+
+        return Inertia::render('Result/PassedStudents', [
+            'passedStudents' => $passedStudents,
+        ]);
+    }
+
+    /**
+     * Promote students who passed the final exam.
+     *
+     * @return \Illuminate\Http\RedirectResponse
+     */
+    public function promoteStudents()
+    {
+        try {
+            DB::beginTransaction();
+
+            // Find all exam results with a 'Pass' status, eager loading the student relationship.
+            $passedResults = ExamResult::with('student')
+                ->where('overall_status', 'Pass')
+                ->get();
+
+            // If no students passed, roll back and return an error message.
+            if ($passedResults->isEmpty()) {
+                DB::rollBack();
+                return back()->with('error', 'No students to promote.');
+            }
+
+            // Loop through each passed exam result to promote the student.
+            foreach ($passedResults as $result) {
+                $student = $result->student;
+                if ($student) {
+                    // Find the next class and session for promotion based on the current IDs.
+                    $currentClassId = $student->class_id; // Changed to match your migration
+                    $currentSessionId = $student->session_id;
+
+                    $nextClass = ClassName::where('id', '>', $currentClassId)->orderBy('id')->first();
+                    $nextSession = ClassSession::where('id', '>', $currentSessionId)->orderBy('id')->first();
+
+                    // If a next class is found, update the student's class ID.
+                    if ($nextClass) {
+                        $student->class_id = $nextClass->id; // Changed to match your migration
+                    }
+
+                    // If a next session is found, update the student's session ID.
+                    if ($nextSession) {
+                        $student->session_id = $nextSession->id;
+                    }
+
+                    // Update the student's overall status to 'Promoted' to prevent re-promotion.
+                    $result->overall_status = 'Promoted';
+
+                    // Save the changes to both the student and the exam result records.
+                    $student->save();
+                    $result->save();
+                }
+            }
+
+            // If all updates are successful, commit the transaction.
+            DB::commit();
+
+            return back()->with('success', 'All passed students have been successfully promoted!');
+        } catch (\Exception $e) {
+            // If any error occurs, roll back the transaction and return an error message.
+            DB::rollBack();
+            return back()->with('error', 'Promotion failed: ' . $e->getMessage());
+        }
+    }
+
+
 
 
 

@@ -298,7 +298,7 @@ const downloadPdf = (studentId, examId) => {
                                         <td class="px-3 py-3 text-nowrap">{{ studentResult.student.name }}</td>
                                         <td class="px-3 py-3 text-center">{{ studentResult.student.roll_number }}</td>
                                         <td class="px-3 py-3 text-center">{{ studentResult.student.admission_number || 'N/A' }}</td>
-                                        <td class="px-3 py-3 text-center">{{ studentResult.student.className?.class_name || 'N/A' }}</td>
+                                        <td class="px-3 py-3 text-center">{{ studentResult.student.class_name?.class_name || 'N/A' }}</td>
                                         <td class="px-3 py-3 text-center">{{ studentResult.student.section?.name || 'N/A' }}</td>
                                         <td class="px-3 py-3 text-center">{{ studentResult.student.session?.name || 'N/A' }}</td>
 

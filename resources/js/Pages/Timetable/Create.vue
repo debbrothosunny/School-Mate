@@ -266,7 +266,7 @@ watch(() => form.teacher_id, (newTeacherId) => {
                                 
                                 <div class="mb-4">
                                     <label class="block text-sm font-medium text-gray-700">Time Slot</label>
-                                    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 mt-2">
+                                    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 mt-2" :class="{ 'border-2 border-red-500 p-2 rounded-md': form.errors.class_time_slot_id }">
                                         <div
                                             v-for="slot in timeSlots"
                                             :key="slot.id"
@@ -285,7 +285,7 @@ watch(() => form.teacher_id, (newTeacherId) => {
                                             </div>
                                         </div>
                                     </div>
-                                    <div v-if="form.errors.class_time_slot_id" class="text-red-500 text-sm">{{ form.errors.class_time_slot_id }}</div>
+                                    <div v-if="form.errors.class_time_slot_id" class="text-red-500 text-sm mt-2">{{ form.errors.class_time_slot_id }}</div>
                                     <div v-if="isBooked" class="p-3 my-4 bg-red-100 border border-red-400 text-red-700 rounded-md">
                                         This room is already booked for the selected day and time slot.
                                     </div>

@@ -155,13 +155,20 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('/class-names/{className}', [ClassNameController::class, 'destroy'])->name('class-names.destroy');
 
 
-        // STUDENT MANAGEMENT ROUTES (Individual Definitions) <--- NEW SECTION
-        Route::get('/students', [StudentController::class, 'index'])->name('students.index');
+
+        
+        // Student Management
+        // NEW: Placing specific student routes at the top to avoid conflicts.
+        Route::post('/students/promote', [StudentController::class, 'promoteStudents'])->name('students.promote');
+        Route::get('/students/passed', [StudentController::class, 'passedStudents'])->name('students.passed');
         Route::get('/students/create', [StudentController::class, 'create'])->name('students.create');
         Route::post('/students', [StudentController::class, 'store'])->name('students.store');
+        Route::get('/students', [StudentController::class, 'index'])->name('students.index');
         Route::get('/students/{student}/edit', [StudentController::class, 'edit'])->name('students.edit');
         Route::post('/students/{student}', [StudentController::class, 'update'])->name('students.update');
         Route::delete('/students/{student}', [StudentController::class, 'destroy'])->name('students.destroy');
+        // The generic show route must be at the bottom of the student routes.
+        Route::get('/students/{id}', [StudentController::class, 'show'])->name('students.show');
 
         Route::get('/attendance', [AttendanceController::class, 'index'])->name('attendance.index');
         Route::post('/attendance', [AttendanceController::class, 'store'])->name('attendance.store');
@@ -279,7 +286,14 @@ Route::middleware(['auth'])->group(function () {
 
         Route::post('/results/finalize/{exam}', [ResultController::class, 'storeExamResults'])->name('results.store');
 
-         Route::get('/results/download-pdf/{student}/{exam}', [ResultController::class, 'downloadResultPdf'])->name('results.download-pdf');
+        Route::get('/results/download-pdf/{student}/{exam}', [ResultController::class, 'downloadResultPdf'])->name('results.download-pdf');
+
+
+
+
+
+        
+        
 
 
 
