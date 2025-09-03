@@ -14,7 +14,7 @@ class ClassTime extends Model
      * The table associated with the model.
      *
      * @var string
-     */
+    */
     protected $table = 'class_times'; // Ensure this matches your actual table name
 
     /**
@@ -29,9 +29,8 @@ class ClassTime extends Model
         'section_id',
         'session_id',
         'day_of_week',
-        'start_time',
-        'end_time',
         'room_id',
+        'class_time_slot_id',
         'status',
     ];
 
@@ -39,10 +38,9 @@ class ClassTime extends Model
      * The attributes that should be cast.
      *
      * @var array<string, string>
-     */
+    */
     protected $casts = [
-        'start_time' => 'datetime:H:i', // Casts to Carbon and formats for display
-        'end_time' => 'datetime:H:i',   // Casts to Carbon and formats for display
+        // 'start_time' and 'end_time' are now on the ClassTimeSlot model, not here.
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];
@@ -65,7 +63,7 @@ class ClassTime extends Model
 
     /**
      * Get the teacher associated with the timetable entry.
-     */
+    */
     public function teacher(): BelongsTo
     {
         return $this->belongsTo(Teacher::class);
@@ -91,5 +89,10 @@ class ClassTime extends Model
     public function room(): BelongsTo 
     {
         return $this->belongsTo(Room::class, 'room_id');
+    }
+
+    public function classTimeSlot(): BelongsTo
+    {
+        return $this->belongsTo(ClassTimeSlot::class, 'class_time_slot_id');
     }
 }

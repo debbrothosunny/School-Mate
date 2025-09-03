@@ -6,7 +6,9 @@ import InputLabel from '@/Components/InputLabel.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
 import { Head, Link, useForm } from '@inertiajs/vue3';
-import { ref } from 'vue'; // Import ref for reactive state
+import { ref, watch } from 'vue'; // Import 'watch'
+import axios from 'axios'; // Import 'axios'
+import { debounce } from 'lodash'; // You will need to install lodash: npm install lodash
 
 defineProps({
     canResetPassword: {
@@ -34,6 +36,44 @@ const registerForm = useForm({
     password: '',
     password_confirmation: '',
     contact_info: '',
+});
+
+// New reactive state to hold real-time validation errors
+const realTimeErrors = ref({});
+
+// A debounced function to check for existing email or contact info
+const checkContactExists = debounce(async () => {
+    // Clear previous real-time errors before making a new check
+    realTimeErrors.value = {}; 
+
+    try {
+        await axios.post(route('check.contact'), {
+            email: registerForm.email,
+            contact_info: registerForm.contact_info,
+        });
+    } catch (error) {
+        if (error.response && error.response.status === 422) {
+            // Set real-time errors if a validation response (422) is received
+            realTimeErrors.value = error.response.data.errors;
+        } else {
+            console.error('An error occurred during real-time validation:', error);
+        }
+    }
+}, 500); // Wait 500ms after the user stops typing
+
+// Watch for changes on the email and contact_info fields and trigger the check
+watch(() => registerForm.email, () => {
+    // Only check if the field is not empty to avoid unnecessary initial requests
+    if (registerForm.email) {
+        checkContactExists();
+    }
+});
+
+watch(() => registerForm.contact_info, () => {
+    // Only check if the field is not empty
+    if (registerForm.contact_info) {
+        checkContactExists();
+    }
 });
 
 // Submit function for Login
@@ -67,40 +107,12 @@ const toggleForm = () => {
         </div>
 
         <div class="relative w-full overflow-hidden">
-            <!-- School-Mate Title and Logo Illustration -->
             <div class="flex flex-col items-center justify-center mb-8">
-                <!-- Placeholder for Logo Illustration -->
-                <svg
-                    class="w-24 h-24 text-indigo-600 mb-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                    xmlns="http://www.w3.org/2000/svg"
-                >
-                    <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="1.5"
-                        d="M12 14l9-5-9-5-9 5 9 5z"
-                    ></path>
-                    <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="1.5"
-                        d="M12 14v4l9-5-9-5-9 5 9 5z"
-                    ></path>
-                    <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="1.5"
-                        d="M12 14v4l-9-5 9-5 9 5z"
-                    ></path>
-                </svg>
-                <h1 class="text-4xl font-extrabold text-gray-900 mb-2">School-Mate</h1>
+                <img src="/images/logo.jpeg" alt="School-Mate Logo" class="w-40 h-40 mb-4">
+                
                 <p class="text-gray-600 text-lg">Your Partner in Education</p>
             </div>
 
-            <!-- Form Toggle Buttons -->
             <div class="flex justify-center mb-6">
                 <button
                     @click="toggleForm"
@@ -118,13 +130,10 @@ const toggleForm = () => {
                 </button>
             </div>
 
-            <!-- Forms Container with Transition -->
             <transition name="slide-fade" mode="out-in">
-                <!-- Login Form -->
                 <form v-if="!showRegisterForm" @submit.prevent="submitLogin" key="login-form" class="p-4">
                     <div>
                         <InputLabel for="login_field" value="Email OR Contact Number" />
-                        <!-- Changed from 'email' to 'login_field' for dynamic login -->
                         <TextInput
                             id="login_field"
                             type="text"
@@ -177,7 +186,6 @@ const toggleForm = () => {
                     </div>
                 </form>
 
-                <!-- Registration Form -->
                 <form v-else @submit.prevent="submitRegister" key="register-form" class="p-4">
                     <div>
                         <InputLabel for="name" value="Name" />
@@ -204,7 +212,7 @@ const toggleForm = () => {
                             autocomplete="username"
                             placeholder="john.teacher@example.com"
                         />
-                        <InputError class="mt-2" :message="registerForm.errors.email" />
+                        <InputError class="mt-2" :message="registerForm.errors.email || realTimeErrors.email" />
                     </div>
 
                     <div class="mt-4">
@@ -233,7 +241,6 @@ const toggleForm = () => {
                         <InputError class="mt-2" :message="registerForm.errors.password_confirmation" />
                     </div>
 
-                    <!-- Contact Info Field -->
                     <div class="mt-4">
                         <InputLabel for="contact_info" value="Contact Info" />
                         <TextInput
@@ -244,13 +251,13 @@ const toggleForm = () => {
                             required
                             autocomplete="tel"
                         />
-                        <InputError class="mt-2" :message="registerForm.errors.contact_info" />
+                        <InputError class="mt-2" :message="registerForm.errors.contact_info || realTimeErrors.contact_info" />
                     </div>
 
                     <div class="flex items-center justify-end mt-4">
                         <PrimaryButton
                             :class="{ 'opacity-25': registerForm.processing }"
-                            :disabled="registerForm.processing"
+                            :disabled="registerForm.processing || Object.keys(realTimeErrors).length > 0"
                         >
                             Register
                         </PrimaryButton>

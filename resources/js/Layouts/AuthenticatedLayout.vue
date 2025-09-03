@@ -667,9 +667,18 @@ const getDashboardRoute = computed(() => {
                                 <NavLink :href="route('class-names.index')" :active="route().current('class-names.*')" class="dark:text-gray-100 dark:hover:bg-gray-700">
                                     <i class="fa-solid fa-chalkboard me-2 w-5"></i>Class Names
                                 </NavLink>
+
+                                <NavLink :href="route('class-time-slots.index')" :active="route().current('class-time-slots.index.*')" class="dark:text-gray-100 dark:hover:bg-gray-700">
+                                    <i class="fa-solid fa-calendar-days me-2 w-5"></i>Class Time Slot
+                                </NavLink>
+
+
                                 <NavLink :href="route('timetable.index')" :active="route().current('timetable.*')" class="dark:text-gray-100 dark:hover:bg-gray-700">
                                     <i class="fa-solid fa-calendar-days me-2 w-5"></i>Class Time Table
                                 </NavLink>
+
+                                
+
                                 <NavLink :href="route('exams.index')" :active="route().current('exams.*')" class="dark:text-gray-100 dark:hover:bg-gray-700">
                                     <i class="fa-solid fa-clipboard-list me-2 w-5"></i>Exam Name
                                 </NavLink>

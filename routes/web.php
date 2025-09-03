@@ -21,11 +21,15 @@ use App\Http\Controllers\NoticeController;
 use App\Http\Controllers\ResultController;
 use App\Http\Controllers\FeeController;
 use App\Http\Controllers\SettingController;
+use App\Http\Controllers\Auth\RegisteredUserController;
 use Inertia\Inertia;
 
 Route::get('/', function () {
     return redirect()->route('login');
+    
 });
+
+Route::post('/check-contact', [RegisteredUserController::class, 'checkContactInfo'])->name('check.contact');
 
 Route::middleware(['auth'])->group(function () {
    
@@ -41,6 +45,7 @@ Route::middleware(['auth'])->group(function () {
          // Dashboard Route
         Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
         Route::get('/users', [UserController::class, 'index'])->name('users.index');
+        
         Route::post('/users/{user}/assign-role', [UserController::class, 'assignRole'])->name('users.assign-role');
     
         // SECTION MANAGEMENT ROUTES (Individual Definitions - corrected destroy)
@@ -77,6 +82,31 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('/class-subjects/{class_subject}', [SubjectController::class, 'classSubjectDestroy'])->name('class-subjects.destroy');
 
         Route::get('/class-subjects/get-filtered-data', [SubjectController::class, 'getFilteredData'])->name('class-subjects.getFilteredData');
+
+
+
+
+
+
+        // Route for displaying Class Time Slot
+        Route::get('/class-time-slots', [ClassTimeController::class, 'classTimeSlotIndex'])->name('class-time-slots.index');
+
+        // Route for displaying the form to create a Class Time Slot
+        Route::get('/class-time-slots/create', [ClassTimeController::class, 'classTimeSlotCreate'])->name('class-time-slots.create');
+
+        // Route for storing a new Class Time Slot
+        Route::post('/class-time-slots', [ClassTimeController::class, 'classTimeSlotStore'])->name('class-time-slots.store');
+
+        // Route for showing the Class Time SlotEdit Form
+        Route::get('/class-time-slots/{classTimeSlot}/edit', [ClassTimeController::class, 'classTimeSlotEdit'])->name('class-time-slots.edit');
+
+        // Route for updating an Class Time Slot
+        Route::put('/class-time-slots/{classTimeSlot}', [ClassTimeController::class, 'classTimeSlotUpdate'])->name('class-time-slots.update');
+
+        // Route for deleting Class Time Slot
+        Route::delete('/class-time-slots/{classTimeSlot}', [ClassTimeController::class, 'classTimeSlotDestroy'])->name('class-time-slots.destroy');
+
+
 
 
         // Route for displaying the main timetable index with filtering capabilities
@@ -387,6 +417,7 @@ Route::middleware(['auth'])->group(function () {
     Route::middleware('role:accounts')->group(function () {
     Route::get('/accounts/dashboard', [AccountsController::class, 'index'])->name('accounts.dashboard');
 
+    // Fee Types Routes
     Route::get('/accounts/fee-types', [FeeController::class, 'FeeTypeIndex'])->name('fee-types.index');
     Route::get('/accounts/fee-types/create', [FeeController::class, 'FeeTypeCreate'])->name('fee-types.create');
     Route::post('/accounts/fee-types', [FeeController::class, 'FeeTypeStore'])->name('fee-types.store');
@@ -394,77 +425,72 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/accounts/fee-types/{feeType}', [FeeController::class, 'FeeTypeUpdate'])->name('fee-types.update');
     Route::delete('/accounts/fee-types/{feeType}', [FeeController::class, 'FeeTypeDestroy'])->name('fee-types.destroy');
 
-
-    // ✨ NEW Class Fee Structure Routes ✨
-    // Display a listing of the class fee structures
+    // Class Fee Structure Routes
     Route::get('/accounts/class-fee-structures', [FeeController::class, 'index'])->name('class-fee-structures.index');
-
-    // Show the form for creating a new class fee structure
     Route::get('/accounts/class-fee-structures/create', [FeeController::class, 'create'])->name('class-fee-structures.create');
-
-    // Store a newly created class fee structure in storage
     Route::post('/accounts/class-fee-structures', [FeeController::class, 'store'])->name('class-fee-structures.store');
-
-    // Display the specified class fee structure (optional, but standard for resource routes)
     Route::get('/accounts/class-fee-structures/{classFeeStructure}', [FeeController::class, 'show'])->name('class-fee-structures.show');
-
-    // Show the form for editing the specified class fee structure
     Route::get('/accounts/class-fee-structures/{classFeeStructure}/edit', [FeeController::class, 'edit'])->name('class-fee-structures.edit');
-
-    // Update the specified class fee structure in storage
-    // Note: Standard RESTful practice for update is PUT or PATCH.
-    // If your frontend form method is POST, you'll need to use @method('PUT') in Vue.
     Route::post('/accounts/class-fee-structures/{classFeeStructure}', [FeeController::class, 'update'])->name('class-fee-structures.update');
-
-    // Remove the specified class fee structure from storage
     Route::delete('/accounts/class-fee-structures/{classFeeStructure}', [FeeController::class, 'destroy'])->name('class-fee-structures.destroy');
 
-
-
-
-    // Display a listing of the student fee assignments
+    // Student Fee Assignment Routes
     Route::get('/accounts/student-fee-assignments', [FeeController::class, 'StudentFeeAssignmentIndex'])->name('student-fee-assignments.index');
-
-    // Show the form for creating a new student fee assignment
     Route::get('/accounts/student-fee-assignments/create', [FeeController::class, 'StudentFeeAssignmentCreate'])->name('student-fee-assignments.create');
-
-    // Store a newly created student fee assignment in storage
     Route::post('/accounts/student-fee-assignments', [FeeController::class, 'StudentFeeAssignmentStore'])->name('student-fee-assignments.store');
-
-
-    // Show the form for editing the specified student fee assignment
     Route::get('/accounts/student-fee-assignments/{studentFeeAssignment}/edit', [FeeController::class, 'StudentFeeAssignmentEdit'])->name('student-fee-assignments.edit');
-
-    // Update the specified student fee assignment in storage
-    // Standard RESTful practice for update is PUT or PATCH.
     Route::post('/accounts/student-fee-assignments/{studentFeeAssignment}', [FeeController::class, 'StudentFeeAssignmentUpdate'])->name('student-fee-assignments.update');
-
-    // Remove the specified student fee assignment from storage
     Route::delete('/accounts/student-fee-assignments/{studentFeeAssignment}', [FeeController::class, 'StudentFeeAssignmentDestroy'])->name('student-fee-assignments.destroy');
-
-
     Route::get('/accounts/get-students-by-class', [FeeController::class, 'getStudentsByClass'])->name('get-students-by-class');
     Route::post('/accounts/bulk-store-assignments', [FeeController::class, 'bulkStoreAssignments'])->name('bulk-store-assignments');
 
-
-    Route::get('/accounts/invoices', [FeeController::class, 'invoiceIndex'])->name('admin.invoices.index'); // NEW ROUTE
+    // Invoice Routes
+    Route::get('/accounts/invoices', [FeeController::class, 'invoiceIndex'])->name('admin.invoices.index');
     Route::get('/accounts/invoices/create', [FeeController::class, 'invoiceCreate'])->name('admin.invoices.create');
     Route::post('/accounts/invoices', [FeeController::class, 'invoiceStore'])->name('admin.invoices.store');
     Route::get('/accounts/invoices/{invoice}', [FeeController::class, 'invoiceShow'])->name('admin.invoices.show');
-
-    // Route::get('/accounts/invoices/get-academic-data', [FeeController::class, 'getAcademicData'])
-    // ->name('admin.invoices.get-academic-data');
+    Route::get('/accounts/invoices/get-academic-data', [StudentController::class, 'getAcademicData'])->name('invoices.get-academic-data');
 
 
+
+
+
+
+
+
+    // Student Routes
+    // This route is for the initial page load to render the Vue component
+    // Route::get('/accounts/students/history', [StudentController::class, 'AccountantStudentHistory'])->name('students.history');
+    // // This route is for the AJAX request to fetch history data based on form submission
+    // Route::get('/accounts/students/history/fetch', [StudentController::class, 'getStudentHistory'])->name('students.history.fetch');
+    // Route::post('/accounts/academic-record', [StudentController::class, 'storeAcademicRecord'])->name('accounts.storeAcademicRecord');
+
+
+
+
+    Route::get('/accounts/{student_id}/history', [StudentController::class, 'showStudentHistory'])->name('students.history');
+
+
+
+
+
+
+    
+
+
+
+
+    // Payment Routes
     Route::get('/accounts/payments/pending', [FeeController::class, 'pendingPayments'])->name('admin.payments.pending');
     Route::post('/accounts/payments/{paymentId}/approve', [FeeController::class, 'approvePayment'])->name('admin.payments.approve');
     Route::post('/accounts/payments/{paymentId}/reject', [FeeController::class, 'rejectPayment'])->name('admin.payments.reject');
 
-
-    Route::get('/income-statement', [AccountsController::class, 'incomeStatement'])
-    ->name('reports.income_statement');
-      
+    // Report Routes
+    Route::get('/income-statement', [AccountsController::class, 'incomeStatement'])->name('reports.income_statement');
     });
+
+
+
 
 
     // STUDENT ONLY ROUTES

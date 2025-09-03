@@ -4,33 +4,38 @@ namespace App\Http\Controllers;
 
 use App\Models\ClassName; // Make sure this is imported
 use App\Models\Group; // Make sure this is imported
+use App\Models\Teacher; 
 use Illuminate\Http\Request;
 use Inertia\Inertia; // Assuming you're using Inertia.js
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
 
 class ClassNameController extends Controller
 {
     /**
      * Display a listing of the resource.
-     */
+    */
     public function index()
     {
-        // Fetch all classes without any relationships
-        $classes = ClassName::paginate(10);
+        // Fetch classes with the associated teacher relationship to avoid N+1 query problem
+        $classes = ClassName::with('teacher')->paginate(10);
 
         return Inertia::render('ClassNames/Index', [
             'classes' => $classes,
         ]);
     }
 
-
     /**
      * Show the form for creating a new resource.
      */
     public function create()
     {
-        // No need to fetch teachers or sections as they are not directly linked to ClassName
-        return Inertia::render('ClassNames/Create');
+        // Fetch all teachers to populate the dropdown for assigning a class teacher
+        $teachers = Teacher::all();
+
+        return Inertia::render('ClassNames/Create', [
+            'teachers' => $teachers,
+        ]);
     }
 
     /**
@@ -39,15 +44,17 @@ class ClassNameController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'class_name' => 'required|string|max:255|unique:class_names,class_name', // Added unique rule
+            'class_name' => 'required|string|max:255|unique:class_names,class_name',
             'status' => 'required|integer|in:0,1',
-            'total_classes' => 'required|integer|min:0', // Added validation for total_classes
+            'total_classes' => 'required|integer|min:0',
+            'teacher_id' => 'required|exists:teachers,id', // Validate that the selected teacher exists
         ]);
 
         ClassName::create([
             'class_name' => $request->class_name,
             'status' => $request->status,
-            'total_classes' => $request->total_classes, // Store total_classes
+            'total_classes' => $request->total_classes,
+            'teacher_id' => $request->teacher_id,
         ]);
 
         return redirect()->route('class-names.index')->with('flash', [
@@ -57,34 +64,26 @@ class ClassNameController extends Controller
     }
 
     /**
-     * Display the specified resource.
-     */
-    public function show(ClassName $className)
-    {
-        // This method was empty in your provided code, and remains so.
-        // If you need to display a single class, you can implement it here.
-    }
-
-
-    /**
      * Show the form for editing the specified resource.
-     */
+    */
     public function edit(ClassName $className)
     {
-        // No need to fetch teachers or sections as they are not directly linked to ClassName
+        // Fetch the list of all teachers and the current class to edit
+        $teachers = Teacher::all();
+        $className->load('teacher'); // Eager load the teacher relationship for the edit form
+
         return Inertia::render('ClassNames/Edit', [
             'className' => $className,
+            'teachers' => $teachers,
         ]);
-        
     }
 
     /**
      * Update the specified resource in storage.
-     */
+    */
     public function update(Request $request, ClassName $className)
     {
         $request->validate([
-            // Added unique rule ignoring the current class_name's ID
             'class_name' => [
                 'required',
                 'string',
@@ -92,13 +91,15 @@ class ClassNameController extends Controller
                 Rule::unique('class_names', 'class_name')->ignore($className->id),
             ],
             'status' => 'required|integer|in:0,1',
-            'total_classes' => 'required|integer|min:0', // Added validation for total_classes
+            'total_classes' => 'required|integer|min:0',
+            'teacher_id' => 'required|exists:teachers,id', // Validate that the selected teacher exists
         ]);
 
         $className->update([
             'class_name' => $request->class_name,
             'status' => $request->status,
-            'total_classes' => $request->total_classes, // Update total_classes
+            'total_classes' => $request->total_classes,
+            'teacher_id' => $request->teacher_id,
         ]);
 
         return redirect()->route('class-names.index')->with('flash', [
@@ -120,8 +121,7 @@ class ClassNameController extends Controller
         }
     }
 
-
-
+    
     // Group Functions
 
     public function groupIndex()
@@ -132,7 +132,6 @@ class ClassNameController extends Controller
             'flash' => session('flash'),
         ]);
     }
-
 
 
      public function groupCreate()

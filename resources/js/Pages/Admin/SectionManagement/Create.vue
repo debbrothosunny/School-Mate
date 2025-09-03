@@ -1,15 +1,15 @@
 <script setup>
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import InputError from '@/Components/InputError.vue';
-import InputLabel from '@/Components/InputLabel.vue';
-import PrimaryButton from '@/Components/PrimaryButton.vue';
-import TextInput from '@/Components/TextInput.vue';
-import { Head, useForm, Link } from '@inertiajs/vue3';
-import { useTheme } from '@/Composables/useTheme';
-import { computed, watchEffect } from 'vue';
+import { useForm, usePage } from '@inertiajs/vue3';
+import Swal from 'sweetalert2';
+import { computed, watch } from 'vue';
 
-const { isDark } = useTheme();
-const flash = computed(() => usePage().props.flash || {});
+// 1. Define page
+const page = usePage();
+
+// 2. Create a flash computed (optional)
+const flash = computed(() => page.props.flash || {});
+
+// 3. Your form setup
 const form = useForm({
   name: '',
   status: 0,
@@ -20,7 +20,27 @@ const submit = () => {
     onFinish: () => form.reset(),
   });
 };
+
+// 4. Watch the actual page.props.flash
+watch(
+  () => page.props.flash,
+  (newFlash) => {
+    if (newFlash?.message) {
+      Swal.fire({
+        icon: newFlash.type === 'success' ? 'success' : 'error',
+        title: newFlash.type === 'success' ? 'Success!' : 'Error!',
+        text: newFlash.message,
+        toast: true,
+        position: 'top-end',
+        showConfirmButton: false,
+        timer: 3000,
+        timerProgressBar: true,
+      });
+    }
+  }
+);
 </script>
+
 
 <template>
   <Head title="Add Section" />

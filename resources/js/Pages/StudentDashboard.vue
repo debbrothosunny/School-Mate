@@ -42,7 +42,7 @@ watch(() => props.upcomingFeeNotice, (newValue) => {
                     <p class="font-semibold text-lg">Hello ${props.userName},</p>
                     <p class="mt-2 text-gray-700">
                         This is an urgent reminder that your <strong>${newValue.invoice_type || 'fee'}</strong>
-                        of <strong>BDT ${newValue.total_amount_due}</strong> is due on <strong>${newValue.due_date}</strong>.
+                        with a balance of <strong>BDT ${newValue.balance_due}</strong> is due on <strong>${newValue.due_date}</strong>.
                     </p>
                     <p class="mt-4 text-sm text-gray-500">
                         Your attention is kindly requested to settle this payment at your earliest convenience. Please proceed to your My Invoices page to make a payment.
@@ -228,7 +228,7 @@ watch(() => props.message, (newMessage) => {
                                                     <span class="text-lg">{{ formatTime(entry.start_time) }} - {{ formatTime(entry.end_time) }}</span>
                                                 </p>
                                                 <p class="text-sm text-gray-600">
-                                                    {{ entry.className?.class_name || 'N/A' }} ({{ entry.section?.name || 'N/A' }}) - {{ entry.subject?.name || 'N/A' }}
+                                                    {{ entry.class_name.class_name || 'N/A' }} ({{ entry.section?.name || 'N/A' }}) - {{ entry.subject?.name || 'N/A' }}
                                                     <span v-if="entry.room?.name"> | Room: {{ entry.room.name }}</span>
                                                 </p>
                                             </li>
@@ -271,19 +271,19 @@ watch(() => props.message, (newMessage) => {
 
 /* Animation for a subtle fade-in and slide-up effect */
 @keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+ from {
+   opacity: 0;
+   transform: translateY(20px);
+ }
+ to {
+   opacity: 1;
+   transform: translateY(0);
+ }
 }
 
 /* Base animation class for the heading */
 .animate-fade-in-up {
-  animation: fadeInUp 0.6s ease-out forwards;
+ animation: fadeInUp 0.6s ease-out forwards;
 }
 
 /* Blinking cursor effect for the typewriter */

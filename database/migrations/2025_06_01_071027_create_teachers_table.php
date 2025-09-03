@@ -8,7 +8,7 @@ return new class extends Migration
 {
     /**
      * Run the migrations.
-     */
+    */
     public function up(): void
     {
         Schema::create('teachers', function (Blueprint $table) {
@@ -23,7 +23,6 @@ return new class extends Migration
             // Optional: Add a unique constraint if each user can only be one teacher
             $table->unique('user_id');
         });
-
     }
 
     /**

@@ -26,11 +26,12 @@ const filteredClasses = computed(() => {
     }
     const lowerCaseQuery = searchQuery.value.toLowerCase();
     return props.classes.data.filter(classItem => {
-        // Include 'total_classes' in search if it's a string, or convert to string for search
+        // Include 'total_classes' and 'teacher name' in the search
         return (
             (classItem.class_name && classItem.class_name.toLowerCase().includes(lowerCaseQuery)) ||
             getStatusText(classItem.status).toLowerCase().includes(lowerCaseQuery) ||
-            (classItem.total_classes !== null && String(classItem.total_classes).includes(lowerCaseQuery)) // Added total_classes to search
+            (classItem.total_classes !== null && String(classItem.total_classes).includes(lowerCaseQuery)) ||
+            (classItem.teacher && classItem.teacher.name && classItem.teacher.name.toLowerCase().includes(lowerCaseQuery))
         );
     });
 });
@@ -121,8 +122,9 @@ const closeDeleteModal = () => {
                         <thead class="bg-gray-50">
                             <tr>
                                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Class Name</th>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Classes</th> <!-- New Header -->
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Classes</th>
                                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Class Teacher</th> <!-- New Header -->
                                 <th scope="col" class="relative px-4 py-3"><span class="sr-only">Actions</span></th>
                             </tr>
                         </thead>
@@ -130,7 +132,7 @@ const closeDeleteModal = () => {
                         <tbody v-if="filteredClasses.length" class="bg-white divide-y divide-gray-200">
                             <tr v-for="classItem in filteredClasses" :key="classItem.id">
                                 <td class="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ classItem.class_name }}</td>
-                                <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-500">{{ classItem.total_classes }}</td> <!-- New Data Cell -->
+                                <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-500">{{ classItem.total_classes }}</td>
                                 <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
                                     <span
                                         :class="{
@@ -142,6 +144,7 @@ const closeDeleteModal = () => {
                                         {{ getStatusText(classItem.status) }}
                                     </span>
                                 </td>
+                                <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-500">{{ classItem.teacher ? classItem.teacher.name : 'N/A' }}</td> <!-- New Data Cell -->
                                 <td class="px-4 py-4 whitespace-nowrap text-right text-sm font-medium">
                                     <Link :href="route('class-names.edit', classItem.id)" class="text-indigo-600 hover:text-indigo-900 mr-4">Edit</Link>
                                     <button
@@ -156,7 +159,7 @@ const closeDeleteModal = () => {
 
                         <tbody v-else>
                             <tr>
-                                <td colspan="4" class="px-4 py-4 text-center text-sm text-gray-500">No classes found.</td> <!-- Updated colspan -->
+                                <td colspan="5" class="px-4 py-4 text-center text-sm text-gray-500">No classes found.</td> <!-- Updated colspan to 5 -->
                             </tr>
                         </tbody>
                     </table>

@@ -17,30 +17,33 @@ const studentToDelete = ref(null);
 const searchQuery = ref('');
 
 const filteredStudents = computed(() => {
-    if (!searchQuery.value) {
-        return [...props.students.data];
+    // If there's a search query, filter the current page's data
+    if (searchQuery.value) {
+        const lowerCaseQuery = searchQuery.value.toLowerCase();
+        return props.students.data.filter(student => {
+            return (
+                (student.name && student.name.toLowerCase().includes(lowerCaseQuery)) ||
+                (student.admission_number && student.admission_number.toLowerCase().includes(lowerCaseQuery)) ||
+                (student.roll_number && student.roll_number.toString().includes(lowerCaseQuery)) ||
+                (student.class_name?.name && student.class_name.name.toLowerCase().includes(lowerCaseQuery)) ||
+                (student.age && student.age.toString().includes(lowerCaseQuery)) ||
+                (student.session?.name && student.session.name.toLowerCase().includes(lowerCaseQuery)) ||
+                (student.group?.name && student.group.name.toLowerCase().includes(lowerCaseQuery)) ||
+                (student.section?.name && student.section.name.toLowerCase().includes(lowerCaseQuery)) ||
+                (student.parent_name && student.parent_name.toLowerCase().includes(lowerCaseQuery)) ||
+                (student.contact && student.contact.toLowerCase().includes(lowerCaseQuery)) ||
+                (student.status === 0 ? 'active' : 'inactive').includes(lowerCaseQuery) ||
+                (student.admission_fee_amount && (student.admission_fee_amount / 100).toFixed(2).includes(lowerCaseQuery)) ||
+                (student.admission_fee_paid !== undefined && (student.admission_fee_paid ? 'paid' : 'unpaid').includes(lowerCaseQuery)) ||
+                (student.payment_method && student.payment_method.toLowerCase().includes(lowerCaseQuery))
+            );
+        });
     }
-    const lowerCaseQuery = searchQuery.value.toLowerCase();
-    return props.students.data.filter(student => {
-        return (
-            (student.name && student.name.toLowerCase().includes(lowerCaseQuery)) ||
-            (student.admission_number && student.admission_number.toLowerCase().includes(lowerCaseQuery)) ||
-            (student.roll_number && student.roll_number.toString().includes(lowerCaseQuery)) ||
-            (student.class_name?.name && student.class_name.name.toLowerCase().includes(lowerCaseQuery)) ||
-            (student.age && student.age.toString().includes(lowerCaseQuery)) ||
-            (student.session?.name && student.session.name.toLowerCase().includes(lowerCaseQuery)) ||
-            (student.group?.name && student.group.name.toLowerCase().includes(lowerCaseQuery)) ||
-            (student.section?.name && student.section.name.toLowerCase().includes(lowerCaseQuery)) ||
-            (student.parent_name && student.parent_name.toLowerCase().includes(lowerCaseQuery)) ||
-            (student.contact && student.contact.toLowerCase().includes(lowerCaseQuery)) ||
-            (student.status === 0 ? 'active' : 'inactive').includes(lowerCaseQuery) ||
-            (student.admission_fee_amount && (student.admission_fee_amount / 100).toFixed(2).includes(lowerCaseQuery)) ||
-            (student.admission_fee_paid !== undefined && (student.admission_fee_paid ? 'paid' : 'unpaid').includes(lowerCaseQuery)) ||
-            (student.payment_method && student.payment_method.toLowerCase().includes(lowerCaseQuery))
-        );
-    });
+    // Otherwise, return the original paginated data
+    return [...props.students.data];
 });
 
+// Computed properties for display totals and pagination info
 const displayTotal = computed(() => {
     return searchQuery.value ? filteredStudents.value.length : props.students.total;
 });
@@ -97,39 +100,51 @@ const formatCurrency = (amountInPaisa) => {
 
     <AuthenticatedLayout>
         <template #header>
-            <h2 class="font-semibold text-xl text-gray-800 leading-tight">Student Management</h2>
+            <h2 class="font-semibold text-2xl text-gray-800 leading-tight">Student Management</h2>
         </template>
 
-        <div class="py-12">
-            <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-                <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
-                    <div class="p-6 text-gray-900">
-                        <div class="flex justify-between items-center mb-6">
-                            <h3 class="text-2xl font-bold text-gray-900">All Students</h3>
+        <div class="bg-gray-50 py-12">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="bg-white overflow-hidden shadow-lg rounded-xl">
+                    <div class="p-6 sm:p-8 text-gray-900">
+                        <!-- Header and Add Button -->
+                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+                            <h3 class="text-3xl font-bold text-gray-900">All Students</h3>
                             <Link :href="route('students.create')">
-                                <PrimaryButton>Add New Student</PrimaryButton>
+                                <PrimaryButton class="shadow-md hover:scale-105 transition-transform duration-200">
+                                    Add New Student
+                                </PrimaryButton>
                             </Link>
                         </div>
 
+                        <!-- Search and Flash Message Section -->
                         <div class="mb-6">
-                            <TextInput
-                                id="search"
-                                type="text"
-                                class="block w-full rounded-md border-gray-300 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                                v-model="searchQuery"
-                                placeholder="Search students..."
-                            />
+                            <div class="relative">
+                                <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                                    <svg class="w-5 h-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                                        <path d="M12.9 14.32a8 8 0 111.414-1.414l4.634 4.634-1.414 1.414-4.634-4.634zM8 14a6 6 0 100-12 6 6 0 000 12z"></path>
+                                    </svg>
+                                </div>
+                                <TextInput
+                                    id="search"
+                                    type="text"
+                                    class="block w-full pl-10 pr-3 py-2 rounded-lg border-gray-300 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                                    v-model="searchQuery"
+                                    placeholder="Search by name, admission number, roll, or class..."
+                                />
+                            </div>
                         </div>
 
-                        <div v-if="flash.message" :class="`p-4 rounded-lg font-medium text-sm my-4 ${flash.type === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`" role="alert">
+                        <div v-if="flash.message" :class="`p-4 rounded-lg font-medium text-sm my-4 transition-all duration-300 ${flash.type === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`" role="alert">
                             {{ flash.message }}
                         </div>
 
-                        <div class="overflow-x-auto rounded-lg shadow-sm border border-gray-200">
+                        <!-- Main Student Table -->
+                        <div class="overflow-x-auto rounded-xl shadow-sm border border-gray-200">
                             <table class="min-w-full divide-y divide-gray-200">
-                                <thead class="bg-gray-50">
+                                <thead class="bg-gray-100">
                                     <tr>
-                                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Image</th>
+                                        <th class="px-6 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider rounded-tl-xl">Image</th>
                                         <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Name</th>
                                         <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Admission No.</th>
                                         <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Roll No.</th>
@@ -144,68 +159,77 @@ const formatCurrency = (amountInPaisa) => {
                                         <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Fee Paid</th>
                                         <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Payment Method</th>
                                         <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
-                                        <th class="px-6 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
+                                        <th class="px-6 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider rounded-tr-xl">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody class="bg-white divide-y divide-gray-200" v-if="filteredStudents.length">
                                     <tr v-for="student in filteredStudents" :key="student.id" class="hover:bg-gray-50 transition-colors duration-200">
-                                        <td class="px-6 py-4 whitespace-nowrap">
+                                        <td class="px-6 py-4 whitespace-nowrap text-center">
                                             <img
                                                 :src="student.image ? `/storage/${student.image}` : 'https://placehold.co/40x40/DDDDDD/000000?text=No+Image'"
                                                 alt="Student Image"
-                                                class="w-10 h-10 object-cover rounded-full"
+                                                class="w-10 h-10 object-cover rounded-full mx-auto"
                                             />
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap font-medium text-gray-900">{{ student.name }}</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ student.admission_number }}</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ student.roll_number }}</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ student.class_name ? student.class_name.name : 'N/A' }}</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ student.age }}</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ student.session ? student.session.name : 'N/A' }}</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ student.group ? student.group.name : 'N/A' }}</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ student.section ? student.section.name : 'N/A' }}</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ student.parent_name }}</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ student.contact }}</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ formatCurrency(student.admission_fee_amount) }}</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{{ student.admission_number }}</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{{ student.roll_number }}</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ student.class_name ? student.class_name.class_name : 'N/A' }}</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{{ student.age }}</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{{ student.session ? student.session.name : 'N/A' }}</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{{ student.group ? student.group.name : 'N/A' }}</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{{ student.section ? student.section.name : 'N/A' }}</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{{ student.parent_name }}</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{{ student.contact }}</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{{ formatCurrency(student.admission_fee_amount) }}</td>
                                         <td class="px-6 py-4 whitespace-nowrap">
-                                            <span :class="`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${student.admission_fee_paid ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`">
+                                            <span :class="`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${student.admission_fee_paid ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`">
                                                 {{ student.admission_fee_paid ? 'Paid' : 'Unpaid' }}
                                             </span>
                                         </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ student.payment_method || 'N/A' }}</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{{ student.payment_method || 'N/A' }}</td>
                                         <td class="px-6 py-4 whitespace-nowrap">
-                                            <span :class="`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${student.status === 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`">
+                                            <span :class="`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${student.status === 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`">
                                                 {{ student.status === 0 ? 'Active' : 'Inactive' }}
                                             </span>
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                            <Link :href="route('students.edit', student.id)" class="text-indigo-600 hover:text-indigo-900 mr-4">Edit</Link>
-                                            <button @click="confirmDelete(student)" class="text-red-600 hover:text-red-900">Delete</button>
+                                            <Link :href="route('students.history', student.id)" class="text-blue-600 hover:text-blue-900 mr-4 transition-colors">
+                                                History
+                                            </Link>
+                                            <Link :href="route('students.edit', student.id)" class="text-indigo-600 hover:text-indigo-900 mr-4 transition-colors">
+                                                Edit
+                                            </Link>
+                                            <button @click="confirmDelete(student)" class="text-red-600 hover:text-red-900 transition-colors">
+                                                Delete
+                                            </button>
                                         </td>
                                     </tr>
                                 </tbody>
                                 <tbody v-else>
                                     <tr>
-                                        <td colspan="16" class="text-center py-4 text-gray-500">No students found.</td>
+                                        <td colspan="16" class="text-center py-8 text-gray-500 text-lg">No students found.</td>
                                     </tr>
                                 </tbody>
                             </table>
                         </div>
 
-                        <div class="mt-4 flex justify-between items-center">
+                        <!-- Pagination and Results Info -->
+                        <div class="mt-8 flex flex-col sm:flex-row justify-between items-center space-y-4 sm:space-y-0">
                             <span class="text-sm text-gray-700" v-if="displayTotal > 0">
-                                Showing {{ displayFrom }} to {{ displayTo }} of {{ displayTotal }} results
+                                Showing <span class="font-semibold text-gray-900">{{ displayFrom }}</span> to <span class="font-semibold text-gray-900">{{ displayTo }}</span> of <span class="font-semibold text-gray-900">{{ displayTotal }}</span> results
                             </span>
                             <span v-else class="text-sm text-gray-700">No results found</span>
-                            <div class="flex" v-if="!searchQuery">
+                            
+                            <div class="flex items-center space-x-2" v-if="!searchQuery">
                                 <Link
                                     v-for="link in students.links"
                                     :key="link.label"
                                     :href="link.url || '#'"
                                     v-html="link.label"
                                     :class="[
-                                        'px-3 py-2 text-sm leading-4 font-medium rounded-md',
-                                        link.active ? 'bg-indigo-600 text-white' : 'text-gray-700 bg-white hover:bg-gray-100',
+                                        'w-10 h-10 flex items-center justify-center text-sm font-medium rounded-full transition-all duration-200',
+                                        link.active ? 'bg-indigo-600 text-white shadow-md' : 'text-gray-700 bg-white hover:bg-gray-100 shadow-sm',
                                         !link.url ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''
                                     ]"
                                 />
@@ -217,15 +241,16 @@ const formatCurrency = (amountInPaisa) => {
         </div>
 
         <!-- Delete Confirmation Modal -->
-        <div v-if="showDeleteModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div class="bg-white p-6 rounded-lg shadow-xl w-full max-w-sm">
-                <h3 class="text-xl font-semibold mb-4 text-gray-800">Confirm Deletion</h3>
+        <div v-if="showDeleteModal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4 transition-opacity duration-300">
+            <div class="bg-white p-6 rounded-2xl shadow-2xl w-full max-w-sm transform transition-transform duration-300 scale-95 opacity-0" :class="{ 'scale-100 opacity-100': showDeleteModal }">
+                <h3 class="text-2xl font-bold mb-4 text-gray-900">Confirm Deletion</h3>
                 <p class="mb-6 text-gray-600">
-                    Are you sure you want to delete student: <span class="font-bold text-gray-900">{{ studentToDelete ? studentToDelete.name : '' }}</span>?
+                    Are you sure you want to delete the student: <span class="font-semibold text-indigo-700">{{ studentToDelete ? studentToDelete.name : '' }}</span>?
+                    This action cannot be undone.
                 </p>
                 <div class="flex justify-end space-x-3">
-                    <button @click="closeDeleteModal" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">Cancel</button>
-                    <DangerButton @click="deleteStudent" :class="{ 'opacity-25': form.processing }" :disabled="form.processing">Delete</DangerButton>
+                    <button @click="closeDeleteModal" class="px-5 py-2.5 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-colors">Cancel</button>
+                    <DangerButton @click="deleteStudent" :class="{ 'opacity-25': form.processing }" :disabled="form.processing" class="px-5 py-2.5 shadow-md hover:scale-105 transition-transform duration-200">Delete</DangerButton>
                 </div>
             </div>
         </div>

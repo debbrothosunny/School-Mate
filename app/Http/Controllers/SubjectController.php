@@ -143,7 +143,8 @@ class SubjectController extends Controller
         }
     }
 
-
+   
+    
 
     // Class Subject Functions
 
@@ -154,6 +155,8 @@ class SubjectController extends Controller
         $classSubjects = ClassSubject::with(['className', 'subject', 'teacher', 'session', 'section', 'group'])
             ->latest('id')
             ->paginate(10);
+
+               
 
         return Inertia::render('ClassSubjects/Index', [
             'classSubjects' => $classSubjects,
@@ -215,10 +218,14 @@ class SubjectController extends Controller
         try {
             ClassSubject::create($validatedData);
 
-            return redirect()->route('class-subjects.index')->with('flash', [
-                'message' => 'Class Subject added successfully!',
-                'type' => 'success'
-            ]);
+           
+
+
+            // 5. Redirect with a success message
+        return redirect()->route('class-subjects.index')
+        ->with('flash', ['type'=>'success','message'=>'Class schedule created successfully!']);
+
+        
         } catch (\Exception $e) {
             return redirect()->back()->with('flash', [
                 'message' => 'Failed to add class subject: ' . $e->getMessage(),

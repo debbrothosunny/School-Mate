@@ -39,5 +39,16 @@ class Teacher extends Model
         return $this->belongsToMany(ClassName::class, 'class_subjects', 'teacher_id', 'class_name_id')
                     ->withPivot('subject_id', 'session_id', 'section_id', 'status'); // Include pivot data if you need it
     }
+
+
+    /**
+     * Get the class assigned to the teacher.
+     */
+    public function className()
+    {
+        return $this->hasOne(ClassName::class);
+    }
+
+    
     
 }

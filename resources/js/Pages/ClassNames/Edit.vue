@@ -1,3 +1,4 @@
+<!-- resources/js/Pages/ClassNames/Edit.vue -->
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import InputError from '@/Components/InputError.vue';
@@ -5,35 +6,24 @@ import InputLabel from '@/Components/InputLabel.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
 import { Head, useForm, Link } from '@inertiajs/vue3';
+import { defineProps } from 'vue';
 
 const props = defineProps({
-    className: Object, // The class data passed from the controller, now includes total_classes
+    className: Object,
+    teachers: Array, // Make sure you are passing this from your controller
 });
 
 // Initialize the form with the current class's data
 const form = useForm({
-    _method: 'post', 
-    class_name: props.className.class_name, // Bind to class_name from prop
-    status: props.className.status, // status will be 0 or 1 directly
-    total_classes: props.className.total_classes, // Initialize with existing total_classes
+    class_name: props.className.class_name,
+    status: props.className.status,
+    total_classes: props.className.total_classes,
+    teacher_id: props.className.teacher_id,
 });
 
 const submit = () => {
-    // Only send fields that are in the class_names table
-    const dataToSend = {
-        class_name: form.class_name,
-        status: form.status,
-        total_classes: form.total_classes, // Include total_classes in dataToSend
-    };
-
-    form.post(route('class-names.update', props.className.id), dataToSend, {
-        onSuccess: () => {
-            // Optional: show a success message (e.g., using flash messages)
-        },
-        onError: (errors) => {
-            console.error("Update failed:", errors);
-        },
-    });
+    // You can use the `put` method for updates, which is the standard RESTful way
+    form.post(route('class-names.update', props.className.id));
 };
 </script>
 
@@ -55,6 +45,20 @@ const submit = () => {
                             <InputLabel for="class_name" value="Class Name" />
                             <TextInput id="class_name" type="text" class="mt-1 block w-full" v-model="form.class_name" required autofocus />
                             <InputError :message="form.errors.class_name" class="mt-2" />
+                        </div>
+                        
+                        <!-- Teacher Select Dropdown -->
+                        <div class="mb-4">
+                            <InputLabel for="teacher" value="Assign Teacher" />
+                            <select id="teacher" v-model="form.teacher_id"
+                                class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm"
+                                :class="{ 'border-red-500': form.errors.teacher_id }">
+                                <option :value="null">-- Select a Teacher --</option>
+                                <option v-for="teacher in teachers" :key="teacher.id" :value="teacher.id">
+                                    {{ teacher.name }}
+                                </option>
+                            </select>
+                            <InputError :message="form.errors.teacher_id" class="mt-2" />
                         </div>
 
                         <div class="mb-4">

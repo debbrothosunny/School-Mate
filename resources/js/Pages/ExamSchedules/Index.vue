@@ -305,7 +305,7 @@ watchEffect(() => {
                             </div>
                             <div class="space-y-2 text-gray-700 mb-4">
                                 <p><span class="font-medium text-gray-900">Exam:</span> {{ schedule.exam?.exam_name || 'N/A' }}</p>
-                                <p><span class="font-medium text-gray-900">Class:</span> {{ schedule.className?.class_name || 'N/A' }} ({{ schedule.section?.name || 'N/A' }})</p>
+                                <p><span class="font-medium text-gray-900">Class:</span> {{ schedule.class_name?.class_name || 'N/A' }} ({{ schedule.section?.name || 'N/A' }})</p>
                                 <p><span class="font-medium text-gray-900">Session:</span> {{ schedule.session?.name || 'N/A' }}</p>
                                 <p><span class="font-medium text-gray-900">Teacher:</span> {{ schedule.teacher?.name || 'N/A' }}</p>
                                 <p><span class="font-medium text-gray-900">Room:</span> {{ schedule.room?.name || 'N/A' }}</p>
@@ -326,7 +326,7 @@ watchEffect(() => {
                     <span class="text-sm text-gray-600" v-if="examSchedules.total > 0">
                         Showing <span class="font-semibold">{{ examSchedules.from }}</span> to <span class="font-semibold">{{ examSchedules.to }}</span> of <span class="font-semibold">{{ examSchedules.total }}</span> results
                     </span>
-                    <span v-else class="text-sm text-gray-600">No results found</span>
+                    
                     <div class="flex flex-wrap items-center space-x-2">
                         <Link
                             v-for="link in examSchedules.links"

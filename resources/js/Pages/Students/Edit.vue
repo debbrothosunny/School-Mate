@@ -8,49 +8,47 @@ import { Head, Link, useForm, usePage } from '@inertiajs/vue3';
 import { ref, computed, watchEffect } from 'vue';
 
 // Helper function to format date to YYYY-MM-DD
-// MOVED TO TOP to ensure it's defined before use in form initialization
 const formatToHtmlDate = (dateString) => {
     if (!dateString) return '';
     try {
         const date = new Date(dateString);
+        // Ensure month and day are padded with a leading zero if needed
         const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0'); // Months are 0-indexed
+        const month = String(date.getMonth() + 1).padStart(2, '0');
         const day = String(date.getDate()).padStart(2, '0');
         return `${year}-${month}-${day}`;
     } catch (e) {
         console.error("Error formatting date:", dateString, e);
-        return ''; // Return empty string on error
+        return '';
     }
 };
 
-
 const props = defineProps({
-    student: Object, // The student object to be edited
-    classes: Array,  // List of available classes
-    sessions: Array, // List of available sessions
-    groups: Array,   // List of available groups
-    sections: Array, // List of available sections
-    availableUsers: Array, // List of users not yet linked to a student/teacher, plus the current student's user
-    flash: Object,   // Flash messages
-    errors: Object,  // Validation errors
+    student: Object,
+    classes: Array,
+    sessions: Array,
+    groups: Array,
+    sections: Array,
+    availableUsers: Array,
+    flash: Object,
+    errors: Object,
 });
 
 const flash = computed(() => usePage().props.flash || {});
 
-// Reactive variable for image preview, initialized with existing student image if available
+// Reactive variable for image preview
 const imagePreviewUrl = ref(props.student.image ? `/storage/${props.student.image}` : null);
 
-
-// Initialize the form with the current student's data, including new fields
+// Initialize the form with the current student's data
 const form = useForm({
-    _method: 'post', // Keep as 'post' if your route is POST for update
+    // Use 'patch' for a more RESTful approach. Inertia will handle the spoofing.
+    _method: 'post',
     name: props.student.name,
     admission_number: props.student.admission_number,
     roll_number: props.student.roll_number,
-    // FIX: Ensure date_of_birth is in YYYY-MM-DD format for HTML date input
     date_of_birth: formatToHtmlDate(props.student.date_of_birth),
     gender: props.student.gender,
-    admission_date: formatToHtmlDate(props.student.admission_date), // Apply formatting here too
+    admission_date: formatToHtmlDate(props.student.admission_date),
     age: props.student.age,
     parent_name: props.student.parent_name,
     contact: props.student.contact,
@@ -59,44 +57,40 @@ const form = useForm({
     session_id: props.student.session_id,
     group_id: props.student.group_id,
     section_id: props.student.section_id,
-    status: props.student.status, // 0 for active, 1 for inactive
+    status: props.student.status,
     enrollment_status: props.student.enrollment_status,
     image: null, // Add image field for new file upload
-    user_id: props.student.user_id, // Initialize with the current user_id
+    user_id: props.student.user_id,
 
-    // New fields initialized with existing student data
-    admission_fee_amount: props.student.admission_fee_amount ? props.student.admission_fee_amount / 100 : null, // Convert paisa to BDT for display
-    admission_fee_paid: !!props.student.admission_fee_paid, // Convert to boolean
+    // New fields
+    admission_fee_amount: props.student.admission_fee_amount ? props.student.admission_fee_amount / 100 : null,
+    admission_fee_paid: !!props.student.admission_fee_paid,
     payment_method: props.student.payment_method || '',
 });
 
 const handleImageChange = (event) => {
     const file = event.target.files[0];
     if (file) {
-        form.image = file; // Assign the selected file to the form data
+        form.image = file;
         const reader = new FileReader();
         reader.onload = (e) => {
-            imagePreviewUrl.value = e.target.result; // Set the preview URL
+            imagePreviewUrl.value = e.target.result;
         };
-        reader.readAsDataURL(file); // Read the file as a data URL
+        reader.readAsDataURL(file);
     } else {
-        form.image = null; // Clear image from form if no file selected
-        imagePreviewUrl.value = null; // Clear image preview
+        form.image = null;
+        imagePreviewUrl.value = null;
     }
 };
 
 const submit = () => {
-    // Ensure admission_fee_amount is converted to paisa (integer) before sending
-    const dataToSend = { ...form.data() };
-    dataToSend.admission_fee_amount = dataToSend.admission_fee_amount !== null && dataToSend.admission_fee_amount !== ''
-                                            ? Math.round(parseFloat(dataToSend.admission_fee_amount) * 100)
-                                            : null;
-
+    // Send the form data to the update route.
+    // Inertia's useForm helper automatically handles method spoofing and FormData.
     form.post(route('students.update', props.student.id), {
-        forceFormData: true, // This is crucial for file uploads with Inertia.js 1.0+
-        data: dataToSend, // Pass the modified data
+        forceFormData: true, // This is crucial for file uploads with Inertia.js
         onSuccess: () => {
-            // No need to manually update flash message, watchEffect will handle it
+            // Optional: you can add a success message or redirect here,
+            // but your watchEffect for flash messages already handles this.
         },
         onError: (errors) => {
             console.error("Student update failed:", errors);
@@ -104,7 +98,7 @@ const submit = () => {
     });
 };
 
-// Watch for flash messages and display SweetAlert (assuming you have it)
+// Watch for flash messages and display SweetAlert
 watchEffect(() => {
     if (typeof Swal !== 'undefined' && flash.value && flash.value.message) {
         Swal.fire({
@@ -136,7 +130,7 @@ watchEffect(() => {
                         <div class="row g-3">
                             <div class="col-md-6">
                                 <InputLabel for="admission_number" value="Admission Number" class="form-label" />
-                                <TextInput id="admission_number" type="text" class="form-control" v-model="form.admission_number" required />
+                                <TextInput id="admission_number" type="text" class="form-control" v-model="form.admission_number" required disabled />
                                 <InputError class="mt-2" :message="form.errors.admission_number" />
                             </div>
 
@@ -311,7 +305,6 @@ watchEffect(() => {
                                     <InputError class="mt-2" :message="form.errors.admission_fee_paid" />
                                 </div>
                             </div>
-
                         </div>
 
                         <div class="d-flex justify-content-end mt-4">

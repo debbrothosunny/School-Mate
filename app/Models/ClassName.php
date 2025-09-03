@@ -13,6 +13,7 @@ class ClassName extends Model
     protected $fillable = [
         'class_name',
         'total_classes',
+        'teacher_id',
         'status',
     ];
 
@@ -76,6 +77,10 @@ class ClassName extends Model
     }
 
 
-    
+    // For Assign Class Teacher
+    public function teacher()
+    {
+        return $this->belongsTo(Teacher::class);
+    }
     
 }

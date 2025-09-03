@@ -177,91 +177,81 @@ class AttendanceController extends Controller
         if (!$teacher) {
             abort(403, 'You are not registered as a teacher or your teacher profile is incomplete.');
         }
-        $teacherId = $teacher->id;
 
-        // Get teacher's assigned classes, sessions, sections, subjects
-        $teacherAssignments = ClassSubject::where('teacher_id', $teacherId)->get();
+        // Fetch classes where the authenticated teacher is explicitly the class teacher
+        // Corrected column name from 'class_teacher_id' to 'teacher_id' as per your schema.
+        $classes = ClassName::where('teacher_id', $teacher->id)->get(['id', 'class_name']);
+        
+        $initialMessage = null;
 
-        $assignedClassIds = $teacherAssignments->pluck('class_name_id')->unique()->toArray();
-        $assignedSessionIds = $teacherAssignments->pluck('session_id')->unique()->toArray();
-        $assignedSectionIds = $teacherAssignments->pluck('section_id')->unique()->toArray();
-        $assignedSubjectIds = $teacherAssignments->pluck('subject_id')->unique()->toArray();
-
-        // Fetch dropdown data
-        $classes = ClassName::whereIn('id', $assignedClassIds)->get(['id', 'class_name']);
-        $sessions = ClassSession::whereIn('id', $assignedSessionIds)->get(['id', 'name']);
-        $sections = Section::whereIn('id', $assignedSectionIds)->get(['id', 'name']);
-        $subjects = Subject::whereIn('id', $assignedSubjectIds)->get(['id', 'name']);
+        // Check if the teacher is a class teacher for any class.
+        // If not, set an error message and do not proceed with fetching other data.
+        if ($classes->isEmpty()) {
+            $initialMessage = ['text' => 'You are not the class teacher for any class. Attendance management is not available for you.', 'type' => 'error'];
+            return Inertia::render('TeacherAttendance/Index', [
+                'classes' => $classes,
+                'sessions' => collect(), // Return empty collections to prevent dropdowns from populating
+                'sections' => collect(),
+                'groups' => collect(),
+                'students' => collect(),
+                'selectedClassId' => null,
+                'selectedSessionId' => null,
+                'selectedSectionId' => null,
+                'selectedGroupId' => null,
+                'selectedAttendanceDate' => null,
+                'initialMessage' => $initialMessage,
+            ]);
+        }
+        
+        // Fetch all sessions, sections, and groups for dropdowns
+        $sessions = ClassSession::all(['id', 'name']);
+        $sections = Section::all(['id', 'name']);
         $groups = Group::all(['id', 'name']);
-
-        // Get selected filters from request
+        
         $classId = $request->input('class_id');
         $sessionId = $request->input('session_id');
         $sectionId = $request->input('section_id');
         $groupId = $request->input('group_id');
-        $subjectId = $request->input('subject_id');
-        $attendanceDate = $request->input('attendance_date'); // This still comes from the frontend as 'attendance_date'
+        $attendanceDate = $request->input('attendance_date');
 
         $students = collect();
-        $initialMessage = null;
+        
+        // Authorization check: Ensure the selected class belongs to the authenticated teacher.
+        // This check is still needed in case a teacher has multiple classes.
+        if ($classId && !$classes->pluck('id')->contains($classId)) {
+            $initialMessage = ['text' => 'You are not the class teacher for the selected class.', 'type' => 'error'];
+        }
+        
+        // Fetch students and their attendance if all required filters are present
+        if ($classId && $sessionId && $sectionId && $groupId && $attendanceDate && $initialMessage === null) {
+            $students = Student::where('class_id', $classId)
+                               ->where('session_id', $sessionId)
+                               ->where('section_id', $sectionId)
+                               ->where('group_id', $groupId)
+                               ->get();
 
-        // Validate selected filters against teacher's assignments
-        if ($classId && !in_array($classId, $assignedClassIds)) {
-            abort(403, 'Unauthorized class selection.');
-        }
-        if ($sessionId && !in_array($sessionId, $assignedSessionIds)) {
-            abort(403, 'Unauthorized session selection.');
-        }
-        if ($sectionId && !in_array($sectionId, $assignedSectionIds)) {
-            abort(403, 'Unauthorized section selection.');
-        }
-        if ($subjectId && !in_array($subjectId, $assignedSubjectIds)) {
-            abort(403, 'Unauthorized subject selection.');
-        }
-
-        // Fetch students and their attendance if all filters are present AND authorized
-        if ($classId && $sessionId && $sectionId && $groupId && $subjectId && $attendanceDate) {
-            // Check if this specific combination is assigned to the teacher via ClassSubject
-            $specificAssignmentExists = ClassSubject::where('teacher_id', $teacherId)
-                ->where('class_name_id', $classId)
-                ->where('session_id', $sessionId)
-                ->where('section_id', $sectionId)
-                ->where('subject_id', $subjectId)
-                ->exists();
-
-            if (!$specificAssignmentExists) {
-                $initialMessage = ['text' => 'You are not assigned to this specific Class, Session, Section, and Subject combination.', 'type' => 'error'];
+            if ($students->isEmpty()) {
+                $initialMessage = ['text' => 'No students found for the selected criteria.', 'type' => 'info'];
             } else {
-                $students = Student::where('class_id', $classId)
-                                   ->where('session_id', $sessionId)
-                                   ->where('section_id', $sectionId)
-                                   ->where('group_id', $groupId)
-                                   ->get();
+                // Fetch existing attendance for these students on this date for this class
+                $existingAttendances = Attendance::where('date', $attendanceDate)
+                                                ->where('class_id', $classId)
+                                                ->where('session_id', $sessionId)
+                                                ->where('section_id', $sectionId)
+                                                ->where('group_id', $groupId)
+                                                ->whereIn('student_id', $students->pluck('id'))
+                                                ->get()
+                                                ->keyBy('student_id');
 
-                if ($students->isEmpty()) {
-                    $initialMessage = ['text' => 'No students found for the selected criteria.', 'type' => 'info'];
-                } else {
-                    // Fetch existing attendance for these students on this date and subject
-                    $existingAttendances = Attendance::where('date', $attendanceDate) // ✨ CHANGED HERE ✨
-                                                     ->where('class_id', $classId)
-                                                     ->where('session_id', $sessionId)
-                                                     ->where('section_id', $sectionId)
-                                                     ->where('group_id', $groupId)
-                                                     ->where('subject_id', $subjectId)
-                                                     ->whereIn('student_id', $students->pluck('id'))
-                                                     ->get()
-                                                     ->keyBy('student_id');
-
-                    // Attach attendance status to each student
-                    foreach ($students as $student) {
-                        $student->attendance_status = $existingAttendances->has($student->id)
-                            ? $existingAttendances[$student->id]->status
-                            : 'absent';
-                    }
+                // Attach attendance status to each student
+                foreach ($students as $student) {
+                    $student->attendance_status = $existingAttendances->has($student->id)
+                        ? $existingAttendances[$student->id]->status
+                        : 'absent';
                 }
             }
-        } else {
-            $initialMessage = ['text' => 'Please select all required filters (Class, Session, Section, Group, Subject, and Attendance Date) to manage attendance.', 'type' => 'info'];
+        } else if (!$initialMessage) {
+            $initialMessage = ['text' => 'Please select all required filters (Class, Session, Section, Group, and Attendance Date) to manage attendance.', 'type' => 'info'];
         }
 
         return Inertia::render('TeacherAttendance/Index', [
@@ -269,21 +259,19 @@ class AttendanceController extends Controller
             'sessions' => $sessions,
             'sections' => $sections,
             'groups' => $groups,
-            'subjects' => $subjects,
             'students' => $students,
             'selectedClassId' => (int)$classId,
             'selectedSessionId' => (int)$sessionId,
             'selectedSectionId' => (int)$sectionId,
             'selectedGroupId' => (int)$groupId,
-            'selectedSubjectId' => (int)$subjectId,
             'selectedAttendanceDate' => $attendanceDate,
             'initialMessage' => $initialMessage,
         ]);
     }
 
     /**
-     * Store or update attendance records.
-    */
+     * Store or update attendance records for a class.
+     */
     public function teacherAttendanceStore(Request $request)
     {
         $user = Auth::user();
@@ -295,7 +283,6 @@ class AttendanceController extends Controller
         if (!$teacher) {
             abort(403, 'You are not registered as a teacher or your teacher profile is incomplete.');
         }
-        $teacherId = $teacher->id;
 
         // Validate incoming data
         $request->validate([
@@ -303,8 +290,7 @@ class AttendanceController extends Controller
             'session_id' => ['required', 'exists:class_sessions,id'],
             'section_id' => ['required', 'exists:sections,id'],
             'group_id' => ['required', 'exists:groups,id'],
-            'subject_id' => ['required', 'exists:subjects,id'],
-            'attendance_date' => ['required', 'date', 'before_or_equal:today'], // Frontend sends 'attendance_date'
+            'attendance_date' => ['required', 'date', 'before_or_equal:today'],
             'attendance_data' => ['required', 'array'],
             'attendance_data.*.student_id' => ['required', 'exists:students,id'],
             'attendance_data.*.status' => ['required', 'string', Rule::in(['present', 'absent', 'late'])],
@@ -314,19 +300,16 @@ class AttendanceController extends Controller
         $sessionId = $request->input('session_id');
         $sectionId = $request->input('section_id');
         $groupId = $request->input('group_id');
-        $subjectId = $request->input('subject_id');
-        $attendanceDate = $request->input('attendance_date'); // This is the value from the frontend
+        $attendanceDate = $request->input('attendance_date');
 
-        // Authorization Check: Ensure the teacher is assigned to this class/subject combination
-        $isAuthorized = ClassSubject::where('teacher_id', $teacherId)
-                                     ->where('class_name_id', $classId)
-                                     ->where('session_id', $sessionId)
-                                     ->where('section_id', $sectionId)
-                                     ->where('subject_id', $subjectId)
-                                     ->exists();
+        // Authorization Check: Ensure the teacher is the class teacher for the submitted class
+        // Corrected column name from 'class_teacher_id' to 'teacher_id'.
+        $isAuthorized = ClassName::where('id', $classId)
+                                 ->where('teacher_id', $teacher->id)
+                                 ->exists();
 
         if (!$isAuthorized) {
-            abort(403, 'You are not authorized to manage attendance for this class/subject combination.');
+            abort(403, 'You are not authorized to manage attendance for this class as you are not the class teacher.');
         }
 
         foreach ($request->input('attendance_data') as $data) {
@@ -337,8 +320,7 @@ class AttendanceController extends Controller
                     'session_id' => $sessionId,
                     'section_id' => $sectionId,
                     'group_id' => $groupId,
-                    'subject_id' => $subjectId,
-                    'date' => $attendanceDate, // ✨ CHANGED HERE (for the database column name) ✨
+                    'date' => $attendanceDate,
                 ],
                 [
                     'status' => $data['status'],
@@ -348,9 +330,6 @@ class AttendanceController extends Controller
 
         return redirect()->back()->with('flash', ['success' => 'Attendance saved successfully!']);
     }
-
-
-    
 
 }
 

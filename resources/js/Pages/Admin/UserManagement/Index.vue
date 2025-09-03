@@ -3,28 +3,15 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { Head, useForm } from '@inertiajs/vue3';
 import { ref, computed } from 'vue';
 
-// Assuming these components exist and are correctly imported
-import PrimaryButton from '@/Components/PrimaryButton.vue';
+import PrimaryButton from '@/Components/PrimaryButton.vue'; // Assuming these components exist from Breeze
 import InputLabel from '@/Components/InputLabel.vue';
+import TextInput from '@/Components/TextInput.vue';
 import InputError from '@/Components/InputError.vue';
 
 const props = defineProps({
-    users: Array,
-    availableRoles: Array,
+    users: Array,           // List of users with their current roles
+    availableRoles: Array, // All available roles (admin, teacher, accounts)
 });
-
-// Dummy user data for demonstration if no users are provided
-const dummyUsers = [
-    { id: 1, name: 'John Doe', email: 'john.doe@example.com', roles: ['admin'] },
-    { id: 2, name: 'Jane Smith', email: 'jane.smith@example.com', roles: ['teacher'] },
-    { id: 3, name: 'Peter Jones', email: 'peter.jones@example.com', roles: ['student'] },
-    { id: 4, name: 'Mary Brown', email: 'mary.brown@example.com', roles: ['accounts'] },
-    { id: 5, name: 'Chris Evans', email: 'chris.evans@example.com', roles: ['editor'] },
-    { id: 6, name: 'Sarah Miller', email: 'sarah.m@example.com', roles: ['maintainer'] },
-    { id: 7, name: 'David Wilson', email: 'david.w@example.com', roles: ['author'] },
-    { id: 8, name: 'Emily White', email: 'emily.w@example.com', roles: ['subscriber'] },
-    { id: 9, name: 'Michael Chen', email: 'michael.c@example.com', roles: [] },
-];
 
 // Reactive state for the role assignment modal
 const showRoleModal = ref(false);
@@ -45,68 +32,45 @@ const openRoleModal = (user) => {
 
 // Function to submit the role update
 const assignRole = () => {
-    if (!selectedUser.value) {
-        console.error("No user selected to assign role.");
-        return;
-    }
+    if (!selectedUser.value) return;
 
-    // Capture the current selected user and the role before resetting the form
-    const userToUpdate = selectedUser.value;
-    const newRole = form.role;
-    
-    // Simulate API call for demonstration
-    // In a real app, replace this with your Inertia form.post
-    // form.post(route('users.assign-role', selectedUser.value.id), {
-    //    onSuccess: () => { ... }
-    // });
-    
-    // Simulating success and updating the local data
-    userToUpdate.roles = newRole ? [newRole] : [];
-    
-    // Log the success message using the captured data
-    console.log(`Role '${newRole || 'No Role'}' assigned successfully to ${userToUpdate.name}.`);
-
-    // Reset the state after a slight delay to ensure the log is captured correctly
-    setTimeout(() => {
-        showRoleModal.value = false;
-        selectedUser.value = null;
-        form.reset('role');
-    }, 100);
+    form.post(route('users.assign-role', selectedUser.value.id), {
+        preserveScroll: true,
+        onSuccess: () => {
+            showRoleModal.value = false;
+            selectedUser.value = null; // Clear selected user
+            form.reset('role'); // Reset form field
+            // Inertia will automatically re-render the page with updated data
+        },
+        onError: (errors) => {
+            console.error("Error assigning role:", errors);
+        },
+    });
 };
 
 // Placeholder for search input
 const search = ref('');
 
-// Filtered and searched users
-const filteredUsers = computed(() => {
-    const usersToDisplay = props.users && props.users.length > 0 ? props.users : dummyUsers;
-    if (!search.value) {
-        return usersToDisplay;
-    }
-    const searchTerm = search.value.toLowerCase();
-    return usersToDisplay.filter(user =>
-        user.name.toLowerCase().includes(searchTerm) ||
-        user.email.toLowerCase().includes(searchTerm)
-    );
-});
+// Removed selectedRoleFilter as all filters are being removed
 
-// Dynamic list of available roles for the button group
 const availableRolesDisplay = computed(() => {
+    // If availableRoles prop is provided, use it. Otherwise, use a default set.
     return props.availableRoles && props.availableRoles.length > 0
         ? props.availableRoles
         : ['admin', 'teacher', 'accounts', 'editor', 'subscriber', 'maintainer', 'author', 'student'];
 });
 
+const displayedUsers = ref(props.users.length > 0 ? props.users : dummyUsers); // Use dummy data if no users are passed
+
 // Pagination (simple client-side for demonstration)
 const currentPage = ref(1);
-const itemsPerPage = ref(8); // Default items per page
-const totalUsers = computed(() => filteredUsers.value.length);
-const totalPages = computed(() => Math.ceil(totalUsers.value / itemsPerPage.value));
+const itemsPerPage = ref(10); // Default items per page
+const totalPages = computed(() => Math.ceil(displayedUsers.value.length / itemsPerPage.value));
 
 const paginatedUsers = computed(() => {
     const start = (currentPage.value - 1) * itemsPerPage.value;
     const end = start + itemsPerPage.value;
-    return filteredUsers.value.slice(start, end);
+    return displayedUsers.value.slice(start, end);
 });
 
 const goToPage = (page) => {
@@ -115,18 +79,6 @@ const goToPage = (page) => {
     }
 };
 
-// Map roles to colors for badges
-const roleColors = {
-    admin: 'bg-purple-600 text-white',
-    teacher: 'bg-green-600 text-white',
-    accounts: 'bg-indigo-600 text-white',
-    editor: 'bg-yellow-600 text-white',
-    subscriber: 'bg-blue-600 text-white',
-    maintainer: 'bg-teal-600 text-white',
-    author: 'bg-orange-600 text-white',
-    student: 'bg-pink-600 text-white',
-    'no role': 'bg-gray-400 text-white',
-};
 </script>
 
 <template>
@@ -134,111 +86,154 @@ const roleColors = {
 
     <AuthenticatedLayout>
         <template #header>
-            <h2 class="font-semibold text-xl text-gray-800 leading-tight">User Management</h2>
+            <h2 class="font-semibold text-xl text-gray-100 leading-tight">User Management</h2>
         </template>
 
-        <div class="py-12 px-4 sm:px-6 lg:px-8 bg-gray-50 min-h-screen font-inter">
+        <div class="py-6 px-4 sm:px-6 lg:px-8 bg-gray-950 min-h-screen font-inter">
             <div class="max-w-7xl mx-auto">
-                <div class="bg-white overflow-hidden shadow-2xl rounded-3xl p-8 transition-all duration-300 transform hover:scale-[1.005]">
-                    
-                    <!-- Header and Search -->
-                    <div class="flex flex-col sm:flex-row items-center justify-between mb-8 space-y-4 sm:space-y-0">
-                        <h3 class="text-2xl font-extrabold text-gray-900">User List</h3>
-                        <div class="relative w-full sm:w-auto">
-                            <input
-                                type="text"
-                                v-model="search"
-                                placeholder="Search users..."
-                                class="w-full sm:w-64 pl-10 pr-4 py-2 rounded-full border border-gray-300 shadow-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all duration-300"
-                            >
-                            <svg class="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                                <path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clip-rule="evenodd" />
-                            </svg>
+                <div class="bg-gray-900 overflow-hidden shadow-xl sm:rounded-lg p-6">
+                    <!-- Top Bar: Search, Items per page, Actions -->
+                    <div class="flex flex-col md:flex-row items-center justify-between mb-6 space-y-4 md:space-y-0 md:space-x-4">
+                        <div class="flex items-center space-x-4 w-full md:w-auto">
+                            <select v-model="itemsPerPage" class="py-2 px-4 rounded-lg bg-gray-700 text-gray-200 border border-gray-600 focus:ring-blue-500 focus:border-blue-500">
+                                <option value="10">10</option>
+                                <option value="25">25</option>
+                                <option value="50">50</option>
+                                <option value="100">100</option>
+                            </select>
+                            <div class="relative flex-grow">
+                                <input
+                                    type="text"
+                                    v-model="search"
+                                    placeholder="Search User"
+                                    class="w-full pl-10 pr-4 py-2 rounded-lg bg-gray-700 text-gray-200 placeholder-gray-400 border border-gray-600 focus:ring-blue-500 focus:border-blue-500"
+                                >
+                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="flex space-x-2 w-full md:w-auto justify-end">
+                            <button class="flex items-center px-4 py-2 bg-gray-700 text-gray-200 rounded-lg hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-gray-800 border border-gray-600">
+                                <svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                                Export
+                            </button>
+                            <button class="flex items-center px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 focus:ring-offset-gray-800">
+                                <svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+                                Add New User
+                            </button>
                         </div>
                     </div>
 
                     <!-- Table -->
-                    <div class="overflow-x-auto rounded-xl border border-gray-200 shadow-inner">
-                        <table class="min-w-full divide-y divide-gray-200">
-                            <thead class="bg-gray-100">
+                    <div class="overflow-x-auto rounded-lg border border-gray-700">
+                        <table class="min-w-full divide-y divide-gray-700">
+                            <thead class="bg-gray-700">
                                 <tr>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider rounded-tl-xl">
-                                        User
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                        <input type="checkbox" class="form-checkbox h-4 w-4 text-blue-600 bg-gray-800 border-gray-600 rounded">
                                     </th>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Role</th>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider rounded-tr-xl">Actions</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">User</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Role</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
                                 </tr>
                             </thead>
-                            <tbody class="bg-white divide-y divide-gray-200">
-                                <tr v-for="user in paginatedUsers" :key="user.id" class="hover:bg-gray-50 transition-colors duration-150">
+                            <tbody class="bg-gray-800 divide-y divide-gray-700">
+                                <tr v-for="user in paginatedUsers" :key="user.id" class="hover:bg-gray-700">
                                     <td class="px-6 py-4 whitespace-nowrap">
-                                        <div class="flex items-center">
-                                            <div class="flex-shrink-0 h-10 w-10">
-                                                <div class="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 font-bold">
-                                                    {{ user.name.charAt(0).toUpperCase() }}
-                                                </div>
-                                            </div>
-                                            <div class="ml-4">
-                                                <div class="text-sm font-medium text-gray-900">{{ user.name }}</div>
-                                                <div class="text-xs text-gray-500">{{ user.email }}</div>
-                                            </div>
-                                        </div>
+                                        <input type="checkbox" class="form-checkbox h-4 w-4 text-blue-600 bg-gray-900 border-gray-700 rounded">
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap">
-                                        <div class="flex items-center space-x-2">
-                                            <span v-for="role in user.roles" :key="role" :class="[
-                                                'inline-flex items-center px-3 py-1 rounded-full text-xs font-bold shadow-sm',
-                                                roleColors[role] || 'bg-gray-400 text-white'
-                                            ]">
-                                                {{ role.charAt(0).toUpperCase() + role.slice(1) }}
-                                            </span>
-                                            <span v-if="user.roles.length === 0" class="text-gray-400 text-xs">No Role</span>
+                                        <div class="text-sm font-medium text-gray-200 flex items-center">
+                                            <svg class="h-4 w-4 text-gray-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+                                            {{ user.name }}
                                         </div>
+                                        <div class="text-sm text-gray-400 ml-6">{{ user.email }}</div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <span v-for="role in user.roles" :key="role" :class="[
+                                            'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium mr-1',
+                                            role === 'admin' ? 'bg-purple-600 text-white' :
+                                            role === 'editor' ? 'bg-yellow-600 text-white' :
+                                            role === 'subscriber' ? 'bg-blue-600 text-white' :
+                                            role === 'maintainer' ? 'bg-teal-600 text-white' :
+                                            role === 'author' ? 'bg-orange-600 text-white' :
+                                            role === 'student' ? 'bg-pink-600 text-white' : // Student role color
+                                            role === 'teacher' ? 'bg-green-600 text-white' : // Teacher role color
+                                            role === 'accounts' ? 'bg-indigo-600 text-white' : // Accounts role color
+                                            'bg-gray-500 text-white'
+                                        ]">
+                                            <span v-if="role === 'editor'" class="mr-1">✏️</span>
+                                            <span v-else-if="role === 'subscriber'" class="mr-1">👤</span>
+                                            <span v-else-if="role === 'admin'" class="mr-1">👑</span>
+                                            <span v-else-if="role === 'maintainer'" class="mr-1">⚙️</span>
+                                            <span v-else-if="role === 'author'" class="mr-1">✍️</span>
+                                            <span v-else-if="role === 'student'" class="mr-1">🎓</span>
+                                            <span v-else-if="role === 'teacher'" class="mr-1">🧑‍🏫</span>
+                                            <span v-else-if="role === 'accounts'" class="mr-1">💰</span>
+                                            {{ role.charAt(0).toUpperCase() + role.slice(1) }}
+                                        </span>
+                                        <span v-if="user.roles.length === 0" class="text-gray-500 text-xs">No Role</span>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                         <div class="flex items-center space-x-2">
-                                            <button @click="openRoleModal(user)" class="text-blue-600 hover:text-blue-800 font-bold transition-colors duration-150">
-                                                Edit Role
+                                            <button @click="openRoleModal(user)" class="text-gray-400 hover:text-gray-300">
+                                                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L15.232 5.232z"></path></svg>
+                                            </button>
+                                            <button class="text-gray-400 hover:text-gray-300">
+                                                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                            </button>
+                                            <button class="text-gray-400 hover:text-gray-300">
+                                                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                                            </button>
+                                            <button class="text-gray-400 hover:text-gray-300">
+                                                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                                             </button>
                                         </div>
                                     </td>
                                 </tr>
-                                <tr v-if="filteredUsers.length === 0">
-                                    <td colspan="3" class="px-6 py-4 text-center text-sm text-gray-500">
-                                        No users found matching your search.
-                                    </td>
+                                <tr v-if="displayedUsers.length === 0">
+                                    <td colspan="4" class="px-6 py-4 whitespace-nowrap text-sm text-gray-400 text-center">No users found.</td>
                                 </tr>
                             </tbody>
                         </table>
                     </div>
 
                     <!-- Pagination -->
-                    <div class="flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 rounded-b-xl sm:px-6 mt-6">
+                    <div class="flex items-center justify-between border-t border-gray-700 bg-gray-800 px-4 py-3 sm:px-6 rounded-b-lg">
                         <div class="flex flex-1 justify-between sm:hidden">
-                            <button @click="goToPage(currentPage - 1)" :disabled="currentPage === 1" class="relative inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Previous</button>
-                            <button @click="goToPage(currentPage + 1)" :disabled="currentPage === totalPages" class="relative ml-3 inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Next</button>
+                            <button @click="goToPage(currentPage - 1)" :disabled="currentPage === 1" class="relative inline-flex items-center rounded-md border border-gray-600 bg-gray-700 px-4 py-2 text-sm font-medium text-gray-300 hover:bg-gray-600">Previous</button>
+                            <button @click="goToPage(currentPage + 1)" :disabled="currentPage === totalPages" class="relative ml-3 inline-flex items-center rounded-md border border-gray-600 bg-gray-700 px-4 py-2 text-sm font-medium text-gray-300 hover:bg-gray-600">Next</button>
                         </div>
                         <div class="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
                             <div>
-                                <p class="text-sm text-gray-700">
-                                    Showing <span class="font-medium">{{ (currentPage - 1) * itemsPerPage + 1 }}</span> to <span class="font-medium">{{ Math.min(currentPage * itemsPerPage, filteredUsers.length) }}</span> of <span class="font-medium">{{ filteredUsers.length }}</span> entries
+                                <p class="text-sm text-gray-300">
+                                    Showing
+                                    <span class="font-medium">{{ (currentPage - 1) * itemsPerPage + 1 }}</span>
+                                    to
+                                    <span class="font-medium">{{ Math.min(currentPage * itemsPerPage, displayedUsers.length) }}</span>
+                                    of
+                                    <span class="font-medium">{{ displayedUsers.length }}</span>
+                                    entries
                                 </p>
                             </div>
                             <div>
                                 <nav class="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
-                                    <button @click="goToPage(currentPage - 1)" :disabled="currentPage === 1" class="relative inline-flex items-center rounded-l-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 transition-colors duration-150">
+                                    <button @click="goToPage(currentPage - 1)" :disabled="currentPage === 1" class="relative inline-flex items-center rounded-l-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-700 hover:bg-gray-700 focus:z-20 focus:outline-offset-0">
                                         <span class="sr-only">Previous</span>
                                         <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                                             <path fill-rule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clip-rule="evenodd" />
                                         </svg>
                                     </button>
                                     <button v-for="page in totalPages" :key="page" @click="goToPage(page)" :aria-current="currentPage === page ? 'page' : undefined" :class="[
-                                        'relative inline-flex items-center px-4 py-2 text-sm font-semibold focus:z-20 focus:outline-offset-0 transition-colors duration-150',
-                                        currentPage === page ? 'z-10 bg-orange-600 text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-600' : 'text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50'
+                                        'relative inline-flex items-center px-4 py-2 text-sm font-semibold focus:z-20 focus:outline-offset-0',
+                                        currentPage === page ? 'z-10 bg-orange-500 text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-500' : 'text-gray-300 ring-1 ring-inset ring-gray-700 hover:bg-gray-700 hover:text-white'
                                     ]">
                                         {{ page }}
                                     </button>
-                                    <button @click="goToPage(currentPage + 1)" :disabled="currentPage === totalPages" class="relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 transition-colors duration-150">
+                                    <button @click="goToPage(currentPage + 1)" :disabled="currentPage === totalPages" class="relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-700 hover:bg-gray-700 focus:z-20 focus:outline-offset-0">
                                         <span class="sr-only">Next</span>
                                         <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                                             <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" />
@@ -253,106 +248,39 @@ const roleColors = {
         </div>
 
         <!-- Role Assignment Modal -->
-        <!-- We use Vue's built-in <Transition> component for a smoother animation. -->
-        <!-- The name 'fade' links it to the CSS transition classes. -->
-        <Transition name="fade">
-            <div v-if="showRoleModal" class="fixed inset-0 bg-gray-900 bg-opacity-80 backdrop-blur-sm h-full w-full flex items-center justify-center z-50">
-                <div class="relative p-8 border border-gray-800 w-full max-w-lg shadow-2xl rounded-2xl bg-gray-950 text-white">
-                    <h3 class="text-3xl font-bold text-gray-100 mb-6">Assign Role to <span class="text-orange-400">{{ selectedUser?.name }}</span></h3>
-                    <form @submit.prevent="assignRole">
-                        <div class="mb-6">
-                            <InputLabel for="role" value="Select Role" class="text-gray-300 mb-4" />
-                            <div class="flex flex-wrap gap-2">
-                                <button
-                                    type="button"
-                                    @click="form.role = roleName"
-                                    v-for="roleName in availableRolesDisplay"
-                                    :key="roleName"
-                                    :class="[
-                                        'px-4 py-2 text-sm font-semibold rounded-full shadow-lg transition-all duration-200 transform',
-                                        roleName === form.role 
-                                            ? 'bg-orange-500 text-white scale-105 ring-2 ring-orange-500 ring-offset-2 ring-offset-gray-950' 
-                                            : 'bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-white',
-                                        'focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 focus:ring-offset-gray-950'
-                                    ]"
-                                >
-                                    {{ roleName.charAt(0).toUpperCase() + roleName.slice(1) }}
-                                </button>
-                                <!-- Optional: Button for "No Role" -->
-                                <button
-                                    type="button"
-                                    @click="form.role = ''"
-                                    :class="[
-                                        'px-4 py-2 text-sm font-semibold rounded-full shadow-lg transition-all duration-200 transform',
-                                        form.role === ''
-                                            ? 'bg-gray-600 text-white scale-105 ring-2 ring-gray-600 ring-offset-2 ring-offset-gray-950'
-                                            : 'bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-white',
-                                        'focus:outline-none focus:ring-2 focus:ring-gray-600 focus:ring-offset-2 focus:ring-offset-gray-950'
-                                    ]"
-                                >
-                                    No Role
-                                </button>
-                            </div>
-                            <InputError class="mt-4" :message="form.errors.role" />
-                        </div>
-                        <div class="flex justify-end space-x-4">
-                            <button type="button" @click="showRoleModal = false" class="inline-flex justify-center py-2 px-4 border border-gray-700 shadow-sm text-sm font-medium rounded-full text-gray-300 bg-gray-800 hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-600 focus:ring-offset-gray-950">
-                                Cancel
-                            </button>
-                            <PrimaryButton :class="{ 'opacity-25': form.processing }" :disabled="form.processing" class="bg-orange-600 hover:bg-orange-700 rounded-full">
-                                {{ form.processing ? 'Assigning...' : 'Assign Role' }}
-                            </PrimaryButton>
-                        </div>
-                    </form>
-                </div>
+        <div v-if="showRoleModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 overflow-y-auto h-full w-full flex items-center justify-center z-50">
+            <div class="relative p-8 border border-gray-700 w-full max-w-md shadow-lg rounded-lg bg-gray-800 text-gray-200">
+                <h3 class="text-xl font-bold text-white mb-6">Assign Role to {{ selectedUser?.name }}</h3>
+                <form @submit.prevent="assignRole">
+                    <div class="mb-6">
+                        <InputLabel for="role" value="Select Role" class="text-gray-300 mb-2" />
+                        <select
+                            id="role"
+                            v-model="form.role"
+                            class="mt-1 block w-full pl-3 pr-10 py-2 text-base bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-gray-200"
+                        >
+                            <option value="" class="bg-gray-700 text-gray-200">No Role</option>
+                            <option v-for="roleName in availableRolesDisplay" :key="roleName" :value="roleName" class="bg-gray-700 text-gray-200">
+                                {{ roleName.charAt(0).toUpperCase() + roleName.slice(1) }}
+                            </option>
+                        </select>
+                        <InputError class="mt-2" :message="form.errors.role" />
+                    </div>
+                    <div class="flex justify-end space-x-4">
+                        <button type="button" @click="showRoleModal = false" class="inline-flex justify-center py-2 px-4 border border-gray-600 shadow-sm text-sm font-medium rounded-md text-gray-300 bg-gray-700 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 focus:ring-offset-gray-800">Cancel</button>
+                        <PrimaryButton :class="{ 'opacity-25': form.processing }" :disabled="form.processing" class="bg-blue-600 hover:bg-blue-700">
+                            {{ form.processing ? 'Assigning...' : 'Assign Role' }}
+                        </PrimaryButton>
+                    </div>
+                </form>
             </div>
-        </Transition>
-        
-        <!-- We also use a Transition for the backdrop for a consistent feel -->
-        <Transition name="fade-backdrop">
-            <div v-if="showRoleModal" class="fixed inset-0 bg-gray-900 bg-opacity-50 z-40"></div>
-        </Transition>
+        </div>
     </AuthenticatedLayout>
 </template>
 
 <style scoped>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
-
+/* No specific styles needed beyond TailwindCSS for this component */
 .font-inter {
     font-family: 'Inter', sans-serif;
-}
-
-/* * The custom keyframe animation has been replaced by Vue's <Transition> component.
-* We define classes for the modal's enter and leave states.
-*/
-
-/* Transition classes for the main modal content (named 'fade') */
-.fade-enter-active,
-.fade-leave-active {
-    transition: opacity 0.3s ease, transform 0.3s ease;
-}
-.fade-enter-from,
-.fade-leave-to {
-    opacity: 0;
-    transform: scale(0.95);
-}
-.fade-enter-to,
-.fade-leave-from {
-    opacity: 1;
-    transform: scale(1);
-}
-
-/* Transition classes for the backdrop (named 'fade-backdrop') */
-.fade-backdrop-enter-active,
-.fade-backdrop-leave-active {
-    transition: opacity 0.3s ease;
-}
-.fade-backdrop-enter-from,
-.fade-backdrop-leave-to {
-    opacity: 0;
-}
-.fade-backdrop-enter-to,
-.fade-backdrop-leave-from {
-    opacity: 1;
 }
 </style>

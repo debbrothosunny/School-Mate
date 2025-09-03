@@ -6,31 +6,26 @@ import PrimaryButton from '@/Components/PrimaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
 import { Head, useForm, Link } from '@inertiajs/vue3';
 
-
-// Props are no longer needed as we're not fetching teachers/sections
-// const props = defineProps({
-//     teachers: Array,
-//     sections: Array,
-// });
-
-const form = useForm({
-    class_name: '', // Renamed 'name' to 'class_name' for consistency with DB
-    status: 0, // Default to Active
-    total_classes: 0, // Added total_classes with a default value
+// Accept the list of teachers as a prop.
+const props = defineProps({
+    teachers: {
+        type: Array,
+        default: () => [], // Set a default empty array to avoid errors
+    },
 });
 
-// The displayedSubject watch is removed as teacher selection is no longer part of this form.
+// A new form field for the selected teacher's ID.
+const form = useForm({
+    class_name: '',
+    status: 0,
+    total_classes: 0,
+    teacher_id: '', // <-- CHANGED to teacher_id
+});
 
 const submit = () => {
-    // Only send fields that are in the class_names table
-    const dataToSend = {
-        class_name: form.class_name,
-        status: form.status,
-        total_classes: form.total_classes, // Include total_classes in dataToSend
-    };
-
-    form.post(route('class-names.store'), dataToSend, {
-        onFinish: () => form.reset('class_name', 'status', 'total_classes'), // Reset all relevant fields
+    // The form data is automatically gathered from the `useForm` object.
+    form.post(route('class-names.store'), {
+        onFinish: () => form.reset('class_name', 'status', 'total_classes', 'teacher_id'),
     });
 };
 </script>
@@ -48,6 +43,30 @@ const submit = () => {
                 <div class="card-body p-4 text-dark">
                     <form @submit.prevent="submit">
                         <div class="row g-4">
+                            <!-- Teacher Name Dropdown -->
+                            <div class="col-12">
+                                <div class="mb-3">
+                                    <InputLabel for="teacher_id" value="Assigned Class Teacher" class="form-label" />
+                                    <select
+                                        id="teacher_id"
+                                        class="form-select"
+                                        v-model="form.teacher_id"
+                                        required
+                                    >
+                                        <option value="" disabled>Select a Teacher</option>
+                                        <!-- Loop through the teachers prop to create dropdown options -->
+                                        <option
+                                            v-for="teacher in teachers"
+                                            :key="teacher.id"
+                                            :value="teacher.id"
+                                        >
+                                            {{ teacher.name }} ({{ teacher.subject_taught }})
+                                        </option>
+                                    </select>
+                                    <InputError class="mt-2" :message="form.errors.teacher_id" />
+                                </div>
+                            </div>
+
                             <!-- Class Name -->
                             <div class="col-12">
                                 <div class="mb-3">

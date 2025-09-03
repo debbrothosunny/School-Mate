@@ -16,6 +16,11 @@ return new class extends Migration
             $table->string('class_name'); 
             $table->tinyInteger('status')->default(0); //0 means active 1 means inactive
             $table->unsignedSmallInteger('total_classes')->default(0);
+
+            // Add the foreign key to link to the 'teachers' table
+            $table->foreignId('teacher_id')
+                  ->constrained() // This assumes the foreign key is named after the model (teacher) followed by _id.
+                  ->onDelete('cascade');
             $table->timestamps();
         });
     }

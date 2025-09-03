@@ -29,7 +29,7 @@ class Book extends Model
 
     /**
      * Get the borrow records for the book.
-     */
+    */
     public function borrowRecords(): HasMany
     {
         return $this->hasMany(BorrowBook::class);

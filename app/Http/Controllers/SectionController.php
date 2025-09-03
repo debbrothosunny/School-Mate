@@ -41,10 +41,12 @@ class SectionController extends Controller
             Section::create($validated);
             DB::commit();
 
-            return redirect()->route('sections.index')->with('flash', [
-                'message' => 'Section "' . $validated['name'] . '" created successfully!',
-                'type' => 'success'
-            ]);
+        // 5. Redirect with a success message
+        return redirect()->route('sections.index')
+        ->with('flash', ['type'=>'success','message'=>'Section created successfully!']);
+
+
+            
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('Section creation failed: ' . $e->getMessage());

@@ -50,4 +50,27 @@ class RegisteredUserController extends Controller
 
         return redirect(route('dashboard', absolute: false));
     }
+
+
+    public function checkContactInfo(Request $request)
+    {
+        $email = $request->input('email');
+        $contactInfo = $request->input('contact_info');
+
+        $errors = [];
+
+        if ($email && User::where('email', $email)->exists()) {
+            $errors['email'] = ['This email is already registered.'];
+        }
+
+        if ($contactInfo && User::where('contact_info', $contactInfo)->exists()) {
+            $errors['contact_info'] = ['This contact number is already registered.'];
+        }
+
+        if (count($errors) > 0) {
+            return response()->json(['errors' => $errors], 422); // Use 422 Unprocessable Entity
+        }
+
+        return response()->json(['message' => 'Available'], 200);
+    }
 }

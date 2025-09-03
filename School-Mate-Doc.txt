@@ -288,5 +288,5 @@ Do you want to start by focusing on setting up the fee_types table and then the 
 
 git init 
 git add .
-git commit -m "12-02-2025 Last Update"
+git commit -m "23-08-2025 Last Update"
 PS C:\xampp\htdocs\trip_planner> git push -u origin master

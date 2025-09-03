@@ -8,12 +8,14 @@ use App\Models\Subject;
 use App\Models\Teacher;
 use App\Models\Section;
 use App\Models\ClassSession;
+use App\Models\ClassTimeSlot;
 use App\Models\Room;
 use App\Models\ClassSubject;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Validation\Rule;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Log;
 
 class ClassTimeController extends Controller
 {
@@ -29,10 +31,11 @@ class ClassTimeController extends Controller
         $subjects = Subject::where('status', 0)->get(['id', 'name', 'code']);
         $teachers = Teacher::where('status', 0)->get(['id', 'name', 'subject_taught']);
         $rooms = Room::where('status', 0)->get(['id', 'name']); // Fetch active rooms for dropdown
+        $timeSlots = ClassTimeSlot::get(['id', 'start_time', 'end_time']);
 
         // Apply filters based on request input
         $query = ClassTime::query()
-            ->with(['className', 'subject', 'teacher', 'section', 'session', 'room']); // Eager load 'room' relationship
+            ->with(['className', 'subject', 'teacher', 'section', 'session', 'room', 'classTimeSlot']);
 
         if ($request->filled('class_name_id')) {
             $query->where('class_name_id', $request->class_name_id);
@@ -52,16 +55,18 @@ class ClassTimeController extends Controller
         if ($request->filled('subject_id')) {
             $query->where('subject_id', $request->subject_id);
         }
-        if ($request->filled('room_id')) { // Add filter for room_id
+        if ($request->filled('room_id')) {
             $query->where('room_id', $request->room_id);
+        }
+        // --- UPDATED: Filter by class_time_slot_id instead of start/end time
+        if ($request->filled('class_time_slot_id')) {
+            $query->where('class_time_slot_id', $request->class_time_slot_id);
         }
 
         // Order results for better display
         $timetableEntries = $query->orderBy('day_of_week')
-                                    ->orderBy('start_time')
-                                    ->get();
-
-        // dd($timetableEntries->toArray());
+            ->orderBy('class_time_slot_id') // --- UPDATED: Order by the new ID
+            ->get();
 
         return Inertia::render('Timetable/Index', [
             'classes' => $classes,
@@ -69,25 +74,49 @@ class ClassTimeController extends Controller
             'sections' => $sections,
             'subjects' => $subjects,
             'teachers' => $teachers,
-            'rooms' => $rooms, // Pass rooms to the Inertia view for filter dropdown
+            'rooms' => $rooms,
+            'timeSlots' => $timeSlots, // --- NEW: Pass time slots for filter dropdown
             'timetableEntries' => $timetableEntries,
-            'selectedFilters' => $request->only(['class_name_id', 'session_id', 'section_id', 'day_of_week', 'teacher_id', 'subject_id', 'room_id']), // Include room_id in selected filters
+            'selectedFilters' => $request->only(['class_name_id', 'session_id', 'section_id', 'day_of_week', 'teacher_id', 'subject_id', 'room_id', 'class_time_slot_id']),
             'flash' => session('flash'),
         ]);
     }
 
     public function create()
     {
-        $classes = ClassName::where('status', 0)->get(['id', 'class_name as name']);
-        $sessions = ClassSession::where('status', 0)->get(['id', 'name']);
-        $sections = Section::where('status', 0)->get(['id', 'name']);
-        $rooms = Room::where('status', 0)->get(['id', 'name']); // Fetch active rooms for create form
+        // Fetch all necessary data from the database
+        $classNames = ClassName::all();
+        $sections = Section::all();
+        $sessions = ClassSession::all();
+        $subjects = Subject::all();
+        $teachers = Teacher::all();
+        $rooms = Room::all();
+        $timeSlots = ClassTimeSlot::all();
+        
+        // Static array for days of the week, as it's not dynamic data
+        $daysOfWeek = [
+            'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'
+        ];
 
+        // Fetch the class-subject-teacher assignments
+        $classSubjects = ClassSubject::all();
+
+        // Fetch all existing timetable entries to check for booked slots
+        // This data is what the Vue component uses for the real-time availability check
+        $existingTimetables = ClassTime::all();
+
+        // Render the Vue component and pass all the data as props
         return Inertia::render('Timetable/Create', [
-            'classes' => $classes,
-            'sessions' => $sessions,
+            'classNames' => $classNames,
             'sections' => $sections,
-            'rooms' => $rooms, // Pass rooms to the Create view
+            'sessions' => $sessions,
+            'subjects' => $subjects,
+            'teachers' => $teachers,
+            'rooms' => $rooms,
+            'timeSlots' => $timeSlots,
+            'daysOfWeek' => $daysOfWeek,
+            'classSubjects' => $classSubjects,
+            'existingTimetables' => $existingTimetables,
         ]);
     }
 
@@ -96,217 +125,210 @@ class ClassTimeController extends Controller
      */
     public function store(Request $request)
     {
-        $validated = $request->validate([
+        // 1. Validate the incoming request data first
+        $validatedData = $request->validate([
             'class_name_id' => 'required|exists:class_names,id',
             'subject_id' => 'required|exists:subjects,id',
             'teacher_id' => 'required|exists:teachers,id',
             'section_id' => 'required|exists:sections,id',
             'session_id' => 'required|exists:class_sessions,id',
-            'day_of_week' => ['required', Rule::in(['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'])],
-            'start_time' => 'required|date_format:H:i',
-            'end_time' => 'required|date_format:H:i|after:start_time',
-            'room_id' => 'nullable|exists:rooms,id',
-            'status' => 'required|integer|in:0,1',
+            'day_of_week' => 'required|string',
+            'room_id' => 'required|exists:rooms,id',
+            'class_time_slot_id' => 'required|exists:class_time_slots,id',
         ]);
 
-        // Backend conflict detection (in addition to database unique constraints)
-        $conflicts = ClassTime::where('session_id', $validated['session_id'])
-            ->where('day_of_week', $validated['day_of_week'])
-            ->where(function ($query) use ($validated) {
-                // Check for overlapping times
-                $query->where(function ($q) use ($validated) {
-                    $q->where('start_time', '<', $validated['end_time'])
-                      ->where('end_time', '>', $validated['start_time']);
-                });
-            })
-            ->where(function ($query) use ($validated) {
-                // Check for conflicts by class-section, teacher, or room
-                $query->where(function ($q) use ($validated) {
-                    $q->where('class_name_id', $validated['class_name_id'])
-                      ->where('section_id', $validated['section_id']);
-                })
-                ->orWhere('teacher_id', $validated['teacher_id']);
+        // 2. Perform the conflict checks
+        // Check if the selected room is already booked for this day and time slot
+        $roomConflict = ClassTime::where('day_of_week', $validatedData['day_of_week'])
+                                 ->where('class_time_slot_id', $validatedData['class_time_slot_id'])
+                                 ->where('room_id', $validatedData['room_id'])
+                                 ->exists();
 
-                // Room conflict: Only check if room_id is provided
-                if (!empty($validated['room_id'])) {
-                    $query->orWhere('room_id', $validated['room_id']);
-                }
-            })
-            ->exists();
+        // Check if the selected teacher is already booked for this day and time slot
+        $teacherConflict = ClassTime::where('day_of_week', $validatedData['day_of_week'])
+                                    ->where('class_time_slot_id', $validatedData['class_time_slot_id'])
+                                    ->where('teacher_id', $validatedData['teacher_id'])
+                                    ->exists();
 
-        if ($conflicts) {
-            return redirect()->back()->withErrors([
-                'general' => 'A conflict was detected: The selected class-section, teacher, or room is already booked for this time slot.'
-            ])->withInput();
+        // 3. Handle the results
+        if ($roomConflict) {
+            return back()->with('message', [
+                'type' => 'error',
+                'text' => 'The selected room is already booked for this time slot.',
+            ]);
         }
 
-
-        ClassTime::create($validated);
-
-        return redirect()->route('timetable.index')->with('flash', [
-            'message' => 'Timetable entry created successfully!',
-            'type' => 'success'
-        ]);
-    }
-
-
-    public function checkConflicts(Request $request)
-    {
-        // Validate the incoming data for the conflict check
-        $request->validate([
-            'class_name_id' => 'required|exists:class_names,id',
-            'subject_id' => 'required|exists:subjects,id',
-            'teacher_id' => 'required|exists:teachers,id',
-            'section_id' => 'required|exists:sections,id',
-            'session_id' => 'required|exists:class_sessions,id',
-            'day_of_week' => ['required', Rule::in(['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'])],
-            'start_time' => 'required|date_format:H:i',
-            'end_time' => 'required|date_format:H:i|after:start_time',
-            'room_id' => 'nullable|exists:rooms,id',
-            // 'timetable_id' => 'nullable|exists:class_times,id', // Optional: for edit page to exclude itself
-        ]);
-
-        $input = $request->only([
-            'class_name_id', 'subject_id', 'teacher_id', 'section_id', 'session_id',
-            'day_of_week', 'start_time', 'end_time', 'room_id'
-        ]);
-
-        // Start building the conflict query
-        $query = ClassTime::where('session_id', $input['session_id'])
-            ->where('day_of_week', $input['day_of_week'])
-            ->where(function ($q) use ($input) {
-                // Check for overlapping times
-                $q->where('start_time', '<', $input['end_time'])
-                  ->where('end_time', '>', $input['start_time']);
-            });
-
-        // Add conditions for class-section, teacher, or room conflicts
-        $query->where(function ($q) use ($input) {
-            // Class-Section conflict
-            $q->where(function ($subQ) use ($input) {
-                $subQ->where('class_name_id', $input['class_name_id'])
-                     ->where('section_id', $input['section_id']);
-            })
-            // Teacher conflict
-            ->orWhere('teacher_id', $input['teacher_id']);
-
-            // Room conflict (only if room_id is provided)
-            if (!empty($input['room_id'])) {
-                $q->orWhere('room_id', $input['room_id']);
-            }
-        });
-
-        // If checking for conflicts during an UPDATE (edit page), exclude the current entry
-        // For CREATE page, this is not needed. This is a common pattern, so I'll include it for future use.
-        // if ($request->filled('timetable_id')) {
-        //     $query->where('id', '!=', $request->timetable_id);
-        // }
-
-        $conflictingEntry = $query->with(['className', 'subject', 'teacher', 'section', 'room'])->first(); // Get the first conflicting entry with its relations
-
-        if ($conflictingEntry) {
-            // Format conflict details for the frontend
-            $conflictDetails = [
-                'isConflict' => true,
-                'message' => 'This time slot conflicts with an existing entry:',
-                'type' => 'conflict',
-                'details' => [
-                    'class_name' => $conflictingEntry->className->class_name ?? 'N/A',
-                    'section_name' => $conflictingEntry->section->name ?? 'N/A',
-                    'subject_name' => $conflictingEntry->subject->name ?? 'N/A',
-                    'teacher_name' => $conflictingEntry->teacher->name ?? 'N/A',
-                    'room_name' => $conflictingEntry->room->name ?? 'N/A',
-                    'day_of_week' => $conflictingEntry->day_of_week,
-                    'start_time' => $conflictingEntry->start_time->format('H:i'), // Ensure Carbon casts are used
-                    'end_time' => $conflictingEntry->end_time->format('H:i'),
-                ]
-            ];
-            return response()->json($conflictDetails, 409); // Use 409 Conflict status
+        if ($teacherConflict) {
+            return back()->with('message', [
+                'type' => 'error',
+                'text' => 'The selected teacher is already assigned to a class at this time.',
+            ]);
         }
 
-        return response()->json([
-            'isConflict' => false,
-            'message' => 'Time slot is available.',
-            'type' => 'available'
-        ]);
-    }
+        // 4. If no conflict, create the new class schedule entry
+        ClassTime::create($validatedData);
 
-
-
-    public function getOccupiedSlots(Request $request)
-    {
-        // Validate the incoming parameters
-        $request->validate([
-            'day_of_week' => ['required', Rule::in(['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'])],
-            'start_time' => 'required|date_format:H:i',
-            'end_time' => 'required|date_format:H:i',
-            'room_id' => 'nullable|exists:rooms,id', // room_id is optional but must exist if provided
-            'session_id' => 'required|exists:class_sessions,id', // Session ID is crucial for context
-            // 'exclude_timetable_id' => 'nullable|exists:class_times,id', // Optional: for edit page to exclude current entry
-        ]);
-
-        $dayOfWeek = $request->input('day_of_week');
-        $startTime = $request->input('start_time');
-        $endTime = $request->input('end_time');
-        $roomId = $request->input('room_id');
-        $sessionId = $request->input('session_id');
-        // $excludeId = $request->input('exclude_timetable_id'); // For edit page
-
-        $occupiedSlots = ClassTime::where('session_id', $sessionId)
-            ->where('day_of_week', $dayOfWeek)
-            // Check for overlapping times
-            ->where(function ($query) use ($startTime, $endTime) {
-                $query->where('start_time', '<', $endTime)
-                      ->where('end_time', '>', $startTime);
-            })
-            // Filter by room_id specifically
-            ->when($roomId, function ($query, $roomId) {
-                // If a room_id is provided, find entries in that room
-                return $query->where('room_id', $roomId);
-            }, function ($query) {
-                // If no room_id is provided, find entries where room_id is NULL
-                // This covers "no specific room" bookings
-                return $query->whereNull('room_id');
-            })
-            // ->when($excludeId, function ($query, $excludeId) { // For edit page
-            //     return $query->where('id', '!=', $excludeId);
-            // })
-            ->with(['className', 'subject', 'teacher', 'section', 'room']) // Eager load relationships
-            ->get();
-
-        // Transform results to a more frontend-friendly format if needed
-        $formattedSlots = $occupiedSlots->map(function ($slot) {
-            return [
-                'id' => $slot->id,
-                'class_name' => $slot->className->class_name ?? 'N/A',
-                'section_name' => $slot->section->name ?? 'N/A',
-                'subject_name' => $slot->subject->name ?? 'N/A',
-                'teacher_name' => $slot->teacher->name ?? 'N/A',
-                'room_name' => $slot->room->name ?? 'N/A',
-                'day_of_week' => $slot->day_of_week,
-                'start_time' => $slot->start_time->format('H:i'),
-                'end_time' => $slot->end_time->format('H:i'),
-            ];
-        });
-
-        return response()->json($formattedSlots);
+        // 5. Redirect with a success message
+        return redirect()->route('timetable.index')
+        ->with('flash', ['type'=>'success','message'=>'Class schedule created successfully!']);
     }
 
     /**
+     * Checks for scheduling conflicts based on the request data.
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+    */
+    // public function checkConflicts(Request $request)
+    // {
+    //     try {
+    //         // Log the incoming request data to help with debugging
+    //         Log::info('Incoming request data for conflict check:', ['data' => $request->all()]);
+
+    //         // 1. Validate the incoming data for the conflict check
+    //         $request->validate([
+    //             'class_name_id' => 'required|exists:class_names,id',
+    //             'subject_id' => 'required|exists:subjects,id',
+    //             'teacher_id' => 'required|exists:teachers,id',
+    //             'section_id' => 'required|exists:sections,id',
+    //             'session_id' => 'required|exists:class_sessions,id',
+    //             'day_of_week' => ['required', Rule::in(['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'])],
+    //             'class_time_slot_id' => 'required|exists:class_time_slots,id',
+    //             'room_id' => 'nullable|exists:rooms,id',
+    //         ]);
+
+    //         // 2. Build a comprehensive query to find any conflicting entry based on the class time slot ID
+    //         $conflictingEntry = ClassTime::where('session_id', $request->input('session_id'))
+    //             ->where('day_of_week', $request->input('day_of_week'))
+    //             ->where('class_time_slot_id', $request->input('class_time_slot_id'))
+    //             ->where(function ($query) use ($request) {
+    //                 // Group the OR conditions to check for any one of the three conflicts
+    //                 $query->where(function ($q) use ($request) {
+    //                     // Conflict for class-section
+    //                     $q->where('class_name_id', $request->input('class_name_id'))
+    //                         ->where('section_id', $request->input('section_id'));
+    //                 })->orWhere(function ($q) use ($request) {
+    //                     // Conflict for teacher
+    //                     $q->where('teacher_id', $request->input('teacher_id'));
+    //                 })->orWhere(function ($q) use ($request) {
+    //                     // Conflict for room if provided
+    //                     if (!empty($request->input('room_id'))) {
+    //                         $q->where('room_id', $request->input('room_id'));
+    //                     } else {
+    //                         // This clause ensures the orWhere group doesn't accidentally
+    //                         // return true if room_id is empty, but a conflict is not found.
+    //                         $q->whereRaw('1 = 0');
+    //                     }
+    //                 });
+    //             })
+    //             ->with(['className', 'subject', 'teacher', 'section', 'room', 'classTimeSlot'])
+    //             ->first();
+
+    //         // 3. If a conflict exists, return 409 with details
+    //         if ($conflictingEntry) {
+    //             return response()->json([
+    //                 'isConflict' => true,
+    //                 'type' => 'conflict',
+    //                 'message' => 'This time slot conflicts with an existing entry.',
+    //                 'details' => [
+    //                     'class_name' => optional($conflictingEntry->className)->name ?? 'N/A',
+    //                     'section_name' => optional($conflictingEntry->section)->name ?? 'N/A',
+    //                     'subject_name' => optional($conflictingEntry->subject)->name ?? 'N/A',
+    //                     'teacher_name' => optional($conflictingEntry->teacher)->name ?? 'N/A',
+    //                     'room_name' => optional($conflictingEntry->room)->name ?? 'N/A',
+    //                     'day_of_week' => $conflictingEntry->day_of_week,
+    //                     'start_time' => optional($conflictingEntry->classTimeSlot)->start_time ?? 'N/A',
+    //                     'end_time' => optional($conflictingEntry->classTimeSlot)->end_time ?? 'N/A',
+    //                 ],
+    //             ], 409);
+    //         }
+
+    //         // 4. No conflict found
+    //         return response()->json([
+    //             'isConflict' => false,
+    //             'type' => 'available',
+    //             'message' => 'Time slot is available.',
+    //         ], 200);
+
+    //     } catch (\Exception $e) {
+    //         // Log the real error with more details
+    //         Log::error('Conflict check failed: ' . $e->getMessage(), [
+    //             'trace' => $e->getTraceAsString(),
+    //             'input' => $request->all(),
+    //             'method' => $request->method(),
+    //             'url' => $request->fullUrl(),
+    //         ]);
+
+    //         // Return the specific error message for debugging
+    //         return response()->json([
+    //             'isConflict' => false,
+    //             'type' => 'error',
+    //             'message' => 'An error occurred while checking for conflicts.',
+    //             'exception_message' => $e->getMessage(),
+    //         ], 500);
+    //     }
+    // }
+
+    /**
+     * Gets a list of all occupied time slots for a given day and time range.
+     * This is used for the real-time availability display, now using a time slot ID.
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+    */
+    // public function getOccupiedSlots(Request $request)
+    // {
+    //     $request->validate([
+    //         'day_of_week' => ['required', Rule::in(['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'])],
+    //         'session_id' => 'required|exists:class_sessions,id',
+    //         'room_id' => 'nullable|exists:rooms,id',
+    //     ]);
+
+    //     $dayOfWeek = $request->input('day_of_week');
+    //     $roomId = $request->input('room_id', null);
+    //     $sessionId = $request->input('session_id');
+
+    //     $occupiedSlots = ClassTime::query()
+    //         ->where('session_id', $sessionId)
+    //         ->where('day_of_week', $dayOfWeek)
+    //         ->when($roomId, function ($query, $roomId) {
+    //             return $query->where('room_id', $roomId);
+    //         })
+    //         ->with(['className', 'subject', 'teacher', 'section', 'room', 'classTimeSlot']) // Ensure classTimeSlot is loaded
+    //         ->get();
+
+    //     $formattedSlots = $occupiedSlots->map(function ($slot) {
+    //         return [
+    //             'id' => $slot->id,
+    //             'class_name' => optional($slot->className)->name ?? 'N/A',
+    //             'section_name' => optional($slot->section)->name ?? 'N/A',
+    //             'subject_name' => optional($slot->subject)->name ?? 'N/A',
+    //             'teacher_name' => optional($slot->teacher)->name ?? 'N/A',
+    //             'room_name' => optional($slot->room)->name ?? 'N/A',
+    //             'day_of_week' => $slot->day_of_week,
+    //             'class_time_slot_id' => $slot->class_time_slot_id, // NEW: Include the slot ID
+    //             'start_time' => optional($slot->classTimeSlot)->start_time ?? 'N/A', // Get time from the relationship
+    //             'end_time' => optional($slot->classTimeSlot)->end_time ?? 'N/A', // Get time from the relationship
+    //         ];
+    //     });
+    //     return response()->json($formattedSlots);
+    // }
+
+
+    /**
      * Show the form for editing the specified timetable entry.
-     */
+    */
     public function edit(ClassTime $timetableEntry)
     {
-        // Eager load relationships for the current entry, including 'room'
-        $timetableEntry->load(['className', 'subject', 'teacher', 'section', 'session', 'room']);
+        $timetableEntry->load(['className', 'subject', 'teacher', 'section', 'session', 'room', 'classTimeSlot']); // --- NEW: Eager load classTimeSlot
 
-        // Provide all options for dropdowns, similar to index
         $classes = ClassName::where('status', 0)->get(['id', 'class_name as name']);
         $sessions = ClassSession::where('status', 0)->get(['id', 'name']);
         $sections = Section::where('status', 0)->get(['id', 'name']);
         $subjects = Subject::where('status', 0)->get(['id', 'name', 'code']);
         $teachers = Teacher::where('status', 0)->get(['id', 'name', 'subject_taught']);
-        $rooms = Room::where('status', 0)->get(['id', 'name']); // Fetch active rooms for edit form
+        $rooms = Room::where('status', 0)->get(['id', 'name']);
+        $timeSlots = ClassTimeSlot::where('status', 0)->get(['id', 'start_time', 'end_time']); // --- NEW: Fetch time slots
 
         return Inertia::render('Timetable/Edit', [
             'timetableEntry' => $timetableEntry,
@@ -315,9 +337,10 @@ class ClassTimeController extends Controller
             'sections' => $sections,
             'subjects' => $subjects,
             'teachers' => $teachers,
-            'rooms' => $rooms, // Pass rooms to the Edit view
+            'rooms' => $rooms,
+            'timeSlots' => $timeSlots, // --- NEW: Pass time slots to the Edit view
             'flash' => session('flash'),
-            'errors' => session('errors') ? session('errors')->getBag('default')->getMessages() : (object)[], // Ensure errors are passed
+            'errors' => session('errors') ? session('errors')->getBag('default')->getMessages() : (object)[],
         ]);
     }
 
@@ -326,6 +349,7 @@ class ClassTimeController extends Controller
      */
     public function update(Request $request, ClassTime $timetableEntry)
     {
+        // --- UPDATED VALIDATION ---
         $validated = $request->validate([
             'class_name_id' => 'required|exists:class_names,id',
             'subject_id' => 'required|exists:subjects,id',
@@ -333,32 +357,24 @@ class ClassTimeController extends Controller
             'section_id' => 'required|exists:sections,id',
             'session_id' => 'required|exists:class_sessions,id',
             'day_of_week' => ['required', Rule::in(['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'])],
-            'start_time' => 'required|date_format:H:i',
-            'end_time' => 'required|date_format:H:i|after:start_time',
+            'class_time_slot_id' => 'required|exists:class_time_slots,id', // --- NEW: Validate the new ID
             'room_id' => 'nullable|exists:rooms,id',
             'status' => 'required|integer|in:0,1',
         ]);
 
         // Conflict detection for update (exclude current entry from conflict check)
-        $conflicts = ClassTime::where('id', '!=', $timetableEntry->id) // Exclude current entry
+        // --- UPDATED: Logic simplified to check based on class_time_slot_id
+        $conflicts = ClassTime::where('id', '!=', $timetableEntry->id)
             ->where('session_id', $validated['session_id'])
             ->where('day_of_week', $validated['day_of_week'])
+            ->where('class_time_slot_id', $validated['class_time_slot_id'])
             ->where(function ($query) use ($validated) {
-                // Check for overlapping times
-                $query->where(function ($q) use ($validated) {
-                    $q->where('start_time', '<', $validated['end_time'])
-                      ->where('end_time', '>', $validated['start_time']);
-                });
-            })
-            ->where(function ($query) use ($validated) {
-                // Check for conflicts by class-section, teacher, or room
                 $query->where(function ($q) use ($validated) {
                     $q->where('class_name_id', $validated['class_name_id'])
-                      ->where('section_id', $validated['section_id']);
+                        ->where('section_id', $validated['section_id']);
                 })
-                ->orWhere('teacher_id', $validated['teacher_id']);
+                    ->orWhere('teacher_id', $validated['teacher_id']);
 
-                // Room conflict: Only check if room_id is provided
                 if (!empty($validated['room_id'])) {
                     $query->orWhere('room_id', $validated['room_id']);
                 }
@@ -411,15 +427,85 @@ class ClassTimeController extends Controller
 
         $subjects = $classSubjects->map(function ($cs) {
             return $cs->subject ? ['id' => $cs->subject->id, 'name' => $cs->subject->name, 'code' => $cs->subject->code] : null;
-        })->filter()->unique('id')->values(); // Get unique subjects and reset keys
+        })->filter()->unique('id')->values();
 
         $teachers = $classSubjects->map(function ($cs) {
             return $cs->teacher ? ['id' => $cs->teacher->id, 'name' => $cs->teacher->name, 'subject_taught' => $cs->teacher->subject_taught] : null;
-        })->filter()->unique('id')->values(); // Get unique teachers and reset keys
+        })->filter()->unique('id')->values();
 
         return response()->json([
             'subjects' => $subjects,
             'teachers' => $teachers,
         ]);
+    }
+
+    // For managing Class Time Slots (like periods, breaks, etc.)
+    public function classTimeSlotIndex()
+    {
+        $timeSlots = ClassTimeSlot::all();
+
+        return Inertia::render('ClassTimeSlots/Index', [
+            'timeSlots' => $timeSlots,
+        ]);
+    }
+
+    // Show the form for creating a new resource.
+    public function classTimeSlotCreate()
+    {
+        return Inertia::render('ClassTimeSlots/Create');
+    }
+
+    // Store a newly created resource in storage.
+    public function classTimeSlotStore(Request $request)
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:255|unique:class_time_slots,name',
+            'start_time' => 'required|date_format:H:i',
+            'end_time' => 'required|date_format:H:i|after:start_time',
+        ]);
+
+        ClassTimeSlot::create($validated);
+
+        return redirect()->route('class-time-slots.index')->with('success', 'Time slot created successfully.');
+    }
+
+
+    // Show the form for editing the specified resource.
+    public function classTimeSlotEdit(ClassTimeSlot $classTimeSlot)
+    {
+        return Inertia::render('ClassTimeSlots/Edit', [
+            'timeSlot' => $classTimeSlot,
+        ]);
+    }
+
+    public function classTimeSlotUpdate(Request $request, ClassTimeSlot $classTimeSlot)
+    {
+        // Intercept and format the time strings
+        $startTime = Carbon::parse($request->input('start_time'))->format('H:i');
+        $endTime = Carbon::parse($request->input('end_time'))->format('H:i');
+
+        // Create a new request object or modify the current one
+        $request->merge([
+            'start_time' => $startTime,
+            'end_time' => $endTime,
+        ]);
+
+        // Now, the validation will receive the corrected H:i format
+        $validated = $request->validate([
+            'name' => 'required|string|max:255|unique:class_time_slots,name,' . $classTimeSlot->id,
+            'start_time' => 'required|date_format:H:i',
+            'end_time' => 'required|date_format:H:i|after:start_time',
+        ]);
+
+        $classTimeSlot->update($validated);
+
+        return redirect()->route('class-time-slots.index')->with('success', 'Time slot updated successfully.');
+    }
+
+    public function classTimeSlotDestroy(ClassTimeSlot $classTimeSlot)
+    {
+        $classTimeSlot->delete();
+
+        return redirect()->route('class-time-slots.index')->with('success', 'Time slot deleted successfully.');
     }
 }

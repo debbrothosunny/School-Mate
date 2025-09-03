@@ -31,7 +31,7 @@ class Student extends Model
         'user_id',
         'admission_number',
         'roll_number',
-        'admission_fee_amount', // Remember to handle conversion (e.g., Taka to Paisa) in your application logic
+        'admission_fee_amount',
         'admission_fee_paid',
         'payment_method',
     ];
@@ -40,12 +40,14 @@ class Student extends Model
      * The attributes that should be cast.
      *
      * @var array<string, string>
-     */
+    */
     protected $casts = [
         'date_of_birth' => 'date',
         'admission_date' => 'date',
         'status' => 'integer',
     ];
+
+    
 
     // Relationship: A Student belongs to a ClassName (e.g., 'Class 1')
     public function className(): BelongsTo
@@ -114,8 +116,14 @@ class Student extends Model
     }
 
 
-    
 
+    /**
+     * Get the exam results for the student.
+    */
+    public function examResults(): HasMany
+    {
+        return $this->hasMany(ExamResult::class, 'student_id');
+    }
 
     
 }

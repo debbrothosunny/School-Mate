@@ -1,10 +1,10 @@
 <script setup>
+/* global Swal */
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue'
 import { Head, Link, useForm, usePage, router } from '@inertiajs/vue3'
 import PrimaryButton from '@/Components/PrimaryButton.vue'
 import DangerButton from '@/Components/DangerButton.vue'
-import TextInput from '@/Components/TextInput.vue'
-import { ref, computed, watchEffect } from 'vue'
+import { computed, watchEffect } from 'vue'
 
 const props = defineProps({
     classes: Array,
@@ -15,12 +15,14 @@ const props = defineProps({
     rooms: Array,
     timetableEntries: Array,
     selectedFilters: Object,
+    timeSlots: Array,
     flash: Object,
 });
 
+// --- Reactive State and Computed Properties ---
 const flash = computed(() => usePage().props.flash || {});
 
-// --- Filter Form State ---
+// Form state for filtering timetable entries
 const filterForm = useForm({
     class_name_id: props.selectedFilters.class_name_id || '',
     session_id: props.selectedFilters.session_id || '',
@@ -28,41 +30,30 @@ const filterForm = useForm({
     day_of_week: props.selectedFilters.day_of_week || '',
     teacher_id: props.selectedFilters.teacher_id || '',
     subject_id: props.selectedFilters.subject_id || '',
+    room_id: props.selectedFilters.room_id || '',
+    class_time_slot_id: props.selectedFilters.class_time_slot_id || '',
 });
 
+// Array of days of the week for the filter dropdown
 const daysOfWeek = [
-    { value: 'MONDAY', label: 'Monday' },
-    { value: 'TUESDAY', label: 'Tuesday' },
-    { value: 'WEDNESDAY', label: 'Wednesday' },
-    { value: 'THURSDAY', label: 'Thursday' },
-    { value: 'FRIDAY', label: 'Friday' },
-    { value: 'SATURDAY', label: 'Saturday' },
-    { value: 'SUNDAY', label: 'Sunday' },
+    { value: 'Monday', label: 'Monday' },
+    { value: 'Tuesday', label: 'Tuesday' },
+    { value: 'Wednesday', label: 'Wednesday' },
+    { value: 'Thursday', label: 'Thursday' },
+    { value: 'Friday', label: 'Friday' },
+    { value: 'Saturday', label: 'Saturday' },
+    { value: 'Sunday', label: 'Sunday' },
 ];
 
-// Function to apply filters
-const applyFilters = () => {
-    router.get(route('timetable.index'), filterForm.data(), {
-        preserveState: true,
-        preserveScroll: true,
-    });
-};
-
-// Function to clear filters
-const clearFilters = () => {
-    filterForm.reset();
-    applyFilters();
-};
-
-// --- Group Timetable Entries by Day ---
+// Computed property to group timetable entries by day of the week
 const groupedTimetable = computed(() => {
     const grouped = {};
     daysOfWeek.forEach(day => {
         grouped[day.value] = props.timetableEntries
             .filter(entry => entry.day_of_week === day.value)
             .sort((a, b) => {
-                const timeA = a.start_time;
-                const timeB = b.start_time;
+                const timeA = a.class_time_slot?.start_time || '00:00:00';
+                const timeB = b.class_time_slot?.start_time || '00:00:00';
                 if (timeA < timeB) return -1;
                 if (timeA > timeB) return 1;
                 return 0;
@@ -71,16 +62,28 @@ const groupedTimetable = computed(() => {
     return grouped;
 });
 
-// --- Delete Action ---
+// --- Functions and Methods ---
+const applyFilters = () => {
+    router.get(route('timetable.index'), filterForm.data(), {
+        preserveState: true,
+        preserveScroll: true,
+    });
+};
+
+const clearFilters = () => {
+    filterForm.reset();
+    applyFilters();
+};
+
 const deleteForm = useForm({});
 const confirmDelete = (entry) => {
     Swal.fire({
         title: 'Are you sure?',
-        text: `You want to delete the entry for ${entry.subject?.name} on ${entry.day_of_week} at ${entry.start_time}? This action cannot be undone.`,
+        text: `You want to delete the entry for ${entry.subject?.name} on ${entry.day_of_week} at ${entry.class_time_slot?.start_time}? This action cannot be undone.`,
         icon: 'warning',
         showCancelButton: true,
-        confirmButtonColor: '#ef4444', // Tailwind red-500
-        cancelButtonColor: '#3b82f6',  // Tailwind blue-500
+        confirmButtonColor: '#ef4444',
+        cancelButtonColor: '#3b82f6',
         confirmButtonText: 'Yes, delete it!'
     }).then((result) => {
         if (result.isConfirmed) {
@@ -102,7 +105,7 @@ const confirmDelete = (entry) => {
     });
 };
 
-// --- Flash Messages ---
+// Watch for flash messages and display them as toasts
 watchEffect(() => {
     if (flash.value && flash.value.message) {
         Swal.fire({
@@ -118,18 +121,18 @@ watchEffect(() => {
     }
 });
 
-// --- Inline SVG Icons ---
+// Inline SVG Icons for use in the template
 const icons = {
-  add: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 mr-1"><path d="M5 12h14"/><path d="M12 5v14"/></svg>`,
-  edit: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>`,
-  del: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4"><path d="M20 5H9l-7 7 7 7h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2Z"/><line x1="10" x2="16" y1="9" y2="15"/><line x1="16" x2="10" y1="9" y2="15"/></svg>`,
-  filter: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 mr-1"><path d="M3 6h18"/><path d="M7 12h10"/><path d="M10 18h4"/></svg>`,
-  clear: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 mr-1"><path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"/><line x1="18" x2="12" y1="9" y2="15"/><line x1="12" x2="18" y1="9" y2="15"/></svg>`
+    add: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 mr-1"><path d="M5 12h14"/><path d="M12 5v14"/></svg>`,
+    edit: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>`,
+    del: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4"><path d="M20 5H9l-7 7 7 7h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2Z"/><line x1="10" x2="16" y1="9" y2="15"/><line x1="16" x2="10" y1="9" y2="15"/></svg>`,
+    filter: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 mr-1"><path d="M3 6h18"/><path d="M7 12h10"/><path d="M10 18h4"/></svg>`,
+    clear: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 mr-1"><path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"/><line x1="18" x2="12" y1="9" y2="15"/><line x1="12" x2="18" y1="9" y2="15"/></svg>`
 };
 
 // Function to get icon string
 const getIcon = (iconName) => {
-  return icons[iconName];
+    return icons[iconName];
 };
 </script>
 
@@ -144,6 +147,7 @@ const getIcon = (iconName) => {
         <div class="py-12">
             <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
                 <div class="bg-white shadow-xl rounded-2xl p-6 sm:p-8">
+                    <!-- Header and Add New Entry Button -->
                     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
                         <h3 class="text-xl font-semibold text-gray-900 mb-2 sm:mb-0">Timetable Overview</h3>
                         <Link :href="route('timetable.create')" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-xl shadow-lg transition duration-300 flex items-center">
@@ -198,17 +202,31 @@ const getIcon = (iconName) => {
                                     <option v-for="subject in subjects" :key="subject.id" :value="subject.id">{{ subject.name }}</option>
                                 </select>
                             </div>
+                            <div>
+                                <label for="filter_room" class="block text-sm font-medium text-gray-700 mb-1">Room</label>
+                                <select id="filter_room" v-model="filterForm.room_id" @change="applyFilters" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                                    <option value="">All Rooms</option>
+                                    <option v-for="room in rooms" :key="room.id" :value="room.id">{{ room.name }}</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="filter_time_slot" class="block text-sm font-medium text-gray-700 mb-1">Time Slot</label>
+                                <select id="filter_time_slot" v-model="filterForm.class_time_slot_id" @change="applyFilters" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                                    <option value="">All Time Slots</option>
+                                    <option v-for="slot in timeSlots" :key="slot.id" :value="slot.id">{{ slot.start_time?.substring(0, 5) }} - {{ slot.end_time?.substring(0, 5) }}</option>
+                                </select>
+                            </div>
                         </div>
                         <div class="flex items-center space-x-4 mt-6">
-                          <button type="button" @click="applyFilters" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-xl shadow-md transition duration-300 flex items-center">
-                              <div v-html="getIcon('filter')"></div>
-                              Apply Filters
-                          </button>
-                          <button type="button" @click="clearFilters" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 px-4 rounded-xl shadow-md transition duration-300 flex items-center">
-                              <div v-html="getIcon('clear')"></div>
-                              Clear Filters
-                          </button>
-                      </div>
+                            <button type="button" @click="applyFilters" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-xl shadow-md transition duration-300 flex items-center">
+                                <div v-html="getIcon('filter')"></div>
+                                Apply Filters
+                            </button>
+                            <button type="button" @click="clearFilters" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 px-4 rounded-xl shadow-md transition duration-300 flex items-center">
+                                <div v-html="getIcon('clear')"></div>
+                                Clear Filters
+                            </button>
+                        </div>
                     </div>
 
                     <!-- Timetable Content -->
@@ -218,53 +236,61 @@ const getIcon = (iconName) => {
                     </div>
 
                     <div v-else>
-                      <template v-for="day in daysOfWeek" :key="day.value">
-                          <div v-if="groupedTimetable[day.value]?.length > 0" class="mb-8">
-                              <div class="bg-gray-800 text-white text-center py-2 rounded-t-xl mb-4 font-bold tracking-wide">
-                                  {{ day.label }}
-                              </div>
-                              <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                                  <div
-                                      v-for="entry in groupedTimetable[day.value]"
-                                      :key="entry.id"
-                                      class="bg-white p-6 rounded-xl shadow-md border border-gray-200 hover:shadow-lg transition-shadow duration-300 flex flex-col justify-between"
-                                  >
-                                      <div>
-                                          <div class="flex justify-between items-start mb-2">
-                                              <span class="text-sm font-medium text-gray-500">{{ entry.start_time?.substring(0, 5) }} - {{ entry.end_time?.substring(0, 5) }}</span>
-                                              <span
-                                                  :class="{
-                                                      'bg-green-100 text-green-800': entry.status === 0,
-                                                      'bg-red-100 text-red-800': entry.status === 1,
-                                                  }"
-                                                  class="px-2.5 py-0.5 rounded-full text-xs font-semibold"
-                                              >
-                                                  {{ entry.status === 0 ? 'Active' : 'Inactive' }}
-                                              </span>
-                                          </div>
-                                          <h4 class="text-lg font-bold text-gray-900">{{ entry.subject?.name || 'N/A' }}</h4>
-                                          <p class="text-sm text-gray-700 mb-2">
-                                              <span class="font-medium">Class:</span> {{ entry.className?.class_name || 'N/A' }} ({{ entry.section?.name || 'N/A' }})
-                                          </p>
-                                          <ul class="text-sm text-gray-600 space-y-1 mt-4 border-t pt-4">
-                                              <li><span class="font-medium">Teacher:</span> {{ entry.teacher?.name || 'N/A' }}</li>
-                                              <li><span class="font-medium">Room:</span> {{ entry.room?.name || 'N/A' }}</li>
-                                          </ul>
-                                      </div>
-                                      <div class="flex justify-end space-x-2 mt-4 pt-4 border-t">
-                                          <Link :href="route('timetable.edit', entry.id)" class="bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-3 rounded-lg flex items-center text-xs">
-                                              <div v-html="getIcon('edit')"></div>
-                                              <span class="ml-1">Edit</span>
-                                          </Link>
-                                          <DangerButton @click="confirmDelete(entry)" class="bg-red-500 hover:bg-red-600 text-white font-medium py-2 px-3 rounded-lg flex items-center text-xs">
-                                              <div v-html="getIcon('del')"></div>
-                                              <span class="ml-1">Delete</span>
-                                          </DangerButton>
-                                      </div>
-                                  </div>
-                              </div>
-                          </div>
-                      </template>
+                        <template v-for="day in daysOfWeek" :key="day.value">
+                            <div v-if="groupedTimetable[day.value]?.length > 0" class="mb-8">
+                                <div class="bg-gray-800 text-white text-center py-2 rounded-t-xl mb-4 font-bold tracking-wide">
+                                    {{ day.label }}
+                                </div>
+                                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                                    <div
+                                        v-for="entry in groupedTimetable[day.value]"
+                                        :key="entry.id"
+                                        class="bg-white p-6 rounded-xl shadow-md border border-gray-200 hover:shadow-lg transition-shadow duration-300 flex flex-col justify-between"
+                                    >
+                                        <div>
+                                            <div class="flex justify-between items-start mb-2">
+                                                <span class="text-sm font-medium text-gray-500">{{ entry.class_time_slot?.start_time?.substring(0, 5) }} - {{ entry.class_time_slot?.end_time?.substring(0, 5) }}</span>
+                                                <!-- FIX: Combined both class attributes into a single dynamic :class -->
+                                                <span
+                                                    :class="[
+                                                        'px-2.5 py-0.5 rounded-full text-xs font-semibold',
+                                                        {
+                                                            'bg-green-100 text-green-800': entry.status === 0,
+                                                            'bg-red-100 text-red-800': entry.status === 1,
+                                                        }
+                                                    ]"
+                                                >
+                                                    {{ entry.status === 0 ? 'Active' : 'Inactive' }}
+                                                </span>
+                                            </div>
+
+                                            <h4 class="text-lg font-bold text-gray-900">{{ entry.subject?.name || 'N/A' }}</h4>
+
+
+                                            <p class="text-sm text-gray-700 mb-2">
+                                                <span class="font-medium">Class:</span> {{ entry.className?.class_name || 'N/A' }} ({{ entry.section?.name || 'N/A' }})
+                                            </p>
+
+
+                                            <ul class="text-sm text-gray-600 space-y-1 mt-4 border-t pt-4">
+                                                <li><span class="font-medium">Teacher:</span> {{ entry.teacher?.name || 'N/A' }}</li>
+                                                <li><span class="font-medium">Room:</span> {{ entry.room?.name || 'N/A' }}</li>
+                                            </ul>
+                                        </div>
+                                        <div class="flex justify-end space-x-2 mt-4 pt-4 border-t">
+                                            <Link :href="route('timetable.edit', entry.id)" class="bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-3 rounded-lg flex items-center text-xs">
+                                                <div v-html="getIcon('edit')"></div>
+                                                <span class="ml-1">Edit</span>
+                                            </Link>
+                                            <DangerButton @click="confirmDelete(entry)" class="bg-red-500 hover:bg-red-600 text-white font-medium py-2 px-3 rounded-lg flex items-center text-xs">
+                                                <div v-html="getIcon('del')"></div>
+                                                <span class="ml-1">Delete</span>
+                                            </DangerButton>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
                     </div>
                 </div>
             </div>

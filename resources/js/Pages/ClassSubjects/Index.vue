@@ -17,6 +17,7 @@ const classSubjectToDelete = ref(null);
 const form = useForm({});
 
 const filteredClassSubjects = computed(() => {
+    // Check if the data exists before trying to filter
     if (!props.classSubjects || !props.classSubjects.data) {
         return [];
     }
@@ -28,8 +29,8 @@ const filteredClassSubjects = computed(() => {
     const lowerCaseQuery = searchQuery.value.toLowerCase();
 
     return props.classSubjects.data.filter(cs => {
-        // Correctly use 'class_name' as per your database schema
-        const className = cs.className?.class_name?.toLowerCase() || '';
+        // Accessing the class name through the nested property 'class_name'
+        const className = cs.class_name?.class_name?.toLowerCase() || '';
         const subjectName = cs.subject?.name?.toLowerCase() || '';
         const teacherName = cs.teacher?.name?.toLowerCase() || '';
         const sessionName = cs.session?.name?.toLowerCase() || '';
@@ -67,7 +68,7 @@ const deleteClassSubject = () => {
             },
             onError: (errors) => {
                 console.error("Error deleting class subject:", errors);
-                alert('An error occurred during deletion. Please try again.');
+                console.log('An error occurred during deletion. Please try again.');
                 closeDeleteModal();
             },
         });
@@ -79,9 +80,10 @@ const closeDeleteModal = () => {
     classSubjectToDelete.value = null;
 };
 
+// Debugging code to inspect the incoming data
 watchEffect(() => {
-    if (flash.value && flash.value.message) {
-        console.log(`Flash message: ${flash.value.message}`);
+    if (props.classSubjects) {
+        console.log("Class Subjects Prop Data:", props.classSubjects.data);
     }
 });
 </script>
@@ -129,7 +131,9 @@ watchEffect(() => {
                             </thead>
                             <tbody class="bg-white" v-if="filteredClassSubjects.length">
                                 <tr v-for="cs in filteredClassSubjects" :key="cs.id">
-                                    <td class="px-3 py-4 text-nowrap">{{ cs.className?.class_name || 'N/A' }}</td>
+                                    <td class="px-3 py-4 text-nowrap">
+                                        {{ cs.class_name?.class_name || 'N/A' }}
+                                    </td>
                                     <td class="px-3 py-4 text-nowrap">{{ cs.subject?.name || 'N/A' }}</td>
                                     <td class="px-3 py-4 text-nowrap">{{ cs.teacher?.name || 'N/A' }}</td>
                                     <td class="px-3 py-4 text-nowrap">{{ cs.session?.name || 'N/A' }}</td>
@@ -189,7 +193,7 @@ watchEffect(() => {
                     <div class="modal-body">
                         Are you sure you want to delete this class subject assignment?
                         <br>
-                        <span class="fw-bold">{{ classSubjectToDelete?.className?.class_name || '' }}</span> -
+                        <span class="fw-bold">{{ classSubjectToDelete?.class_name?.class_name || '' }}</span> -
                         <span class="fw-bold">{{ classSubjectToDelete?.subject?.name || '' }}</span>
                         for Session: <span class="fw-bold">{{ classSubjectToDelete?.session?.name || '' }}</span>
                         and Section: <span class="fw-bold">{{ classSubjectToDelete?.section?.name || '' }}</span>
@@ -206,6 +210,5 @@ watchEffect(() => {
         <div v-if="showDeleteModal" class="modal-backdrop fade show"></div>
     </AuthenticatedLayout>
 </template>
-
 <style scoped>
 </style>

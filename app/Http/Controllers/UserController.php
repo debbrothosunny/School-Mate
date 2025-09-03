@@ -11,7 +11,7 @@ class UserController extends Controller
 {
     /**
      * Display a listing of users with their roles.
-     */
+    */
     public function index()
     {
         $users = User::with('roles')->orderBy('id', 'desc')->get()->map(function ($user) {
@@ -35,6 +35,7 @@ class UserController extends Controller
     /**
      * Assign/update a role for a specific user.
     */
+    
     public function assignRole(Request $request, User $user)
     {
         $request->validate([
