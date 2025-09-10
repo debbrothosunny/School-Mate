@@ -17,6 +17,7 @@ use App\Models\Group;
 use App\Models\User;
 use Illuminate\Support\Facades\LOG;
 use Illuminate\Support\Facades\DB; // For raw queries if needed, though Eloquent is better
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Notifications\DatabaseNotification; // Assuming you're using Laravel's built-in notifications
 use App\Models\ClassTime; // Import ClassTime model
 use Carbon\Carbon;
@@ -61,7 +62,7 @@ class DashboardController extends Controller
                 'labels' => ['Present', 'Absent', 'Late'],
                 'data'   => [0, 0, 0],
             ],
-            'message'  => 'Welcome to your Dashboard!',
+            'message'  => "Good to have you back, Admin. Let's explore your school's data today.",
             'userName' => $user->name,
         ];
 
@@ -128,65 +129,78 @@ class DashboardController extends Controller
     }
 
  
-    public function teacherIndex(Request $request)
+                 
+    public function teacherIndex()
     {
-        $user = $request->user();
+        $userId = Auth::user()->id;
 
-        if (!$user->hasRole('teacher') || !$user->teacher) {
-            abort(403, 'Unauthorized. You are not assigned as a teacher.');
+        // Get the teacher tied to this user
+        $teacher = Teacher::where('user_id', $userId)->first();
+
+        if (!$teacher) {
+            return redirect()->route('home')->with('error', 'You are not assigned as a teacher.');
         }
 
-        $teacher = $user->teacher;
+        $teacherId = $teacher->id;
 
-        // First, get the distinct class_name_ids associated with the teacher
-        // Assuming 'classNames' is a belongsToMany relationship on the Teacher model
-        // and it uses a pivot table (e.g., 'class_subjects' as seen in your error message)
-        $distinctClassIds = $teacher->classNames()
-                                    ->pluck('class_names.id') // Get only the IDs
-                                    ->unique(); // Ensure unique IDs in case of pivot table duplicates
+        // Get unique class IDs assigned to this teacher
+        $assignedClassIds = DB::table('class_times')
+            ->where('teacher_id', $teacherId)
+            ->pluck('class_name_id')
+            ->unique()
+            ->toArray();
 
-        // Now, fetch the ClassName models using these distinct IDs
-        // and eager load all the necessary relationships
-        $myClasses = ClassName::whereIn('id', $distinctClassIds)
-                            ->with([
-                                'section',
-                                'students',
-                                'classSchedules.room',
-                                'examSchedules' => function ($query) use ($teacher) {
-                                    $query->where('teacher_id', $teacher->id)
-                                        ->with('room', 'subject');
-                                }
-                            ])
-                            ->get();
+        if (empty($assignedClassIds)) {
+            $myClasses = collect();
+        } else {
+            $myClasses = ClassName::whereIn('id', $assignedClassIds)
+                ->with([
+                    'students',
+                    'classSchedules' => function ($query) use ($teacherId) {
+                        $query->where('teacher_id', $teacherId)
+                            ->with(['room', 'classTimeSlot']);
+                    },
+                    'examSchedules' => function ($query) use ($teacherId) {
+                        $query->where('teacher_id', $teacherId)
+                            ->with(['subject', 'room', 'examSlot']);
+                    },
+                    'section'
+                ])->get();
+        }
 
-        $dashboardData = [
+        return Inertia::render('TeacherDashboard', [
+            'message' => 'Welcome to your dashboard!',
+            'teacherName' => $teacher->name,
             'myClasses' => $myClasses,
-            'teacherName' => $teacher->name ?? $user->name,
-            'message' => 'Welcome, Teacher!',
-            'teacherSpecificStat1' => 'Value 1',
-            'teacherSpecificStat2' => 'Value 2',
-        ];
-
-        return Inertia::render('TeacherDashboard', $dashboardData);
+        ]);
     }
+
+
 
 
     
     //  Student Dashboard 
     public function studentIndex(Request $request)
     {
-        // Eager load the 'student' relationship to avoid an N+1 query problem.
-        // This fetches the student data in the same query as the user.
         $user = User::with('student')->find($request->user()->id);
 
-        // If the user isn't found or doesn't have the 'student' role, redirect.
         if (!$user || !$user->hasRole('student')) {
             return redirect()->route('dashboard');
         }
 
         $student = $user->student;
 
-        // Initialize dashboard data with default values
+        // Log the student details for debugging
+        Log::info('StudentDashboard - User ID: ' . $user->id);
+        if ($student) {
+            Log::info('StudentDashboard - Student details:', [
+                'student_id' => $student->id,
+                'class_id' => $student->class_id,
+                'section_id' => $student->section_id,
+                'session_id' => $student->session_id,
+            ]);
+        }
+
         $dashboardData = [
             'message' => 'Welcome back, ' . $user->name . '! Here an overview of your academic life.',
             'userName' => $user->name,
@@ -197,33 +211,36 @@ class DashboardController extends Controller
                 'attendedClasses' => 0,
                 'percentage' => 0,
             ],
-            // New key for the upcoming fee notice
             'upcomingFeeNotice' => null,
         ];
 
-        // Proceed only if a student profile exists for the user
         if ($student) {
             try {
-                // Fetch timetable entries using the student's class, section, and session IDs.
-                // Eager load all necessary relationships to prevent multiple queries in the view.
+                // Timetable Entries: Eager load the 'classTimeSlot' relationship
                 $studentTimetable = ClassTime::where('class_name_id', $student->class_id)
                     ->where('section_id', $student->section_id)
                     ->where('session_id', $student->session_id)
-                    ->with(['className', 'subject', 'teacher', 'section', 'session', 'room'])
+                    ->with(['className', 'subject', 'teacher', 'section', 'session', 'room', 'classTimeSlot'])
                     ->orderBy('day_of_week')
-                    ->orderBy('start_time')
+                    ->orderBy('class_time_slot_id')
                     ->get();
+                
+                // Log the count of timetable entries found
+                Log::info('StudentDashboard - Timetable entries found: ' . $studentTimetable->count());
 
-                // Fetch exam schedules with the same filtering and eager loading.
+                // Exam Schedules: Eager load the 'examSlot' relationship
                 $studentExams = ExamSchedule::where('class_id', $student->class_id)
                     ->where('section_id', $student->section_id)
                     ->where('session_id', $student->session_id)
-                    ->with(['subject', 'room'])
+                    ->with(['subject', 'room', 'examSlot'])
                     ->orderBy('exam_date')
-                    ->orderBy('start_time')
+                    ->orderBy('exam_slot_id') // Corrected column name
                     ->get();
 
-                // Fetch all relevant attendance records in a single query
+                // Log the count of exam schedule entries found
+                Log::info('StudentDashboard - Exam schedule entries found: ' . $studentExams->count());
+
+                // Attendance Records
                 $attendanceRecords = Attendance::where('student_id', $student->id)
                     ->where('class_id', $student->class_id)
                     ->where('section_id', $student->section_id)
@@ -231,45 +248,38 @@ class DashboardController extends Controller
                     ->get();
 
                 $totalClasses = $attendanceRecords->count();
-                // Filter the collection to count only 'present' records.
+
                 $attendedClasses = $attendanceRecords->where('status', 'present')->count();
 
-                // Calculate attendance percentage, safely handling division by zero.
                 $attendancePercentage = ($totalClasses > 0) ? ($attendedClasses / $totalClasses) * 100 : 0;
-                
-                // --- NEW: Check for an upcoming tuition fee due date ---
+
+                // Upcoming Fees Notice (due in next 3 days)
                 $today = Carbon::now()->startOfDay();
                 $threeDaysFromNow = Carbon::now()->addDays(3)->endOfDay();
-                
+
                 $upcomingInvoice = Invoice::where('student_id', $student->id)
-                                          ->where('status', '!=', 'paid')
-                                          ->where('balance_due', '>', 0)
-                                          ->whereBetween('due_date', [$today, $threeDaysFromNow])
-                                          ->orderBy('due_date', 'asc')
-                                          ->first();
-                
-                // Populate the dashboard data array
+                    ->where('status', '!=', 'paid')
+                    ->where('balance_due', '>', 0)
+                    ->whereBetween('due_date', [$today, $threeDaysFromNow])
+                    ->orderBy('due_date')
+                    ->first();
+
                 $dashboardData['studentTimetable'] = $studentTimetable;
                 $dashboardData['studentExams'] = $studentExams;
                 $dashboardData['studentAttendance'] = [
                     'totalClasses' => $totalClasses,
                     'attendedClasses' => $attendedClasses,
-                    'percentage' => round($attendancePercentage, 2), // Round to 2 decimal places
+                    'percentage' => round($attendancePercentage, 2),
                 ];
                 $dashboardData['upcomingFeeNotice'] = $upcomingInvoice;
-
             } catch (\Exception $e) {
-                // Log the error and provide a user-friendly message.
                 Log::error("Error fetching student dashboard data: " . $e->getMessage());
-                $dashboardData['message'] = 'There was an error fetching your data. Please contact an administrator.';
+                $dashboardData['message'] = 'Catch up on your progress here.';
             }
-
         } else {
-            // If the student profile doesn't exist, update the message.
             $dashboardData['message'] = 'Your student profile is not fully set up. Please contact an administrator.';
         }
 
-        // Render the Inertia component with the final data.
         return Inertia::render('StudentDashboard', $dashboardData);
     }
 }

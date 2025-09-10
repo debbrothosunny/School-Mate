@@ -384,9 +384,6 @@ class ResultController extends Controller
     }
 
 
-
-
-
     /**
      * Generate and download a PDF result sheet for a specific student and exam.
     */

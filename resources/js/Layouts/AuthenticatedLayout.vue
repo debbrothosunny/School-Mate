@@ -1,238 +1,242 @@
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue';
-import { Link, usePage, router } from '@inertiajs/vue3';
-import Echo from 'laravel-echo';
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 
-// Your existing components
-import ApplicationLogo from '@/Components/ApplicationLogo.vue';
-import Dropdown from '@/Components/Dropdown.vue';
-import DropdownLink from '@/Components/DropdownLink.vue';
+import { Link, usePage, router, useRemember } from '@inertiajs/vue3';
+
+import Echo from 'laravel-echo';
+import Swal from 'sweetalert2';
 import NavLink from '@/Components/NavLink.vue';
 import ResponsiveNavLink from '@/Components/ResponsiveNavLink.vue';
-
-// Theme composable
 import { useTheme } from '@/Composables/useTheme';
+
 const { isDark, toggleTheme } = useTheme();
 
 const page = usePage();
 
-// Nav dropdown toggles
+
+// Navigation dropdown states (all refs)
 const showingNavigationDropdown = ref(false);
 const showAcademicDropdown = ref(false);
 const showExamDropdown = ref(false);
 const showLibraryDropdown = ref(false);
+
 const showAcademicDropdownMobile = ref(false);
 const showExamDropdownMobile = ref(false);
 const showLibraryDropdownMobile = ref(false);
 
-// ----------------------------------------------------------------------------
-// Real-time Notification State
-// ----------------------------------------------------------------------------
+// Notifications reactive state
 const notifications = ref(page.props.auth.user.notifications || []);
 const unreadNotificationsCount = ref(page.props.auth.user.unread_notifications_count || 0);
 const showNotificationsDropdown = ref(false);
 
-// Audio element reference and state for autoplay policy
+// Notification sound states
 const notificationSound = ref(null);
 const isSoundEnabled = ref(false);
 const showSoundNotice = ref(false);
-
-// Import the notification sound file dynamically using Vite's asset handling
 const notificationSoundFile = new URL('/sounds/notification.mp3', import.meta.url).href;
 
-// ----------------------------------------------------------------------------
-// Echo Listeners
-// ----------------------------------------------------------------------------
+// Role based computed properties
+const user = computed(() => page.props.auth.user);
+const isAdmin = computed(() => user.value?.roles?.map(r => r.toLowerCase()).includes('admin'));
+const isAccounts = computed(() => user.value?.roles?.map(r => r.toLowerCase()).includes('accounts'));
+const isTeacher = computed(() => user.value?.roles?.map(r => r.toLowerCase()).includes('teacher'));
+const isStudent = computed(() => !isAdmin.value && !isAccounts.value && !isTeacher.value);
+const getDashboardRoute = computed(() => {
+  if (isAdmin.value) return route('dashboard');
+  if (isAccounts.value) return route('accounts.dashboard');
+  if (isTeacher.value) return route('teacher.dashboard');
+  if (isStudent.value) return route('student.dashboard');
+  return route('dashboard');
+});
+
+// Lifecycle hooks for realtime notifications and Echo listeners
 onMounted(() => {
-    const user = page.props.auth.user;
+  notificationSound.value = new Audio(notificationSoundFile);
 
-    // Show notice to enable sound if it's not already enabled after a short delay
-    setTimeout(() => {
-        if (!isSoundEnabled.value) {
-            showSoundNotice.value = true;
-        }
-    }, 5000);
+  setTimeout(() => {
+    if (!isSoundEnabled.value) showSoundNotice.value = true;
+  }, 5000);
 
-    if (window.Echo) {
-        window.Echo.connector.pusher.connection.bind('connected', () => {
-            console.log('Echo connection status: Connected!');
+  if (window.Echo) {
+    window.Echo.connector.pusher.connection.bind('connected', () => console.log('Echo connected'));
+    window.Echo.connector.pusher.connection.bind('disconnected', () => console.error('Echo disconnected'));
+
+    window.Echo.channel('notices')
+      .listen('.new.notice', ({ notice }) => {
+          notifications.value.unshift({
+            id: `notice-${notice.id}`,
+            type: 'notice',
+            message: notice.title,
+            data: notice,
+            created_at: notice.created_at,
+            read_at: null,
+          });
+          unreadNotificationsCount.value++;
+          if (isSoundEnabled.value) notificationSound.value.play().catch(() => {});
+      });
+
+    if (user.value) {
+      window.Echo.private(`App.Models.User.${user.value.id}`)
+        .notification((payload) => {
+          notifications.value.unshift({
+            id: payload.invoice_id || payload.data?.id,
+            type: 'invoice',
+            message: payload.message,
+            data: payload,
+            created_at: payload.created_at,
+            read_at: null,
+          });
+          unreadNotificationsCount.value++;
+          if (isSoundEnabled.value) notificationSound.value.play().catch(() => {});
         });
-        window.Echo.connector.pusher.connection.bind('disconnected', () => {
-            console.error('Echo connection status: Disconnected!');
-        });
 
-        // Public notices channel
-        window.Echo.channel('notices')
-            .listen('.new.notice', ({ notice }) => {
-                notifications.value.unshift({
-                    id: `notice-${notice.id}`,
-                    type: 'notice',
-                    message: notice.title,
-                    data: notice,
-                    created_at: notice.created_at,
-                    read_at: null,
-                });
-                unreadNotificationsCount.value++;
-                try {
-                    // Only play sound if it has been enabled by user interaction
-                    if (isSoundEnabled.value) {
-                        notificationSound.value.play();
-                    }
-                } catch (e) {
-                    console.error('Could not play notification sound:', e);
-                }
+      if (user.value.roles && user.value.roles.includes('accounts')) {
+        window.Echo.private(`private.accountant.${user.value.id}`)
+          .listen('.student.payment.made', (e) => {
+            notifications.value.unshift({
+              id: `payment-${e.paymentId}`,
+              type: 'payment',
+              message: `New payment of ${e.amount} from student: ${e.studentName}`,
+              data: e,
+              created_at: new Date().toISOString(),
+              read_at: null,
             });
-
-        // Private Laravel notifications channel
-        if (user) {
-            window.Echo.private(`App.Models.User.${user.id}`)
-                .notification((payload) => {
-                    console.log('Received real-time notification:', payload);
-
-                    // Add the new notification to the top of the array
-                    notifications.value.unshift({
-                        id: payload.invoice_id || payload.data?.id,
-                        type: 'invoice',
-                        message: payload.message,
-                        data: payload,
-                        created_at: payload.created_at,
-                        read_at: null, // Mark as unread
-                    });
-                    unreadNotificationsCount.value++;
-                    try {
-                        // Only play sound if it has been enabled by user interaction
-                        if (isSoundEnabled.value) {
-                            notificationSound.value.play();
-                        }
-                    } catch (e) {
-                        console.error('Could not play notification sound:', e);
-                    }
-                });
-
-            // NEW LISTENER: Listen for student payment notifications if the user is an accountant.
-            if (user.roles && user.roles.includes('accounts')) {
-                // Corrected channel name from `private.Accountant` to `private.accountant`
-                window.Echo.private(`private.accountant.${user.id}`)
-                    .listen('.student.payment.made', (e) => {
-                        console.log('Received student payment notification:', e);
-                        notifications.value.unshift({
-                            id: `payment-${e.paymentId}`,
-                            type: 'payment',
-                            message: `New payment of ${e.amount} from student: ${e.studentName}`,
-                            data: e,
-                            created_at: new Date().toISOString(),
-                            read_at: null,
-                        });
-                        unreadNotificationsCount.value++;
-                        try {
-                            if (isSoundEnabled.value) {
-                                notificationSound.value.play();
-                            }
-                        } catch (err) {
-                            console.error('Could not play notification sound for payment:', err);
-                        }
-                    });
-            }
-        }
-    } else {
-        console.error('Echo is not available or not configured correctly.');
+            unreadNotificationsCount.value++;
+            if (isSoundEnabled.value) notificationSound.value.play().catch(() => {});
+          });
+      }
     }
+  }
 });
 
 onUnmounted(() => {
-    if (window.Echo) {
-        window.Echo.leave('notices');
-        if (page.props.auth.user) {
-            window.Echo.leave(`private-App.Models.User.${page.props.auth.user.id}`);
-            if (page.props.auth.user.roles && page.props.auth.user.roles.includes('accounts')) {
-                // Corrected channel name from `private-private.accountant` to `private.accountant`
-                window.Echo.leave(`private.accountant.${page.props.auth.user.id}`);
-            }
-        }
+  if (window.Echo) {
+    window.Echo.leave('notices');
+    if (user.value) {
+      window.Echo.leave(`private-App.Models.User.${user.value.id}`);
+      if (user.value.roles && user.value.roles.includes('accounts')) {
+        window.Echo.leave(`private.accountant.${user.value.id}`);
+      }
     }
+  }
 });
 
-// ----------------------------------------------------------------------------
 // Handlers
-// ----------------------------------------------------------------------------
 const handleNotificationsClick = () => {
-    showNotificationsDropdown.value = !showNotificationsDropdown.value;
-
-    // Attempt to play the sound. This will be the user interaction that
-    // enables autoplay.
-    if (notificationSound.value) {
-        notificationSound.value.play()
-            .then(() => {
-                isSoundEnabled.value = true;
-                showSoundNotice.value = false;
-                console.log('Audio playback permission granted and sound enabled.');
-            })
-            .catch(e => {
-                console.warn('Audio playback was blocked by browser policy:', e);
-            });
-    }
-
-    if (showNotificationsDropdown.value && unreadNotificationsCount.value > 0) {
-        router.post(route('notifications.markAsRead'), {}, {
-            onSuccess: () => {
-                unreadNotificationsCount.value = 0;
-            },
-            onError: (errors) => {
-                console.error('Failed to mark notifications as read:', errors);
-            },
-        });
-    }
+  showNotificationsDropdown.value = !showNotificationsDropdown.value;
+  if (notificationSound.value) {
+    notificationSound.value.play()
+      .then(() => {
+        isSoundEnabled.value = true;
+        showSoundNotice.value = false;
+      }).catch(() => {});
+  }
+  if (showNotificationsDropdown.value && unreadNotificationsCount.value > 0) {
+    router.post(route('notifications.markAsRead'), {}, {
+      onSuccess: () => unreadNotificationsCount.value = 0,
+    });
+  }
 };
 
 const markAllAsRead = () => {
-    router.post(route('notifications.markAllAsRead'), {}, {
-        preserveScroll: true,
-        onSuccess: () => {
-            unreadNotificationsCount.value = 0;
-            notifications.value.forEach(notification => notification.read_at = notification.read_at || new Date().toISOString());
-        },
-        onError: (errors) => {
-            console.error('Failed to mark all notifications as read:', errors);
-            },
-        });
+  router.post(route('notifications.markAllAsRead'), {}, {
+    preserveScroll: true,
+    onSuccess: () => {
+      unreadNotificationsCount.value = 0;
+      notifications.value.forEach(n => {
+        if (!n.read_at) n.read_at = new Date().toISOString();
+      });
+    },
+  });
 };
 
 const logout = () => {
-    router.post(route('logout'));
+  router.post(route('logout'));
 };
 
 const confirmLogout = () => {
-    Swal.fire({
-        title: 'Are you sure?',
-        text: "You will be logged out of your session.",
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonColor: '#3085d6',
-        cancelButtonColor: '#d33',
-        confirmButtonText: 'Yes, log me out!',
-    }).then((result) => {
-        if (result.isConfirmed) logout();
-    });
+  Swal.fire({
+    title: 'Are you sure?',
+    text: "You will be logged out of your session.",
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonColor: '#3085d6',
+    cancelButtonColor: '#d33',
+    confirmButtonText: 'Yes, log me out!',
+  }).then((result) => {
+    if (result.isConfirmed) logout();
+  });
 };
 
-// ----------------------------------------------------------------------------
-// Role-based Computeds (unchanged)
-// ----------------------------------------------------------------------------
-const isAdmin = computed(() => page.props.auth.user?.roles?.map(r => r.toLowerCase()).includes('admin'));
-const isAccounts = computed(() => page.props.auth.user?.roles?.map(r => r.toLowerCase()).includes('accounts'));
-const isTeacher = computed(() => page.props.auth.user?.roles?.map(r => r.toLowerCase()).includes('teacher'));
-const isStudent = computed(() => !isAdmin.value && !isAccounts.value && !isTeacher.value);
-const user = computed(() => page.props.auth.user);
-const getDashboardRoute = computed(() => {
-    if (isAdmin.value) return route('dashboard');
-    if (isAccounts.value) return route('accounts.dashboard');
-    if (isTeacher.value) return route('teacher.dashboard');
-    if (isStudent.value) return route('student.dashboard');
-    return route('dashboard');
-});
+// Dropdown toggle for refs
+const toggleDropdown = (dropdownRef) => {
+  dropdownRef.value = !dropdownRef.value;
+};
+
+
+
+// Add near your other computed properties
+const academicRoutes = [
+  'sections.index',
+  'sections.edit',
+  'sessions.index',
+  'sessions.create',    
+  'sessions.edit',     
+  'groups.index',
+  'groups.edit',
+  'subjects.index',
+  'subjects.edit',
+  'class-subjects.index',
+  'class-names.index',
+  'class-names.edit',
+  'class-time-slots.index',
+  'timetable.index',
+  'exams.index',
+  'exams.edit',
+  'exam-time-slots.index',
+  'exam-schedules.index',
+  'results.show',
+];
+
+const isAcademicRouteActive = computed(() =>
+  academicRoutes.some(r => route().current(r))
+);
+
+watch(
+  () => isAcademicRouteActive.value,
+  (active) => {
+    if (active) showAcademicDropdown.value = true;
+  },
+  { immediate: true }
+);
+
+const libraryRoutes = [
+  'books.index',
+  'books.create',
+  'books.edit',
+  'borrow-records.index',
+  'borrow-records.create',
+  'borrow-records.edit',
+];
+
+const isLibraryRouteActive = computed(() =>
+  libraryRoutes.some(r => route().current(r))
+);
+
+watch(
+  () => isLibraryRouteActive.value,
+  (active) => {
+    if (active) showLibraryDropdown.value = true;
+  },
+  { immediate: true }
+);
+
 </script>
 
+
+
 <template>
+
     <!-- Main layout container with Inter font -->
     <!-- The `dark:bg-gray-900` on this div will apply to the entire page background -->
     <div class="min-h-screen bg-white dark:bg-black text-black dark:text-white">
@@ -244,23 +248,15 @@ const getDashboardRoute = computed(() => {
                 <!-- Logo and App Name -->
                 <div class="flex items-center">
                     <div class="shrink-0 flex items-center">
-                        <Link :href="getDashboardRoute">
-                            <span class="text-xl font-extrabold text-gray-800 tracking-tight dark:text-gray-100">School-Mate</span>
+                        <Link :href="getDashboardRoute">                 
+                            <!-- School logo -->
+                            <img src="{{ asset('images/logo.jpeg') }}" alt="School Logo" class="h-8 w-8 rounded-full mr-3">
+                            
+                            <!-- App name in Bengali -->
+                            <span class="text-xl font-extrabold text-gray-800 tracking-tight dark:text-gray-100">বিদ্যালয়</span>
                         </Link>
                     </div>
-                    <div class="ml-4 text-xl font-extrabold text-gray-800 hidden sm:block tracking-tight dark:text-gray-100">
-                        School Management System
-                    </div>
                 </div>
-
-
-
-
-
-
-
-
-
 
                 <!-- User Dropdown (right side) -->
                 <div class="flex items-center ms-6">
@@ -333,56 +329,7 @@ const getDashboardRoute = computed(() => {
                             </div>
                         </div>
                     </div>
-
-
-                    <div class="relative">
-                        <Dropdown align="right" width="48">
-                            <template #trigger>
-                                <span class="inline-flex rounded-md">
-                                    <button
-                                        type="button"
-                                class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:text-gray-900 focus:outline-none transition ease-in-out duration-150 dark:bg-gray-800 dark:text-gray-300 dark:hover:text-gray-100"
-                                    >
-                                        {{ $page.props.auth.user.name }}
-                                        <svg
-                                            class="ms-2 -me-0.5 h-4 w-4"
-                                            xmlns="http://www.w3.org/2000/svg"
-                                            viewBox="0 0 20 20"
-                                            fill="currentColor"
-                                        >
-                                            <path
-                                                fill-rule="evenodd"
-                                                d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
-                                                clip-rule="evenodd"
-                                            />
-                                        </svg>
-                                    </button>
-                                </span>
-                            </template>
-                            <template #content>
-                                <DropdownLink :href="route('profile.edit')" class="dark:text-gray-100 dark:hover:bg-gray-700"> Profile </DropdownLink>
-                                <DropdownLink @click.prevent="confirmLogout" class="dark:text-gray-100 dark:hover:bg-gray-700">
-                                    Log Out
-                                </DropdownLink>
-
-                                
-                            </template>
-                        </Dropdown>
-                    </div>
                 </div>
-
-
-
-
-
-
-
-
-
-
-
-
-
 
                 <!-- Mobile hamburger button -->
                 <div class="-me-2 flex items-center md:hidden">
@@ -549,9 +496,6 @@ const getDashboardRoute = computed(() => {
                     <ResponsiveNavLink :href="route('teacher.dashboard')" :active="route().current('teacher.dashboard')" class="dark:text-gray-100 dark:hover:bg-gray-700">
                         <i class="fa-solid fa-gauge-high me-2 w-5"></i>Teacher Dashboard
                     </ResponsiveNavLink>
-                    <ResponsiveNavLink :href="route('my-classes.index')" :active="route().current('my-classes.index')" class="dark:text-gray-100 dark:hover:bg-gray-700">
-                        <i class="fa-solid fa-calendar-days me-2 w-5"></i>My Class Timetable
-                    </ResponsiveNavLink>
                 </div>
 
                 <div v-if="isStudent" class="mt-4 border-t border-gray-200 pt-4 dark:border-gray-700">
@@ -559,6 +503,10 @@ const getDashboardRoute = computed(() => {
                     <ResponsiveNavLink :href="route('student.dashboard')" :active="route().current('student.dashboard')" class="dark:text-gray-100 dark:hover:bg-gray-700">
                         <i class="fa-solid fa-gauge-high me-2 w-5"></i>My Dashboard
                     </ResponsiveNavLink>
+
+
+
+
                     <div class="relative">
                         <button
                             @click="showLibraryDropdownMobile = !showLibraryDropdownMobile"
@@ -584,30 +532,19 @@ const getDashboardRoute = computed(() => {
                             </ResponsiveNavLink>
                         </div>
                     </div>
-                </div>
-            </div>
 
-            <div class="pt-4 pb-1 border-t border-gray-200 dark:border-gray-700">
-                <div class="px-4">
-                    <div class="font-medium text-base text-gray-800 dark:text-gray-100">
-                        {{ $page.props.auth.user.name }}
-                    </div>
-                    <div class="font-medium text-sm text-gray-500 dark:text-gray-400">
-                        {{ $page.props.auth.user.email }}
-                    </div>
-                </div>
-
-                <div class="mt-3 space-y-1">
-                    <ResponsiveNavLink :href="route('profile.edit')" class="dark:text-gray-100 dark:hover:bg-gray-700"> Profile </ResponsiveNavLink>
-                    <ResponsiveNavLink @click.prevent="confirmLogout" class="dark:text-gray-100 dark:hover:bg-gray-700"> Log Out </ResponsiveNavLink>
                 </div>
             </div>
         </div>
     </nav>
 
+
+
+
     <div class="flex flex-1">
         <!-- Desktop Sidebar -->
         <aside :class="{ 'hidden': !isAdmin && !isTeacher && !isAccounts && !isStudent, 'block': isAdmin || isTeacher || isAccounts || isStudent }"
+
                 class="fixed inset-y-0 left-0 bg-white text-gray-800 w-64 p-4 z-30 overflow-y-auto
                         md:block md:static md:shadow-md md:z-auto transition-all duration-300 ease-in-out dark:bg-gray-800 dark:text-gray-100">
             <div class="space-y-4">
@@ -620,6 +557,10 @@ const getDashboardRoute = computed(() => {
                     <NavLink :href="route('users.index')" :active="route().current('users.index')" class="dark:text-gray-100 dark:hover:bg-gray-700">
                         <i class="fa-solid fa-users me-2 w-5"></i>Users Management
                     </NavLink>
+
+
+
+                   <!-- Academic DropdownLink -->
                     <div class="relative">
                         <button
                             @click="showAcademicDropdown = !showAcademicDropdown"
@@ -636,14 +577,33 @@ const getDashboardRoute = computed(() => {
                                 <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
                             </svg>
                         </button>
-                        <!-- Added dark:bg-gray-800 to the dropdown content div -->
+
                         <div v-show="showAcademicDropdown" class="ps-4 mt-2 space-y-1 bg-white dark:bg-gray-800">
-                            <NavLink :href="route('sections.index')" :active="route().current('sections.*')" class="dark:text-gray-100 dark:hover:bg-gray-700">
-                                <i class="fa-solid fa-layer-group me-2 w-5"></i>Section Management
+                        
+
+
+                            <NavLink
+                            :href="route('sections.index')"
+                            :active="route().current('sections.index')"
+                            :preserve-state="true"
+                            class="dark:text-gray-100 dark:hover:bg-gray-700"
+                            >
+                            <i class="fa-solid fa-layer-group me-2 w-5"></i>Section Management
                             </NavLink>
-                            <NavLink :href="route('sessions.index')" :active="route().current('sessions.*')" class="dark:text-gray-100 dark:hover:bg-gray-700">
-                                <i class="fa-solid fa-calendar-alt me-2 w-5"></i>Session Management
+
+
+
+                            <NavLink
+                            :href="route('sessions.index')"
+                            :active="route().current('sessions.*')"
+                            preserve-state
+                            class="dark:text-gray-100 dark:hover:bg-gray-700"
+                            >
+                            <i class="fa-solid fa-calendar-alt me-2 w-5"></i>Session Management
                             </NavLink>
+
+
+
                             <NavLink :href="route('groups.index')" :active="route().current('groups.index.*')" class="dark:text-gray-100 dark:hover:bg-gray-700">
                                 <i class="fa-solid fa-users-viewfinder me-2 w-5"></i>Group
                             </NavLink>
@@ -665,41 +625,63 @@ const getDashboardRoute = computed(() => {
                             <NavLink :href="route('exams.index')" :active="route().current('exams.*')" class="dark:text-gray-100 dark:hover:bg-gray-700">
                                 <i class="fa-solid fa-clipboard-list me-2 w-5"></i>Exam Name
                             </NavLink>
+                            <NavLink :href="route('exam-time-slots.index')" :active="route().current('exam-time-slots.index.*')" class="dark:text-gray-100 dark:hover:bg-gray-700">
+                                <i class="fa-solid fa-clipboard-list me-2 w-5"></i>Exam Time Slot
+                            </NavLink>
                             <NavLink :href="route('exam-schedules.index')" :active="route().current('exam-schedules.*')" class="dark:text-gray-100 dark:hover:bg-gray-700">
                                 <i class="fa-solid fa-calendar-check me-2 w-5"></i>Exam Schedules
                             </NavLink>
-                            <NavLink :href="route('marks.index')" :active="route().current('marks.*')" class="dark:text-gray-100 dark:hover:bg-gray-700">
-                                <i class="fa-solid fa-marker me-2 w-5"></i>Marks
+                            <NavLink :href="route('results.show')" :active="route().current('results.show.*')" class="dark:text-gray-100 dark:hover:bg-gray-700">
+                                <i class="fa-solid fa-calendar-check me-2 w-5"></i>Result
                             </NavLink>
                         </div>
                     </div>
 
+
+                   <!-- Library DropdownLink -->
+    
                     <div class="relative">
                         <button
                             @click="showLibraryDropdown = !showLibraryDropdown"
-                            class="flex items-center justify-between w-full text-start py-2 px-3 text-gray-700 hover:bg-gray-100 transition duration-150 ease-in-out rounded-md font-medium dark:text-gray-300 dark:hover:bg-gray-700"
+                            class="flex items-center justify-between w-full text-start py-2 px-3 text-gray-700 hover:bg-gray-100 rounded-md font-medium dark:text-gray-300 dark:hover:bg-gray-700 transition duration-150 ease-in-out"
+                            type="button"
+                            :aria-expanded="showLibraryDropdown"
+                            aria-controls="library-menu"
                         >
-                            <i class="fa-solid fa-book-reader me-2 w-5"></i>Library Management
+                            <i class="fa-solid fa-book-reader me-2 w-5"></i>Library
                             <svg
-                                class="ms-2 h-4 w-4 transform transition-transform duration-200"
-                                :class="{ 'rotate-180': showLibraryDropdown }"
-                                xmlns="http://www.w3.org/2000/svg"
-                                viewBox="0 0 20 20"
-                                fill="currentColor"
+                            class="ms-2 h-4 w-4 transform transition-transform duration-200"
+                            :class="{ 'rotate-180': showLibraryDropdown }"
+                            xmlns="http://www.w3.org/2000/svg"
+                            viewBox="0 0 20 20"
+                            fill="currentColor"
                             >
-                                <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                            <path fill-rule="evenodd" clip-rule="evenodd"
+                                d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
                             </svg>
                         </button>
-                        <!-- Added dark:bg-gray-800 to the dropdown content div -->
-                        <div v-show="showLibraryDropdown" class="ps-4 mt-2 space-y-1 bg-white dark:bg-gray-800">
+                        <div
+                            v-show="showLibraryDropdown"
+                            @click.stop
+                            id="library-menu"
+                            class="ps-4 mt-2 space-y-1 bg-white dark:bg-gray-800 rounded-md"
+                        >
                             <NavLink :href="route('books.index')" :active="route().current('books.*')" class="dark:text-gray-100 dark:hover:bg-gray-700">
-                                <i class="fa-solid fa-book-open-reader me-2 w-5"></i>Books
+                            <i class="fa-solid fa-book-open-reader me-2 w-5"></i>Books
                             </NavLink>
                             <NavLink :href="route('borrow-records.index')" :active="route().current('borrow-books.*')" class="dark:text-gray-100 dark:hover:bg-gray-700">
-                                <i class="fa-solid fa-handshake me-2 w-5"></i>Borrow Records
+                            <i class="fa-solid fa-handshake me-2 w-5"></i>Borrow Records
                             </NavLink>
                         </div>
                     </div>
+
+
+
+
+
+
+
+
 
                     <NavLink :href="route('bus-schedules.index')" :active="route().current('bus-schedules.*')" class="dark:text-gray-100 dark:hover:bg-gray-700">
                         <i class="fa-solid fa-bus me-2 w-5"></i>Bus Schedules
@@ -715,15 +697,15 @@ const getDashboardRoute = computed(() => {
                     <NavLink :href="route('students.index')" :active="route().current('students.index')" class="dark:text-gray-100 dark:hover:bg-gray-700">
                         <i class="fa-solid fa-user-graduate me-2 w-5"></i>Student Management
                     </NavLink>
+                    
                     <NavLink :href="route('attendance.index')" :active="route().current('attendance.index')" class="dark:text-gray-100 dark:hover:bg-gray-700">
                         <i class="fa-solid fa-clipboard-user me-2 w-5"></i>Student Attendance
                     </NavLink>
+
                     <NavLink :href="route('grade-configurations.index')" :active="route().current('grade-configurations.index')" class="dark:text-gray-100 dark:hover:bg-gray-700">
                         <i class="fa-solid fa-star me-2 w-5"></i>Grade System
                     </NavLink>
-                    <NavLink :href="route('results.show')" :active="route().current('results.show')" class="dark:text-gray-100 dark:hover:bg-gray-700">
-                        <i class="fa-solid fa-chart-bar me-2 w-5"></i>Result
-                    </NavLink>
+                    
 
                     <NavLink :href="route('students.passed')" :active="route().current('students.passed')" class="dark:text-gray-100 dark:hover:bg-gray-700">
                         <i class="fa-solid fa-chart-bar me-2 w-5"></i>Passed Student 
@@ -733,6 +715,11 @@ const getDashboardRoute = computed(() => {
                         <i class="fa-solid fa-chart-bar me-2 w-5"></i>Setting
                     </NavLink>
                 </div>
+
+
+
+
+
 
                 <!-- ACCOUNTS PANEL (DESKTOP) -->
                 <div v-if="isAccounts" class="mt-6">
@@ -770,12 +757,9 @@ const getDashboardRoute = computed(() => {
                 <!-- TEACHER TOOLS (DESKTOP) -->
                 <div v-if="isTeacher && !isAdmin" class="mt-6">
                     <h3 class="text-xs uppercase font-semibold text-gray-500 mb-2 px-3 dark:text-gray-400">Teacher Tools</h3>
+                    
                     <NavLink :href="route('teacher.dashboard')" :active="route().current('teacher.dashboard')" class="dark:text-gray-100 dark:hover:bg-gray-700">
                         <i class="fa-solid fa-gauge-high me-2 w-5"></i>Teacher Dashboard
-                    </NavLink>
-                    
-                    <NavLink :href="route('my-classes.index')" :active="route().current('my-classes.index')" class="dark:text-gray-100 dark:hover:bg-gray-700">
-                        <i class="fa-solid fa-calendar-days me-2 w-5"></i>My Class Timetable
                     </NavLink>
 
                     <NavLink :href="route('teacher.my-notices')" :active="route().current('teacher.my-notices')" class="dark:text-gray-100 dark:hover:bg-gray-700">
@@ -787,7 +771,7 @@ const getDashboardRoute = computed(() => {
                     </NavLink>
                     
                     <NavLink :href="route('teacherattendance.index')" :active="route().current('teacherattendance.index')" class="dark:text-gray-100 dark:hover:bg-gray-700">
-                        <i class="fa-solid fa-clipboard-user me-2 w-5"></i>Teacher Attendance
+                        <i class="fa-solid fa-clipboard-user me-2 w-5"></i>Student Attendance
                     </NavLink>
                 </div>
 
@@ -798,9 +782,12 @@ const getDashboardRoute = computed(() => {
                         <i class="fa-solid fa-gauge-high me-2 w-5"></i>My Dashboard
                     </NavLink>
 
-                    <div class="relative">
+
+                    <!-- Library DropdownLink Student Side -->
+             
+                    <div v-if="isStudent" class="relative">
                         <button
-                            @click="showLibraryDropdown = !showLibraryDropdown"
+                            @click="toggleDropdown(showLibraryDropdown)"
                             class="flex items-center justify-between w-full text-start py-2 px-3 text-gray-700 hover:bg-gray-100 transition duration-150 ease-in-out rounded-md font-medium dark:text-gray-300 dark:hover:bg-gray-700"
                         >
                             <i class="fa-solid fa-book-reader me-2 w-5"></i>Student Library
@@ -814,7 +801,6 @@ const getDashboardRoute = computed(() => {
                                 <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
                             </svg>
                         </button>
-                        <!-- Added dark:bg-gray-800 to the dropdown content div -->
                         <div v-show="showLibraryDropdown" class="ps-4 mt-2 space-y-1 bg-white dark:bg-gray-800">
                             <NavLink :href="route('student.books.index')" :active="route().current('student.books.index')" class="dark:text-gray-100 dark:hover:bg-gray-700">
                                 <i class="fa-solid fa-book-open-reader me-2 w-5"></i>Available Books
@@ -823,12 +809,35 @@ const getDashboardRoute = computed(() => {
                                 <i class="fa-solid fa-handshake me-2 w-5"></i>My Borrowed Books
                             </NavLink>
                         </div>
-
-                        <NavLink :href="route('student.invoices.index')" :active="route().current('student.invoices.index')" class="dark:text-gray-100 dark:hover:bg-gray-700">
-                            <i class="fa-solid fa-gauge-high me-2 w-5"></i>My Invoice
-                        </NavLink>
                     </div>
                 </div>
+
+                <!-- Sidebar bottom profile section -->
+        <div class="mt-auto pt-6 border-t border-gray-300 dark:border-gray-700">
+            <div class="px-4">
+            <div class="font-semibold text-gray-900 dark:text-gray-100 truncate">
+                {{ user.name }}
+            </div>
+            <div class="text-sm text-gray-500 dark:text-gray-400 truncate mb-4">
+                {{ user.email }}
+            </div>
+            <div class="flex flex-col space-y-2">
+                <NavLink
+                :href="route('profile.edit')"
+                class="block px-3 py-2 rounded-md text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
+                >
+                Profile
+                </NavLink>
+                <button
+                @click="confirmLogout"
+                class="block text-left w-full px-3 py-2 rounded-md text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700 focus:outline-none"
+                >
+                Log Out
+                </button>
+            </div>
+            </div>
+        </div>
+
             </div>
         </aside>
 
@@ -838,6 +847,11 @@ const getDashboardRoute = computed(() => {
             <slot />
         </main>
     </div>
+
+
+
+
+
 
     </div>
 </template>

@@ -4,7 +4,6 @@ import { Head, usePage } from '@inertiajs/vue3';
 import { computed, watchEffect } from 'vue';
 
 
-
 const props = defineProps({
     notices: Object, // Paginated notices data for the authenticated user
     flash: Object, // Flash messages
@@ -28,7 +27,6 @@ watchEffect(() => {
             });
         } else {
             console.warn('Swal (SweetAlert2) is not defined. Flash messages will not be displayed via Swal.');
-            alert(flash.value.message);
         }
     }
 });
@@ -59,7 +57,7 @@ const displayTargetUsers = (usersArray) => {
             <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
                 <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-6">
 
-                    <!-- Flash Message Display -->
+                    <!-- Flash Message Display (assuming FlashMessage component exists) -->
                     <FlashMessage v-if="flash && flash.message" :flash="flash" class="mb-4" />
 
                     <h3 class="text-lg font-medium text-gray-900 mb-6">Notices for You</h3>
@@ -71,9 +69,13 @@ const displayTargetUsers = (usersArray) => {
 
                     <div v-else class="space-y-6">
                         <div v-for="notice in notices.data" :key="notice.id" class="border border-gray-200 rounded-lg p-4 shadow-sm bg-gray-50">
-                            <h4 class="text-xl font-semibold text-gray-800 mb-2">{{ notice.title }}</h4>
+                            <!-- FIX: Use notice.notice_title -->
+                            <h4 class="text-xl font-semibold text-gray-800 mb-2">{{ notice.notice_title }}</h4>
                             <p class="text-sm text-gray-600 mb-3">
-                                Published on: <span class="font-medium">{{ formatNoticeDate(notice.notice_date) }}</span>
+                                <!-- FIX: Use notice.start_date and display end_date -->
+                                <span class="font-medium">
+                                    {{ formatNoticeDate(notice.start_date) }} - {{ formatNoticeDate(notice.end_date) }}
+                                </span>
                                 <span v-if="notice.creator"> by {{ notice.creator.name }}</span>
                             </p>
                             <div class="prose max-w-none text-gray-700 mb-4">

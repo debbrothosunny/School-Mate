@@ -1,3 +1,82 @@
+<script setup>
+import { ref, watch, computed, watchEffect } from 'vue';
+import { useForm, router, usePage } from '@inertiajs/vue3';
+import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
+
+const props = defineProps({
+    classes: Array,
+    sessions: Array,
+    sections: Array,
+    groups: Array,
+    students: Array,
+    attendanceExists: Boolean,
+    selectedClassId: Number,
+    selectedSessionId: Number,
+    selectedSectionId: Number,
+    selectedGroupId: Number,
+    selectedAttendanceDate: String,
+    initialMessage: Object,
+});
+
+const filterForm = useForm({
+    class_id: props.selectedClassId || '',
+    session_id: props.selectedSessionId || '',
+    section_id: props.selectedSectionId || '',
+    group_id: props.selectedGroupId || '',
+    attendance_date: props.selectedAttendanceDate || new Date().toISOString().slice(0, 10),
+});
+
+const attendanceForm = useForm({
+    class_id: filterForm.class_id,
+    session_id: filterForm.session_id,
+    section_id: filterForm.section_id,
+    group_id: filterForm.group_id,
+    attendance_date: filterForm.attendance_date,
+    attendance_data: props.students.map(s => ({
+        student_id: s.id,
+        status: s.attendance_status || 'absent',
+    })),
+});
+
+watch(() => filterForm.class_id, val => attendanceForm.class_id = val);
+watch(() => filterForm.session_id, val => attendanceForm.session_id = val);
+watch(() => filterForm.section_id, val => attendanceForm.section_id = val);
+watch(() => filterForm.group_id, val => attendanceForm.group_id = val);
+watch(() => filterForm.attendance_date, val => attendanceForm.attendance_date = val);
+
+watch(() => props.students, students => {
+    attendanceForm.attendance_data = students.map(s => ({
+        student_id: s.id,
+        status: s.attendance_status || 'absent',
+    }));
+}, { deep: true });
+
+const applyFilters = () => {
+    router.get(route('teacherattendance.index'), filterForm.data(), {
+        preserveState: true,
+        preserveScroll: true,
+    });
+};
+
+const submitAttendance = () => {
+    attendanceForm.post(route('teacherattendance.store'), {
+        onSuccess: () => applyFilters(),
+    });
+};
+
+const canSubmit = computed(() =>
+    filterForm.class_id &&
+    filterForm.session_id &&
+    filterForm.section_id &&
+    filterForm.group_id &&
+    filterForm.attendance_date &&
+    props.students.length > 0
+);
+
+
+</script>
+
+
 <template>
     <Head title="Manage Attendance" />
 
@@ -5,6 +84,17 @@
         <template #header>
             <h2 class="font-semibold text-xl text-gray-800 leading-tight">Manage Student Attendance</h2>
         </template>
+
+        <!-- Flash message -->
+        <div v-if="$page.props.flash.message" 
+            :class="[
+                'p-4 mb-6 rounded border-l-4 font-semibold',
+                $page.props.flash.message.type === 'success' ? 'bg-green-100 border-green-500 text-green-700' : '',
+                $page.props.flash.message.type === 'error' ? 'bg-red-100 border-red-500 text-red-700' : '',
+                $page.props.flash.message.type === 'info' ? 'bg-blue-100 border-blue-500 text-blue-700' : ''
+            ]" role="alert">
+        {{ $page.props.flash.message.text }}
+        </div>
 
         <div class="py-12 bg-gray-100 min-h-screen">
             <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
@@ -146,101 +236,5 @@
     </AuthenticatedLayout>
 </template>
 
-<script setup>
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import { Head, useForm, router } from '@inertiajs/vue3';
-import { ref, watch, computed } from 'vue';
-
-const props = defineProps({
-    classes: Array,
-    sessions: Array,
-    sections: Array,
-    groups: Array,
-    students: Array, // Students for the selected criteria
-    selectedClassId: Number,
-    selectedSessionId: Number,
-    selectedSectionId: Number,
-    selectedGroupId: Number,
-    selectedAttendanceDate: String, // Date string (YYYY-MM-DD)
-    initialMessage: Object, // { text: '...', type: 'info' | 'error' }
-});
-
-// Form state for filters
-const filterForm = useForm({
-    class_id: props.selectedClassId || '',
-    session_id: props.selectedSessionId || '',
-    section_id: props.selectedSectionId || '',
-    group_id: props.selectedGroupId || '',
-    attendance_date: props.selectedAttendanceDate || new Date().toISOString().slice(0, 10), // Default to today
-});
-
-// Form state for attendance submission
-const attendanceForm = useForm({
-    class_id: filterForm.class_id,
-    session_id: filterForm.session_id,
-    section_id: filterForm.section_id,
-    group_id: filterForm.group_id,
-    attendance_date: filterForm.attendance_date,
-    attendance_data: props.students.map(student => ({
-        student_id: student.id,
-        status: student.attendance_status || 'absent', // Default to 'absent'
-    })),
-});
-
-// Watch for changes in filter form and update attendanceForm accordingly
-watch(() => filterForm.class_id, (newValue) => { attendanceForm.class_id = newValue; });
-watch(() => filterForm.session_id, (newValue) => { attendanceForm.session_id = newValue; });
-watch(() => filterForm.section_id, (newValue) => { attendanceForm.section_id = newValue; });
-watch(() => filterForm.group_id, (newValue) => { attendanceForm.group_id = newValue; });
-watch(() => filterForm.attendance_date, (newValue) => { attendanceForm.attendance_date = newValue; });
 
 
-// When students prop changes, re-initialize attendanceForm.attendance_data
-watch(() => props.students, (newStudents) => {
-    attendanceForm.attendance_data = newStudents.map(student => ({
-        student_id: student.id,
-        status: student.attendance_status || 'absent',
-    }));
-}, { deep: true });
-
-// Function to apply filters
-const applyFilters = () => {
-    router.get(route('teacherattendance.index'), filterForm.data(), {
-        preserveState: true,
-        preserveScroll: true,
-        onSuccess: () => {
-            // After successful filter, if students are loaded, attendanceForm will re-init via watcher
-        },
-    });
-};
-
-// Function to submit attendance
-const submitAttendance = () => {
-    attendanceForm.post(route('teacherattendance.store'), {
-        onSuccess: () => {
-            applyFilters(); // Re-fetch students to show updated attendance
-        },
-        onError: (errors) => {
-            console.error("Submission errors:", errors);
-            // Inertia automatically shows validation errors
-        },
-    });
-};
-
-// Determine if the form can be submitted (i.e., all filters selected and students loaded)
-const canSubmit = computed(() =>
-    filterForm.class_id &&
-    filterForm.session_id &&
-    filterForm.section_id &&
-    filterForm.group_id &&
-    filterForm.attendance_date &&
-    props.students && props.students.length > 0
-);
-
-const getMessageClass = (type) => {
-    if (type === 'success') return 'bg-green-100 border-green-500 text-green-700';
-    if (type === 'error') return 'bg-red-100 border-red-500 text-red-700';
-    if (type === 'info') return 'bg-blue-100 border-blue-500 text-blue-700';
-    return '';
-};
-</script>

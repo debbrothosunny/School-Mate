@@ -9,22 +9,18 @@ import {
   Legend,
   ArcElement
 } from 'chart.js'
-import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
-
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 // Register Chart.js components
 ChartJS.register(Title, Tooltip, Legend, ArcElement)
-
 // Define incoming props
 const props = defineProps({
   cards: Object,
   attendanceStats: Object,
-  message: String, // This prop is now unused as the message is hardcoded for the typewriter effect.
   activeSince: String,
   presentCount: Number,
   absentCount: Number,
   lateCount: Number,
 })
-
 // Prepare pie-chart data and options
 const monthlyAttendancePieChartData = {
   labels: props.attendanceStats.labels,
@@ -40,7 +36,6 @@ const monthlyAttendancePieChartData = {
     },
   ],
 }
-
 const monthlyAttendancePieChartOptions = {
   responsive: true,
   maintainAspectRatio: false,
@@ -75,7 +70,6 @@ const monthlyAttendancePieChartOptions = {
     },
   },
 }
-
 // Pastel background colors only
 const cardBgColors = [
   'bg-blue-50',
@@ -86,7 +80,6 @@ const cardBgColors = [
   'bg-indigo-50',
   'bg-pink-50',
 ]
-
 // Build cards array, filter out zeros
 const cardItems = computed(() => {
   const items = [
@@ -104,14 +97,12 @@ const cardItems = computed(() => {
   ];
   return items.filter(item => item.value !== 0);
 });
-
 // Greeting & live clock
 const greeting = ref('')
 const timeIconClass = ref('')
 const currentDate = ref('')
 const currentTime = ref('')
 let intervalId = null
-
 function updateDateTime() {
   const now = new Date()
   const hrs = now.getHours()
@@ -119,7 +110,6 @@ function updateDateTime() {
   const secs = String(now.getSeconds()).padStart(2, '0')
   const ampm = hrs >= 12 ? 'PM' : 'AM'
   const h12 = hrs % 12 || 12
-
   if (hrs >= 5 && hrs < 12) {
     greeting.value = 'Good Morning!'
     timeIconClass.value = 'fas fa-sun sun-animation'
@@ -133,28 +123,23 @@ function updateDateTime() {
     greeting.value = 'Good Night!'
     timeIconClass.value = 'fas fa-moon moon-animation'
   }
-
   currentDate.value = now.toLocaleDateString('en-US', {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
   })
   currentTime.value = `${h12}:${mins}:${secs} ${ampm}`
 }
-
 onMounted(() => {
   updateDateTime()
   intervalId = setInterval(updateDateTime, 1000)
 })
-
 onUnmounted(() => {
   clearInterval(intervalId)
 })
-
 // Typewriter effect logic
 const typedMessage = ref('');
 const isTyping = ref(false);
 const typingSpeed = 50; // Milliseconds per character
-const messageToType = "Welcome, Admin! Here’s a complete school overview."
-
+const messageToType = "Good to have you back, Admin. Let's explore your school's data today."
 const typeWriterEffect = (text) => {
   let i = 0;
   typedMessage.value = '';
@@ -169,7 +154,6 @@ const typeWriterEffect = (text) => {
     }
   }, typingSpeed);
 };
-
 // Start the typewriter effect when the component is mounted
 onMounted(() => {
   typeWriterEffect(messageToType);
@@ -178,27 +162,20 @@ onMounted(() => {
 
 <template>
   <Head title="Dashboard" />
-
   <AuthenticatedLayout>
-    <div class="w-full min-h-screen bg-white py-8 px-4">
+    <div class="dashboard-container w-full min-h-screen bg-white py-8 px-4">
       <div class="max-w-7xl mx-auto">
-
         <!-- Header & Cards -->
         <div class="bg-white shadow-xl rounded-lg p-6 mb-8">
-
           <!-- Dynamic message with typewriter effect -->
-          <h3 class="text-gray-800 text-xl mb-4 font-mono">
+          <h3 class="text-gray-800 text-xl mb-4 font-semibold typewriter-container">
             {{ typedMessage }}<span :class="{'typewriter-cursor': isTyping}">|</span>
           </h3>
-
           <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             <div
               v-for="(card, idx) in cardItems"
               :key="card.title"
-              :class="[
-                cardBgColors[idx % cardBgColors.length],
-                'rounded-lg p-4 shadow-lg transition transform hover:scale-105'
-              ]"
+              :class="[cardBgColors[idx % cardBgColors.length], 'rounded-lg p-4 shadow-lg transition transform hover:scale-105']"
               class="flex flex-col items-center justify-center"
             >
               <!-- Conditionally render icon or Tk symbol -->
@@ -209,24 +186,16 @@ onMounted(() => {
               <p class="mt-2 text-lg font-medium text-black">{{ card.title }}</p>
             </div>
           </div>
-
           <!-- Attendance Pie Chart -->
           <div class="bg-white rounded-lg shadow-md p-6">
             <div class="w-full mx-auto" style="max-width:600px; height:500px;">
-              <Pie
-                :data="monthlyAttendancePieChartData"
-                :options="monthlyAttendancePieChartOptions"
-              />
+              <Pie :data="monthlyAttendancePieChartData" :options="monthlyAttendancePieChartOptions" />
             </div>
-            <p
-              v-if="attendanceStats.data.every(v => v === 0)"
-              class="text-center text-gray-500 mt-4"
-            >
+            <p v-if="attendanceStats.data.every(v => v === 0)" class="text-center text-gray-500 mt-4">
               No attendance data available for your current view.
             </p>
           </div>
         </div>
-
         <!-- Greeting & Time -->
         <div class="text-center text-gray-700 mt-8">
           <div class="text-2xl font-semibold">
@@ -238,23 +207,25 @@ onMounted(() => {
             <span class="mx-2">|</span>
             <span class="text-indigo-500">{{ currentTime }}</span>
           </div>
-          <div
-            v-if="activeSince"
-            class="text-lg mt-2 text-gray-500"
-          >
+          <div v-if="activeSince" class="text-lg mt-2 text-gray-500">
             Active Since: {{ activeSince }}
           </div>
           <div class="mt-4 italic text-gray-400">
             <small>The journey of a thousand miles begins with a single step.</small>
           </div>
         </div>
-
       </div>
     </div>
   </AuthenticatedLayout>
 </template>
 
 <style scoped>
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap');
+
+.dashboard-container {
+  font-family: 'Poppins', sans-serif;
+}
+
 .sun-animation {
   color: #FACC15;
   animation: rotateSun 5s linear infinite;
@@ -276,14 +247,29 @@ onMounted(() => {
 .typewriter-cursor {
   display: inline-block;
   vertical-align: bottom;
-  width: 0.5em; /* Adjust width to match font size */
-  height: 1.2em; /* Adjust height to match line height */
-  background-color: currentColor; /* Matches the text color */
+  width: 0.5em;
+  height: 1.2em;
+  background-color: currentColor;
   animation: blink 0.7s step-end infinite;
 }
-
 @keyframes blink {
   from, to { opacity: 1; }
   50% { opacity: 0; }
 }
+
+/* Fade and slide animation for typewriter container */
+@keyframes fadeSlideIn {
+  0% {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.typewriter-container {
+  animation: fadeSlideIn 1s ease forwards;
+}
+
 </style>

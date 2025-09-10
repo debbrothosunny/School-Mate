@@ -8,7 +8,6 @@ use App\Http\Controllers\SectionController;
 use App\Http\Controllers\TeacherController;
 use App\Http\Controllers\ClassNameController;
 use App\Http\Controllers\StudentController;
-use App\Http\Controllers\MyClassesController;
 use App\Http\Controllers\AccountsController;
 use App\Http\Controllers\AttendanceController;
 use App\Http\Controllers\SubjectController;
@@ -184,6 +183,36 @@ Route::middleware(['auth'])->group(function () {
 
 
 
+
+        // Display the index page with a list of all time slots.
+        Route::get('/exam-time-slots', [ExamController::class, 'examTimeSlotIndex'])
+            ->name('exam-time-slots.index');
+
+        // Display the form to create a new time slot.
+        Route::get('/exam-time-slots/create', [ExamController::class, 'examTimeSlotCreate'])
+            ->name('exam-time-slots.create');
+
+        // Store a new time slot in the database.
+        Route::post('/exam-time-slots', [ExamController::class, 'examTimeSlotStore'])
+            ->name('exam-time-slots.store');
+
+        // Display the form to edit an existing time slot.
+        // The route receives the ExamTimeSlot model instance through route model binding.
+        Route::get('/exam-time-slots/{examTimeSlot}/edit', [ExamController::class, 'examTimeSlotEdit'])
+            ->name('exam-time-slots.edit');
+
+        // Update an existing time slot in the database.
+        // The route receives the ExamTimeSlot model instance through route model binding.
+        Route::put('/exam-time-slots/{examTimeSlot}', [ExamController::class, 'examTimeSlotUpdate'])
+            ->name('exam-time-slots.update');
+
+        // Delete a time slot from the database.
+        // The route receives the ExamTimeSlot model instance through route model binding.
+        Route::delete('/exam-time-slots/{examTimeSlot}', [ExamController::class, 'examTimeSlotDestroy'])
+            ->name('exam-time-slots.destroy');
+
+
+
         Route::get('/exam-schedules', [ExamController::class, 'ExamSchdeuleIndex'])->name('exam-schedules.index');
         Route::get('/exam-schedules/create', [ExamController::class, 'ExamSchdeuleCreate'])->name('exam-schedules.create');
         Route::post('/exam-schedules', [ExamController::class, 'ExamSchdeuleStore'])->name('exam-schedules.store');
@@ -213,8 +242,9 @@ Route::middleware(['auth'])->group(function () {
 
 
         // Marks Router
-        Route::get('/marks', [MarkController::class, 'index'])->name('marks.index');
-        Route::post('/marks', [MarkController::class, 'store'])->name('marks.store');
+
+        // Route::get('/marks', [MarkController::class, 'index'])->name('marks.index');
+        // Route::post('/marks', [MarkController::class, 'store'])->name('marks.store');
 
 
 
@@ -411,17 +441,17 @@ Route::middleware(['auth'])->group(function () {
 
     // TEACHER ONLY ROUTES
     Route::middleware('role:teacher')->group(function () {
-        Route::get('/teacher/my-classes', [MyClassesController::class, 'index'])->name('my-classes.index');
-        Route::get('/teacher/dashboard', [DashboardController::class, 'teacherIndex'])->name('teacher.dashboard');
+        
+    Route::get('/teacher/dashboard', [DashboardController::class, 'teacherIndex'])->name('teacher.dashboard');
 
-        Route::get('teacher/marks', [MarkController::class, 'teacherMarksIndex'])->name('teachermarks.index');
-        Route::post('teacher/marks', [MarkController::class, 'teacherMarksStore'])->name('teachermarks.store');
+    Route::get('teacher/marks', [MarkController::class, 'teacherMarksIndex'])->name('teachermarks.index');
+    Route::post('teacher/marks', [MarkController::class, 'teacherMarksStore'])->name('teachermarks.store');
 
-        Route::get('/teacher/my-notices', [NoticeController::class, 'myNotices'])->name('teacher.my-notices');
+    Route::get('/teacher/my-notices', [NoticeController::class, 'myNotices'])->name('teacher.my-notices');
 
-        // ✨ NEW Teacher Attendance Routes - Adjusted to fit here ✨
-        Route::get('/teacher/attendance', [AttendanceController::class, 'teacherAttendanceIndex'])->name('teacherattendance.index');
-        Route::post('/teacher/attendance', [AttendanceController::class, 'teacherAttendanceStore'])->name('teacherattendance.store');
+    // ✨ NEW Teacher Attendance Routes - Adjusted to fit here ✨
+    Route::get('/teacher/attendance', [AttendanceController::class, 'teacherAttendanceIndex'])->name('teacherattendance.index');
+    Route::post('/teacher/attendance', [AttendanceController::class, 'teacherAttendanceStore'])->name('teacherattendance.store');
 
     });
 
@@ -462,6 +492,9 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/accounts/invoices', [FeeController::class, 'invoiceIndex'])->name('admin.invoices.index');
     Route::get('/accounts/invoices/create', [FeeController::class, 'invoiceCreate'])->name('admin.invoices.create');
     Route::post('/accounts/invoices', [FeeController::class, 'invoiceStore'])->name('admin.invoices.store');
+    Route::get('/accounts/invoices/{id}/download-pdf', [FeeController::class, 'downloadPdf'])->name('account.invoices.download-pdf');
+
+
     Route::get('/accounts/invoices/{invoice}', [FeeController::class, 'invoiceShow'])->name('admin.invoices.show');
     Route::get('/accounts/invoices/get-academic-data', [StudentController::class, 'getAcademicData'])->name('invoices.get-academic-data');
 

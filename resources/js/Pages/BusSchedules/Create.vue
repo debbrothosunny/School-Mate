@@ -5,9 +5,7 @@ import InputError from '@/Components/InputError.vue';
 import InputLabel from '@/Components/InputLabel.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
-import { computed, watchEffect } from 'vue';
-
-
+import { computed, watchEffect, ref, watch } from 'vue';
 
 const props = defineProps({
     classNames: Object, // List of class names for dropdown
@@ -23,7 +21,7 @@ const form = useForm({
     driver_name: '',
     capacity: null,
     status: 0, // Default to Active
-    class_id: null,
+    class_id: null, // Changed to a single value for single selection
 });
 
 watchEffect(() => {
@@ -41,7 +39,6 @@ watchEffect(() => {
             });
         } else {
             console.warn('Swal (SweetAlert2) is not defined. Flash messages will not be displayed via Swal.');
-            alert(flash.value.message);
         }
     }
 });
@@ -86,13 +83,13 @@ const submit = () => {
                             <div>
                                 <InputLabel for="departure_time" value="Departure Time" />
                                 <TextInput id="departure_time" type="time" class="mt-1 block w-full" v-model="form.departure_time" required />
-                                <p class="mt-1 text-sm text-gray-500">Format: HH:MM (e.g., 09:00 for 9 AM, 14:30 for 2:30 PM)</p>
+                                
                                 <InputError class="mt-2" :message="form.errors.departure_time" />
                             </div>
                             <div>
                                 <InputLabel for="arrival_time" value="Arrival Time" />
                                 <TextInput id="arrival_time" type="time" class="mt-1 block w-full" v-model="form.arrival_time" required />
-                                <p class="mt-1 text-sm text-gray-500">Format: HH:MM (e.g., 09:00 for 9 AM, 14:30 for 2:30 PM)</p>
+                                
                                 <InputError class="mt-2" :message="form.errors.arrival_time" />
                             </div>
                         </div>
@@ -110,13 +107,15 @@ const submit = () => {
                         </div>
 
                         <div>
-                            <InputLabel for="class_name_id" value="Associated Class" />
-                            <select id="class_name_id" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm" v-model="form.class_id">
-                                <option :value="null">-- Select a Class --</option>
-                                <option v-for="className in props.classNames" :key="className.id" :value="className.id">
+                            <InputLabel value="Associated Class" />
+                            <div class="flex flex-wrap gap-2 mt-1">
+                                <label v-for="className in props.classNames" :key="className.id"
+                                       :class="{'bg-blue-500 text-white': form.class_id === className.id, 'bg-gray-200 text-gray-700': form.class_id !== className.id}"
+                                       class="px-4 py-2 rounded-full cursor-pointer transition-colors duration-200 ease-in-out">
+                                    <input type="radio" :value="className.id" v-model="form.class_id" class="hidden" />
                                     {{ className.class_name }}
-                                </option>
-                            </select>
+                                </label>
+                            </div>
                             <InputError class="mt-2" :message="form.errors.class_id" />
                         </div>
 

@@ -1,15 +1,17 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import { Head, useForm, Link } from '@inertiajs/vue3';
+import { Head, useForm, Link, usePage } from '@inertiajs/vue3';
 import InputError from '@/Components/InputError.vue';
 import InputLabel from '@/Components/InputLabel.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
-import TextInput from '@/Components/TextInput.vue'; // You might use this or remove if name is only a select
+import Swal from 'sweetalert2';
 
 const props = defineProps({
-    groupTypes: Array, // Array of allowed group names (e.g., ['Science', 'Arts', 'Commerce', 'None'])
+    groupTypes: Array,
     errors: Object,
 });
+
+const flash = usePage().props.flash || {};
 
 const form = useForm({
     name: '',
@@ -17,18 +19,33 @@ const form = useForm({
 });
 
 const submit = () => {
-    form.post(route('groups.store'));
+    form.post(route('groups.store'), {
+        onSuccess: () => {
+            Swal.fire({
+                icon: 'success',
+                title: 'Success!',
+                text: 'Group created successfully.',
+                toast: true,
+                position: 'top-end',
+                showConfirmButton: false,
+                timer: 3000,
+                timerProgressBar: true,
+            });
+            form.reset(); // Reset form after successful creation
+        },
+        onError: (errors) => {
+            console.error('Group creation failed:', errors);
+        },
+    });
 };
 </script>
 
 <template>
     <Head title="Create Group" />
-
     <AuthenticatedLayout>
         <template #header>
             <h2 class="font-semibold text-xl text-gray-800 leading-tight">Create New Group</h2>
         </template>
-
         <div class="py-12">
             <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
                 <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-6">
@@ -46,7 +63,6 @@ const submit = () => {
                             </select>
                             <InputError class="mt-2" :message="form.errors.name" />
                         </div>
-
                         <div>
                             <InputLabel for="status" value="Status" />
                             <select
@@ -60,11 +76,11 @@ const submit = () => {
                             </select>
                             <InputError class="mt-2" :message="form.errors.status" />
                         </div>
-
                         <div class="flex items-center justify-end mt-4">
                             <Link :href="route('groups.index')" class="text-gray-600 hover:text-gray-900 mr-4">Cancel</Link>
                             <PrimaryButton :class="{ 'opacity-25': form.processing }" :disabled="form.processing">
-                                Create Group
+                                <span v-if="form.processing">Creating...</span>
+                                <span v-else>Create Group</span>
                             </PrimaryButton>
                         </div>
                     </form>

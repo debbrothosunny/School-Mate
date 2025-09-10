@@ -17,17 +17,19 @@ class ClassNameController extends Controller
     */
     public function index()
     {
-        // Fetch classes with the associated teacher relationship to avoid N+1 query problem
         $classes = ClassName::with('teacher')->paginate(10);
 
         return Inertia::render('ClassNames/Index', [
             'classes' => $classes,
+            'message' => session('message'), // Pass flash message
+            'type' => session('type'), // Pass flash type e.g., 'success' or 'error'
         ]);
     }
 
+
     /**
      * Show the form for creating a new resource.
-     */
+    */
     public function create()
     {
         // Fetch all teachers to populate the dropdown for assigning a class teacher
@@ -40,7 +42,7 @@ class ClassNameController extends Controller
 
     /**
      * Store a newly created resource in storage.
-     */
+    */
     public function store(Request $request)
     {
         $request->validate([
@@ -115,11 +117,19 @@ class ClassNameController extends Controller
     {
         try {
             $className->delete();
-            return redirect()->back()->with('flash', ['message' => 'Class deleted successfully!', 'type' => 'success']);
+            return redirect()->back()->with([
+                'message' => 'Class deleted successfully!',
+                'type' => 'success',
+            ]);
         } catch (\Exception $e) {
-            return redirect()->back()->with('flash', ['message' => 'Error deleting class: ' . $e->getMessage(), 'type' => 'error']);
+            return redirect()->back()->with([
+            'message' => 'Class deleted successfully!',
+            'type' => 'success',
+        ]);
         }
+
     }
+
 
     
     // Group Functions
@@ -127,11 +137,15 @@ class ClassNameController extends Controller
     public function groupIndex()
     {
         $groups = Group::orderBy('name')->paginate(10);
+
         return Inertia::render('Groups/Index', [
             'groups' => $groups,
-            'flash' => session('flash'),
+            // Pass flash data explicitly as message and type (not nested in flash)
+            'message' => session('message'),
+            'type' => session('type'),
         ]);
     }
+
 
 
      public function groupCreate()
@@ -184,10 +198,11 @@ class ClassNameController extends Controller
 
         $group->update($validated);
 
-        return redirect()->route('groups.index')->with('flash', [
-            'message' => 'Group updated successfully.',
-            'type' => 'success'
-        ]);
+    return redirect()->route('groups.index')->with([
+        'message' => 'Group updated successfully.',
+        'type' => 'success',
+    ]);
+
     }
 
     /**

@@ -37,6 +37,13 @@ const closeDeleteModal = () => {
     showDeleteModal.value = false;
     assignmentToDelete.value = null;
 };
+
+// New function to format the date
+const formatDate = (dateString) => {
+    if (!dateString) return 'Indefinite';
+    const options = { year: 'numeric', month: 'long', day: 'numeric' };
+    return new Date(dateString).toLocaleDateString(undefined, options);
+};
 </script>
 
 <template>
@@ -93,8 +100,10 @@ const closeDeleteModal = () => {
                                 >
                                     <td class="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ assignment.student ? assignment.student.name : 'N/A' }}</td>
                                     <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-500">{{ assignment.fee_type ? assignment.fee_type.name : 'N/A' }}</td>
-                                    <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-500">{{ assignment.applies_from }}</td>
-                                    <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-500">{{ assignment.applies_to || 'Indefinite' }}</td>
+                                    <!-- Changed this line -->
+                                    <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-500">{{ formatDate(assignment.applies_from) }}</td>
+                                    <!-- Changed this line to handle null dates -->
+                                    <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-500">{{ formatDate(assignment.applies_to) }}</td>
                                     <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
                                         <span
                                             :class="{

@@ -18,6 +18,7 @@ use App\Models\Student;
 use App\Models\Invoice;
 use App\Models\Payment;
 use Inertia\Inertia;
+use Illuminate\Support\Facades\Redirect;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -548,87 +549,95 @@ class FeeController extends Controller
     */
     public function invoiceStore(Request $request)
     {
-        // 1. Validate the incoming request data.
-        // This ensures the required fields are present and correctly formatted.
+        // 1. Validate the incoming request data FIRST, so the $validated
+        // variable is available for the entire method.
         $validated = $request->validate([
-            'student_id' => 'required|exists:students,id',
+            'selected_students' => 'required|array|min:1',
+            'selected_students.*' => 'exists:students,id',
             'due_date' => 'required|date',
+            'billing_period' => 'nullable|string|max:255',
             'selected_fee_types' => 'required|array',
             'selected_fee_types.*' => 'exists:fee_types,id',
         ]);
 
-        // 2. Load the student with their academic relationships and the user relationship.
-        // The 'user' relationship is needed to send the notification later.
-        $student = Student::with(['className', 'section', 'session', 'group', 'user'])->find($validated['student_id']);
+        $invoicesCreatedCount = 0;
+        $invoices = []; // To store created invoice objects if needed later
 
-        $totalAmount = 0;
-        $invoiceItemsData = [];
+        // 2. Loop through each student ID to create a separate invoice for each.
+        foreach ($validated['selected_students'] as $studentId) {
+            $student = Student::with(['className', 'section', 'session', 'group', 'user'])->find($studentId);
 
-        // 3. Define the billing period.
-        $billingPeriod = now()->format('F Y'); // e.g., "August 2025"
+            $totalAmount = 0;
+            $invoiceItemsData = [];
+            
+            $billingPeriod = $validated['billing_period'] ?? now()->format('F Y');
 
-        // 4. Loop through each selected fee type to find its fee structure and calculate the total.
-        foreach ($validated['selected_fee_types'] as $feeTypeId) {
-            // Find the fee structure based on the student's current academic context.
-            $feeStructure = ClassFeeStructure::with('feeType')
-                ->where('class_id', $student->class_id)
-                ->where('session_id', $student->session_id)
-                ->where('section_id', $student->section_id)
-                ->when($student->group_id, function ($query, $groupId) {
-                    return $query->where('group_id', $groupId);
-                })
-                ->where('fee_type_id', $feeTypeId)
-                ->first();
+            // Find fee structures and calculate total for the current student.
+            foreach ($validated['selected_fee_types'] as $feeTypeId) {
+                $feeStructure = ClassFeeStructure::with('feeType')
+                    ->where('class_id', $student->class_id)
+                    ->where('session_id', $student->session_id)
+                    ->where('section_id', $student->section_id)
+                    ->when($student->group_id, function ($query, $groupId) {
+                        return $query->where('group_id', $groupId);
+                    })
+                    ->where('fee_type_id', $feeTypeId)
+                    ->first();
 
-            if ($feeStructure) {
-                // If a fee structure is found, prepare the data for an invoice item.
-                $description = $feeStructure->feeType->name . ' - ' . $billingPeriod;
-                $amount = $feeStructure->amount;
+                if ($feeStructure) {
+                    $description = $feeStructure->feeType->name . ' - ' . $billingPeriod;
+                    $amount = $feeStructure->amount;
 
-                $invoiceItemsData[] = [
-                    'fee_type_id' => $feeTypeId,
-                    'description' => $description,
-                    'amount' => $amount,
-                ];
-                $totalAmount += $amount;
-            } else {
-                Log::warning("No ClassFeeStructure found for fee_type_id: {$feeTypeId} for student {$student->id}'s academic context.");
+                    $invoiceItemsData[] = [
+                        'fee_type_id' => $feeTypeId,
+                        'description' => $description,
+                        'amount' => $amount,
+                    ];
+                    $totalAmount += $amount;
+                } else {
+                    Log::warning("No ClassFeeStructure found for fee_type_id: {$feeTypeId} for student {$student->id}'s academic context.");
+                }
             }
+
+            if (empty($invoiceItemsData)) {
+                continue;
+            }
+
+            $invoice = null;
+            // Use a database transaction to ensure the invoice and its items are created together.
+            DB::transaction(function () use ($student, $totalAmount, $invoiceItemsData, $validated, &$invoice) {
+                $invoice = Invoice::create([
+                    'student_id' => $student->id,
+                    'invoice_number' => 'INV-' . now()->timestamp . '-' . $student->id,
+                    'due_date' => $validated['due_date'],
+                    'total_amount_due' => $totalAmount,
+                    'balance_due' => $totalAmount,
+                    'status' => 'pending',
+                    'issued_at' => now(),
+                    'billing_period' => $validated['billing_period'] ?? now()->format('F Y'),
+                ]);
+
+                $invoice->invoiceItems()->createMany($invoiceItemsData);
+            });
+
+            // Notify the student's user if they exist.
+            if ($student->user && $invoice) {
+                $student->user->notify(new InvoiceCreated($invoice));
+            }
+
+            $invoicesCreatedCount++;
         }
 
-        // 5. If no valid fee items are found, redirect back with an error.
-        if (empty($invoiceItemsData)) {
-            return redirect()->back()->with('flash', ['type' => 'error', 'message' => 'No valid fee items found for the selected student and fees.']);
+        if ($invoicesCreatedCount > 0) {
+            return redirect()->route('admin.invoices.index')->with('flash', ['type' => 'success', 'message' => "Successfully created {$invoicesCreatedCount} invoices."]);
+        } else {
+            return redirect()->back()->with('flash', ['type' => 'error', 'message' => 'No invoices were created. Please ensure students and fee structures are correctly set up.']);
         }
-
-        $invoice = null;
-        // 6. Use a database transaction to ensure both the invoice and its items are created together.
-        // If either creation fails, everything is rolled back.
-        DB::transaction(function () use ($validated, $totalAmount, $invoiceItemsData, $billingPeriod, &$invoice) {
-            $invoice = Invoice::create([
-                'student_id' => $validated['student_id'],
-                'invoice_number' => 'INV-' . time(),
-                'due_date' => $validated['due_date'],
-                'total_amount_due' => $totalAmount,
-                'balance_due' => $totalAmount, // Initially, the balance is the total amount due.
-                'status' => 'pending',
-                'issued_at' => now(),
-                'billing_period' => $billingPeriod,
-            ]);
-
-            // Create all the related invoice items for the newly created invoice.
-            $invoice->invoiceItems()->createMany($invoiceItemsData);
-        });
-
-        // 7. Notify the student's user if they exist.
-        // This logic is now placed here, after the transaction is committed.
-        if ($student->user) {
-            $student->user->notify(new InvoiceCreated($invoice));
-        }
-
-        // 8. Redirect to the newly created invoice's page with a success message.
-        return redirect()->route('admin.invoices.show', $invoice)->with('flash', ['type' => 'success', 'message' => 'Invoice created successfully.']);
     }
+
+
+
+    
 
 
     /**
@@ -671,6 +680,22 @@ class FeeController extends Controller
             'students' => $students,
             'fee_structures' => $feeStructures,
         ]);
+    }
+
+
+
+
+    // Invoice download as PDF function
+    public function downloadPdf($id)
+    {
+        // Eager load necessary relations for invoice
+        $invoice = Invoice::with(['student', 'invoiceItems', 'payments'])->findOrFail($id);
+
+        // Generate PDF from Blade view 'invoices.pdf' passing invoice data
+        $pdf = Pdf::loadView('Invoices.pdf', compact('invoice'));
+
+        // Send the generated PDF as a downloadable file
+        return $pdf->download("invoice_{$invoice->invoice_number}.pdf");
     }
 
 

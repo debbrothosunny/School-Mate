@@ -265,238 +265,6 @@ class StudentController extends Controller
     
 
 
-    
-
-
-   
-
-
-    // New method to fetch students and fee structures based on academic criteria
-    // public function AccountantStudentHistory()
-    // {
-    //     return Inertia::render('Accountant/StudentHistory/StudentHistory', [
-    //         'classes' => ClassName::all(),
-    //         'sessions' => ClassSession::all(),
-    //         'sections' => Section::all(),
-    //         'groups' => Group::all(),
-    //         'groupedData' => [], // Start with an empty array for search results
-    //         'errorMessage' => null,
-    //         'feeStructures' => [],
-    //     ]);
-    // }
-
-    
-    // public function getAcademicData(Request $request)
-    // {
-    //     $validated = $request->validate([
-    //         'class_id' => 'required|exists:class_names,id',
-    //         'session_id' => 'required|exists:class_sessions,id',
-    //         'section_id' => 'required|exists:sections,id',
-    //         'group_id' => 'nullable|exists:groups,id',
-    //     ]);
-        
-    //     $studentAcademicRecords = StudentAcademicRecord::where([
-    //         'class_id' => $validated['class_id'],
-    //         'session_id' => $validated['session_id'],
-    //         'section_id' => $validated['section_id'],
-    //     ])
-    //     ->when($validated['group_id'], function ($query, $groupId) {
-    //         return $query->where('group_id', $groupId);
-    //     }, function ($query) {
-    //         return $query->whereNull('group_id');
-    //     })
-    //     ->with('student:id,name,admission_number')
-    //     ->get();
-
-    //     $students = $studentAcademicRecords->pluck('student');
-
-    //     $feeStructuresQuery = ClassFeeStructure::with('feeType')
-    //         ->where('class_id', $validated['class_id'])
-    //         ->where('session_id', $validated['session_id']);
-
-    //     if ($validated['section_id']) {
-    //         $feeStructuresQuery->where('section_id', $validated['section_id']);
-    //     }
-
-    //     if ($validated['group_id']) {
-    //         $feeStructuresQuery->where('group_id', $validated['group_id']);
-    //     } else {
-    //         $feeStructuresQuery->whereNull('group_id');
-    //     }
-        
-    //     $feeStructures = $feeStructuresQuery->get();
-        
-    //     return response()->json([
-    //         'students' => $students,
-    //         'fee_structures' => $feeStructures,
-    //     ]);
-    // }
-
-    
-    //  public function showStudentHistory(Request $request)
-    // {
-    //     // Get the validated data from the request, or default to null for the first load
-    //     $validated = $request->validate([
-    //         'class_id' => 'nullable|exists:class_names,id',
-    //         'session_id' => 'nullable|exists:class_sessions,id',
-    //         'section_id' => 'nullable|exists:sections,id',
-    //         'group_id' => 'nullable|exists:groups,id',
-    //     ]);
-        
-    //     $groupedData = collect([]);
-    //     $feeStructures = collect([]);
-    //     $errorMessage = null;
-
-    //     // Only fetch student data if all required fields are present
-    //     if (isset($validated['class_id']) && isset($validated['session_id']) && isset($validated['section_id'])) {
-    //         try {
-    //             // Step 1: Find student academic records that match the selected criteria
-    //             $academicRecords = StudentAcademicRecord::where([
-    //                 'class_id' => $validated['class_id'],
-    //                 'session_id' => $validated['session_id'],
-    //                 'section_id' => $validated['section_id'],
-    //             ])
-    //             ->when(isset($validated['group_id']), function ($query) use ($validated) {
-    //                 return $query->where('group_id', $validated['group_id']);
-    //             }, function ($query) {
-    //                 return $query->whereNull('group_id');
-    //             })
-    //             ->with(['student:id,name,admission_number', 'className', 'session', 'section', 'group'])
-    //             ->get();
-        
-    //             // Step 2: Get a list of all student IDs from the found records
-    //             $studentIds = $academicRecords->pluck('student_id');
-        
-    //             // Step 3: Find all invoices for those students
-    //             $invoices = Invoice::with('invoiceItems.feeType')
-    //                              ->whereIn('student_id', $studentIds)
-    //                              ->orderBy('due_date', 'asc')
-    //                              ->get();
-                                 
-    //             // Step 4: Find all exam results for those students and their sessions
-    //             $examResults = ExamResult::with(['exam', 'class', 'section', 'group'])
-    //                                      ->whereIn('student_id', $studentIds)
-    //                                      ->where('session_id', $validated['session_id'])
-    //                                      ->get();
-        
-    //             // Step 5: Organize and combine the data for the frontend
-    //             foreach ($academicRecords as $record) {
-    //                 $studentId = $record->student_id;
-                    
-    //                 // Filter invoices and exam results to only those for the current student
-    //                 $studentInvoices = $invoices->where('student_id', $studentId)->values();
-    //                 $studentExamResults = $examResults->where('student_id', $studentId)->values();
-        
-    //                 $groupedData->push([
-    //                     'student_id' => $studentId,
-    //                     'student_name' => $record->student->name,
-    //                     'academic_details' => [
-    //                         'class_name' => $record->className->class_name,
-    //                         'session_name' => $record->session->name,
-    //                         'section_name' => $record->section->name,
-    //                         'group_name' => $record->group ? $record->group->name : 'N/A',
-    //                         'roll_number' => $record->roll_number,
-    //                         'admission_number' => $record->student->admission_number, // Add admission number here
-    //                     ],
-    //                     'invoice_history' => $studentInvoices,
-    //                     'exam_results' => $studentExamResults, // Add exam results here
-    //                 ]);
-    //             }
-                
-    //             // Step 6: Fetch fee structures based on the validated request data
-    //             $feeStructuresQuery = ClassFeeStructure::with('feeType')
-    //                 ->where('class_id', $validated['class_id'])
-    //                 ->where('session_id', $validated['session_id']);
-
-    //             if (isset($validated['section_id'])) {
-    //                 $feeStructuresQuery->where('section_id', $validated['section_id']);
-    //             }
-                
-    //             if (isset($validated['group_id'])) {
-    //                 $feeStructuresQuery->where('group_id', $validated['group_id']);
-    //             } else {
-    //                 $feeStructuresQuery->whereNull('group_id');
-    //             }
-                
-    //             $feeStructures = $feeStructuresQuery->get();
-                
-    //             // Set an error message if no students were found
-    //             if ($groupedData->isEmpty()) {
-    //                 $errorMessage = "No students found for this academic context.";
-    //             }
-
-    //         } catch (\Exception $e) {
-    //             // If any part of the process fails, set a user-friendly error message
-    //             $errorMessage = 'Failed to load student history. Please try again.';
-    //             // Log the full error for your own debugging
-    //             Log::error('Student history loading failed: ' . $e->getMessage());
-    //         }
-    //     }
-
-    //     // Pass all necessary data directly to the Inertia page
-    //     return Inertia::render('Accountant/StudentHistory/StudentHistory', [
-    //         'classes' => ClassName::all(),
-    //         'sessions' => ClassSession::all(),
-    //         'sections' => Section::all(),
-    //         'groups' => Group::all(),
-    //         'groupedData' => $groupedData,
-    //         'feeStructures' => $feeStructures,
-    //         'errorMessage' => $errorMessage,
-    //     ]);
-    // }
-
-    
-    // public function storeAcademicRecord(Request $request)
-    // {
-    //     // Step 1: Validate the incoming request data
-    //     // The 'roll_number' is not required as it's not being submitted from the form.
-    //     $validated = $request->validate([
-    //         'student_ids' => 'required|array',
-    //         'student_ids.*' => 'exists:students,id', // Validate each ID in the array
-    //         'class_id' => 'required|exists:class_names,id',
-    //         'session_id' => 'required|exists:class_sessions,id',
-    //         'section_id' => 'required|exists:sections,id',
-    //         'group_id' => 'nullable|exists:groups,id',
-    //     ]);
-
-    //     $successCount = 0;
-    //     $failedIds = [];
-
-    //     // Step 2: Loop through each selected student and create a record
-    //     foreach ($validated['student_ids'] as $studentId) {
-    //         // Using updateOrCreate ensures we don't create a new record if one already exists
-    //         // for this student in the same session, preventing database constraint errors.
-    //         $record = StudentAcademicRecord::updateOrCreate(
-    //             [
-    //                 'student_id' => $studentId,
-    //                 'session_id' => $validated['session_id'],
-    //             ],
-    //             [
-    //                 'class_id' => $validated['class_id'],
-    //                 'section_id' => $validated['section_id'],
-    //                 'group_id' => $validated['group_id'],
-    //                 // Roll number is left blank here, as your form doesn't provide it
-    //                 'roll_number' => null, 
-    //             ]
-    //         );
-
-    //         if ($record) {
-    //             $successCount++;
-    //         } else {
-    //             $failedIds[] = $studentId;
-    //         }
-    //     }
-
-    //     // Step 3: Redirect back with a status message based on the outcome
-    //     $message = "Successfully stored {$successCount} academic record(s).";
-    //     if (!empty($failedIds)) {
-    //         $message .= " Failed to store records for the following student IDs: " . implode(', ', $failedIds);
-    //     }
-
-    //     return redirect()->back()->with('success', $message);
-    // }
-
-
 
 
 
@@ -553,9 +321,9 @@ class StudentController extends Controller
 
 
 
-     /**
+    /**
      * Display a list of all students who passed the final exam.
-     */
+    */
 
     public function show(string $id)
     {
@@ -578,18 +346,23 @@ class StudentController extends Controller
 
     public function passedStudents()
     {
-        // Fetch exam results with a 'Pass' status, eager loading the related student, class name, and session.
-        $passedStudents = ExamResult::with(['student.className', 'student.section', 'student.session'])
+        // Fetch exam results for students who passed the 'Yearly' exam.
+        $passedStudents = ExamResult::with(['student.className', 'student.section', 'student.session', 'exam'])
+            // Use a simple `where` clause to filter by the specific exam name.
+            ->whereHas('exam', function ($query) {
+                $query->where('exam_name', 'Yearly');
+            })
+            // Filter by the overall status, ensuring it's 'Pass'.
             ->where('overall_status', 'Pass')
             ->get()
             ->map(function ($result) {
-                // Map the results to a more convenient format for the frontend.
+                // Map the results to a convenient format for the frontend.
                 return [
                     'id' => $result->student_id,
                     'name' => $result->student->name,
-                    'className' => $result->student->className,
-                    'session' => $result->student->session,
-                    'section' => $result->student->section,
+                    'className' => $result->student->className->class_name ?? 'N/A',
+                    'session' => $result->student->session->name ?? 'N/A',
+                    'section' => $result->student->section->name ?? 'N/A',
                     'overall_status' => $result->overall_status,
                 ];
             });
@@ -599,11 +372,16 @@ class StudentController extends Controller
         ]);
     }
 
+
+
+
+
+
     /**
      * Promote students who passed the final exam.
      *
      * @return \Illuminate\Http\RedirectResponse
-     */
+    */
     public function promoteStudents()
     {
         try {
@@ -660,6 +438,13 @@ class StudentController extends Controller
             return back()->with('error', 'Promotion failed: ' . $e->getMessage());
         }
     }
+
+
+
+    
+    
+
+
 
 
 

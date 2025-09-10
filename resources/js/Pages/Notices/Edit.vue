@@ -18,13 +18,24 @@ const props = defineProps({
 
 const flash = computed(() => usePage().props.flash || {});
 
+// Function to format date string to YYYY-MM-DD
+const formatDate = (dateString) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
 const form = useForm({
-    _method: 'post', 
-    title: props.notice.title,
+    _method: 'post',
+    notice_title: props.notice.notice_title,
     content: props.notice.content,
-    notice_date: props.notice.notice_date, // Date should already be in YYYY-MM-DD format from Laravel casting
+    // FIX: Format the date string for the HTML date input
+    start_date: formatDate(props.notice.start_date),
+    end_date: formatDate(props.notice.end_date),
     status: props.notice.status,
-    // IMPORTANT FIX: Convert existing target_user roles to lowercase on initialization
     target_user: props.notice.target_user ? props.notice.target_user.map(role => role.toLowerCase()) : [],
 });
 
@@ -44,7 +55,6 @@ watchEffect(() => {
             });
         } else {
             console.warn('Swal (SweetAlert2) is not defined. Flash messages will not be displayed via Swal.');
-            alert(flash.value.message);
         }
     }
 });
@@ -62,11 +72,11 @@ const submit = () => {
 </script>
 
 <template>
-    <Head :title="`Edit Notice: ${notice.title}`" />
+    <Head :title="`Edit Notice: ${notice.notice_title}`" />
 
     <AuthenticatedLayout>
         <template #header>
-            <h2 class="font-semibold text-xl text-gray-800 leading-tight">Edit Notice: {{ notice.title }}</h2>
+            <h2 class="font-semibold text-xl text-gray-800 leading-tight">Edit Notice: {{ notice.notice_title }}</h2>
         </template>
 
         <div class="py-12">
@@ -74,9 +84,9 @@ const submit = () => {
                 <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-6">
                     <form @submit.prevent="submit" class="space-y-6">
                         <div>
-                            <InputLabel for="title" value="Title" />
-                            <TextInput id="title" type="text" class="mt-1 block w-full" v-model="form.title" required autofocus />
-                            <InputError class="mt-2" :message="form.errors.title" />
+                            <InputLabel for="notice_title" value="Title" />
+                            <TextInput id="notice_title" type="text" class="mt-1 block w-full" v-model="form.notice_title" required autofocus />
+                            <InputError class="mt-2" :message="form.errors.notice_title" />
                         </div>
 
                         <div>
@@ -86,9 +96,15 @@ const submit = () => {
                         </div>
 
                         <div>
-                            <InputLabel for="notice_date" value="Notice Date" />
-                            <TextInput id="notice_date" type="date" class="mt-1 block w-full" v-model="form.notice_date" />
-                            <InputError class="mt-2" :message="form.errors.notice_date" />
+                            <InputLabel for="start_date" value="Start Date" />
+                            <TextInput id="start_date" type="date" class="mt-1 block w-full" v-model="form.start_date" />
+                            <InputError class="mt-2" :message="form.errors.start_date" />
+                        </div>
+
+                        <div>
+                            <InputLabel for="end_date" value="End Date" />
+                            <TextInput id="end_date" type="date" class="mt-1 block w-full" v-model="form.end_date" />
+                            <InputError class="mt-2" :message="form.errors.end_date" />
                         </div>
 
                         <div>

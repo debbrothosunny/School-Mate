@@ -18,9 +18,9 @@ const props = defineProps({
     flash: Object, // Flash messages
 });
 
-// Reactive filter state
+// Reactive filter state. Defaults status to "Active" (1) as requested.
 const search = ref(props.filters.search || '');
-const status = ref(props.filters.status !== undefined ? Number(props.filters.status) : '');
+const status = ref(props.filters.status !== undefined ? Number(props.filters.status) : 0);
 const target_user = ref(props.filters.target_user || '');
 
 // Watch for changes in filters and trigger Inertia visit
@@ -42,7 +42,7 @@ const clearFilters = () => {
     target_user.value = '';
 };
 
-// Helper to get status string from integer
+// Helper to get status string from integer (0: Active, 1: Inactive)
 const getStatusString = (status) => {
     switch (status) {
         case 0: return 'Active';
@@ -54,8 +54,8 @@ const getStatusString = (status) => {
 // Helper to determine status badge class based on integer status
 const getStatusBadgeClass = (status) => {
     switch (status) {
-        case 0: return 'bg-green-100 text-green-800';
-        case 1: return 'bg-gray-100 text-gray-800';
+        case 0: return 'bg-green-100 text-green-800'; // Corrected: 0 is Active, so use green badge
+        case 1: return 'bg-gray-100 text-gray-800';  // Corrected: 1 is Inactive, so use gray badge
         default: return 'bg-gray-100 text-gray-800';
     }
 };
@@ -66,11 +66,20 @@ const displayTargetUsers = (usersArray) => {
     return usersArray.map(user => user.charAt(0).toUpperCase() + user.slice(1)).join(', ');
 };
 
-// Helper: Function to format date for display
-const formatNoticeDate = (dateString) => {
-    if (!dateString) return 'N/A';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+// Helper: Function to format date range for display
+const formatDateRange = (startDateString, endDateString) => {
+    if (!startDateString || !endDateString) return 'N/A';
+    const startDate = new Date(startDateString);
+    const endDate = new Date(endDateString);
+
+    const startFormatted = startDate.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+    const endFormatted = endDate.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+
+    if (startFormatted === endFormatted) {
+        return startFormatted; // If dates are the same, show only one
+    }
+
+    return `${startFormatted} - ${endFormatted}`;
 };
 
 
@@ -152,7 +161,7 @@ const deleteNotice = () => {
                                     type="text"
                                     class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring focus:ring-indigo-500 focus:ring-opacity-50"
                                     v-model="search"
-                                    placeholder="Search by title or content..."
+                                    placeholder="Search by title.."
                                 />
                             </div>
                             <!-- Status Dropdown -->
@@ -200,10 +209,10 @@ const deleteNotice = () => {
                                         Title
                                     </th>
                                     <th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                                        Content
+                                        Message
                                     </th>
                                     <th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                                        Notice Date
+                                        Date Range
                                     </th>
                                     <th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
                                         Status
@@ -227,13 +236,13 @@ const deleteNotice = () => {
                                 </tr>
                                 <tr v-for="notice in notices.data" :key="notice.id" class="hover:bg-gray-50 transition-colors duration-200">
                                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                        {{ notice.title }}
+                                        {{ notice.notice_title }}
                                     </td>
                                     <td class="px-6 py-4 text-sm text-gray-500 max-w-xs overflow-hidden text-ellipsis">
                                         {{ notice.content.length > 100 ? notice.content.substring(0, 100) + '...' : notice.content }}
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                        {{ formatNoticeDate(notice.notice_date) }}
+                                        {{ formatDateRange(notice.start_date, notice.end_date) }}
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm">
                                         <span :class="['px-2 inline-flex text-xs leading-5 font-semibold rounded-full', getStatusBadgeClass(notice.status)]">
@@ -274,7 +283,7 @@ const deleteNotice = () => {
             <div class="relative p-8 bg-white w-full max-w-md mx-auto rounded-lg shadow-2xl animate-fade-in-up">
                 <h3 class="text-2xl font-bold text-gray-900 mb-4 text-center">Confirm Deletion</h3>
                 <p class="text-gray-700 mb-6 text-center">
-                    Are you sure you want to permanently delete the notice "<span class="font-semibold">{{ noticeToDelete ? noticeToDelete.title : '' }}</span>"? This action cannot be undone.
+                    Are you sure you want to permanently delete the notice "<span class="font-semibold">{{ noticeToDelete ? noticeToDelete.notice_title : '' }}</span>"? This action cannot be undone.
                 </p>
                 <div class="flex justify-center gap-4">
                     <SecondaryButton @click="closeDeleteModal">Cancel</SecondaryButton>

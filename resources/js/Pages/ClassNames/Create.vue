@@ -5,30 +5,53 @@ import InputLabel from '@/Components/InputLabel.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
 import { Head, useForm, Link } from '@inertiajs/vue3';
+import Swal from 'sweetalert2';
 
-// Accept the list of teachers as a prop.
 const props = defineProps({
     teachers: {
         type: Array,
-        default: () => [], // Set a default empty array to avoid errors
+        default: () => [],
     },
 });
 
-// A new form field for the selected teacher's ID.
 const form = useForm({
     class_name: '',
     status: 0,
     total_classes: 0,
-    teacher_id: '', // <-- CHANGED to teacher_id
+    teacher_id: '',
 });
 
 const submit = () => {
-    // The form data is automatically gathered from the `useForm` object.
     form.post(route('class-names.store'), {
-        onFinish: () => form.reset('class_name', 'status', 'total_classes', 'teacher_id'),
+        onSuccess: () => {
+            Swal.fire({
+                icon: 'success',
+                title: 'Success!',
+                text: 'Class created successfully.',
+                toast: true,
+                position: 'top-end',
+                timer: 3000,
+                showConfirmButton: false,
+                timerProgressBar: true,
+            });
+            form.reset('class_name', 'status', 'total_classes', 'teacher_id');
+        },
+        onError: (errors) => {
+            Swal.fire({
+                icon: 'error',
+                title: 'Error!',
+                text: 'Failed to create the class. Please check the form and try again.',
+                toast: true,
+                position: 'top-end',
+                timer: 3000,
+                showConfirmButton: false,
+                timerProgressBar: true,
+            });
+        }
     });
 };
 </script>
+
 
 <template>
     <Head title="Create New Class" />
@@ -37,7 +60,7 @@ const submit = () => {
         <template #header>
             <h2 class="font-weight-semibold fs-4 text-dark leading-tight">Create New Class</h2>
         </template>
-
+   
         <div class="container-fluid py-4 px-4">
             <div class="card shadow-sm rounded-lg">
                 <div class="card-body p-4 text-dark">

@@ -8,8 +8,6 @@ import TextInput from '@/Components/TextInput.vue';
 import Checkbox from '@/Components/Checkbox.vue';
 import { computed, watchEffect, ref } from 'vue';
 
-
-
 const props = defineProps({
     availableRoles: Array, // Array of roles (e.g., ['all', 'student', 'teacher'])
     flash: Object, // Flash messages
@@ -19,10 +17,11 @@ const props = defineProps({
 const flash = computed(() => usePage().props.flash || {});
 
 const form = useForm({
-    title: '',
+    notice_title: '', // Changed from `title`
     content: '',
-    notice_date: new Date().toISOString().slice(0, 10), // Default to today's date
-    status: 0, // Default to Active
+    start_date: new Date().toISOString().slice(0, 10), // Changed from `notice_date`
+    end_date: new Date().toISOString().slice(0, 10), // New field for end date
+    status: 0, // Default to Draft (0)
     target_user: [], // Initialize as an empty array for multiple selections
 });
 
@@ -42,6 +41,7 @@ watchEffect(() => {
             });
         } else {
             console.warn('Swal (SweetAlert2) is not defined. Flash messages will not be displayed via Swal.');
+            // This is a temporary fallback for testing. It will not work in the final application.
             alert(flash.value.message);
         }
     }
@@ -50,10 +50,12 @@ watchEffect(() => {
 const submit = () => {
     form.post(route('notices.store'), {
         onSuccess: () => {
-            form.reset('title', 'content', 'notice_date', 'status', 'target_user'); // Reset specific fields
-            form.notice_date = new Date().toISOString().slice(0, 10); // Reset date to today
-            form.status = 0; // Reset status to active
-            form.target_user = []; // Reset target users
+            // Reset specific fields after successful submission
+            form.reset('notice_title', 'content', 'start_date', 'end_date', 'status', 'target_user');
+            form.start_date = new Date().toISOString().slice(0, 10);
+            form.end_date = new Date().toISOString().slice(0, 10);
+            form.status = 0;
+            form.target_user = [];
         },
         onError: (errors) => {
             console.error("Notice creation failed:", errors);
@@ -74,47 +76,60 @@ const submit = () => {
             <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
                 <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-6">
                     <form @submit.prevent="submit" class="space-y-6">
+                        <!-- Notice Title -->
                         <div>
-                            <InputLabel for="title" value="Title" />
-                            <TextInput id="title" type="text" class="mt-1 block w-full" v-model="form.title" required autofocus />
-                            <InputError class="mt-2" :message="form.errors.title" />
+                            <InputLabel for="notice_title" value="Notice Title" />
+                            <TextInput id="notice_title" type="text" class="mt-1 block w-full" v-model="form.notice_title" required autofocus />
+                            <InputError class="mt-2" :message="form.errors.notice_title" />
                         </div>
 
+                        <!-- Content -->
                         <div>
-                            <InputLabel for="content" value="Content" />
+                            <InputLabel for="content" value="Message" />
                             <textarea id="content" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm" v-model="form.content" rows="6" required></textarea>
                             <InputError class="mt-2" :message="form.errors.content" />
                         </div>
 
-                        <div>
-                            <InputLabel for="notice_date" value="Notice Date" />
-                            <TextInput id="notice_date" type="date" class="mt-1 block w-full" v-model="form.notice_date" />
-                            <InputError class="mt-2" :message="form.errors.notice_date" />
+                        <!-- Date Range -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <!-- Start Date -->
+                            <div>
+                                <InputLabel for="start_date" value="Start Date" />
+                                <TextInput id="start_date" type="date" class="mt-1 block w-full" v-model="form.start_date" required />
+                                <InputError class="mt-2" :message="form.errors.start_date" />
+                            </div>
+                            <!-- End Date -->
+                            <div>
+                                <InputLabel for="end_date" value="End Date" />
+                                <TextInput id="end_date" type="date" class="mt-1 block w-full" v-model="form.end_date" required />
+                                <InputError class="mt-2" :message="form.errors.end_date" />
+                            </div>
                         </div>
 
+                        <!-- Status -->
                         <div>
                             <InputLabel for="status" value="Status" />
                             <select id="status" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm" v-model.number="form.status" required>
-                                <option :value="0">Active</option>
                                 <option :value="1">Inactive</option>
+                                <option :value="0">Active</option>
                             </select>
                             <InputError class="mt-2" :message="form.errors.status" />
                         </div>
 
+                        <!-- Target Users -->
                         <div>
                             <InputLabel value="Target Users" class="mb-2" />
                             <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
                                 <div v-for="role in availableRoles" :key="role" class="flex items-center">
-                                    <!-- Ensure the value bound to the checkbox is the lowercase role string -->
                                     <Checkbox :id="`target_user_${role}`" :value="role" v-model:checked="form.target_user" />
                                     <InputLabel :for="`target_user_${role}`" class="ml-2 capitalize">{{ role }}</InputLabel>
                                 </div>
                             </div>
                             <InputError class="mt-2" :message="form.errors.target_user" />
-                            <!-- Specific error for the first element if it fails validation -->
                             <InputError v-if="form.errors['target_user.0']" class="mt-2" :message="form.errors['target_user.0']" />
                         </div>
 
+                        <!-- Action Buttons -->
                         <div class="flex items-center justify-end mt-4">
                             <Link :href="route('notices.index')" class="text-gray-600 hover:text-gray-900 mr-4">Cancel</Link>
                             <PrimaryButton :class="{ 'opacity-25': form.processing }" :disabled="form.processing">

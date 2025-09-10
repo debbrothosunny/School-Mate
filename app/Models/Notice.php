@@ -7,15 +7,22 @@ use Illuminate\Database\Eloquent\Model;
 
 class Notice extends Model
 {
-
     use HasFactory;
+
+    /**
+     * The attributes that are mass assignable.
+     *
+     * @var array<int, string>
+     */
     protected $fillable = [
-        'title',
+        'notice_title',
         'content',
-        'notice_date',
+        'start_date',
+        'end_date',
         'status',
-        'target_user', // This will be cast to an array
+        'target_user',
         'created_by',
+   
     ];
 
 
@@ -25,47 +32,56 @@ class Notice extends Model
      * @var array<string, string>
      */
     protected $casts = [
-        'notice_date' => 'date',
+        'start_date' => 'date',
+        'end_date' => 'date',
+        'target_user' => 'array',
         'status' => 'integer',
-        'target_user' => 'array', // Cast the JSON column to a PHP array
     ];
 
+    /**
+     * Get the user who created the notice.
+     */
     public function creator()
     {
         return $this->belongsTo(User::class, 'created_by');
     }
 
-
+    /**
+     * Get the class this notice belongs to (if applicable).
+     */
     public function className()
     {
-        return $this->belongsTo(ClassName::class, 'class_id'); // Ensure foreign key
+        return $this->belongsTo(ClassName::class, 'class_id');
     }
-
 
     /**
      * Scope a query to only include published notices for a specific role.
      *
+     * We'll assume '1' is the published status.
+     *
      * @param  \Illuminate\Database\Eloquent\Builder  $query
      * @param  string  $role  The role to filter by (e.g., 'student', 'teacher', 'parent', 'all')
      * @return \Illuminate\Database\Eloquent\Builder
-    */
+     */
     public function scopeForRole($query, $role)
     {
-        return $query->where('status', 0) // Only active notices
+        return $query->where('status', 1) // 1 for published notices
             ->where(function ($q) use ($role) {
                 $q->whereJsonContains('target_user', $role)
-                ->orWhereJsonContains('target_user', 'all');
+                  ->orWhereJsonContains('target_user', 'all');
             });
     }
 
     /**
-     * Scope a query to include only active notices.
+     * Scope a query to include only active (published) notices.
      *
      * @param  \Illuminate\Database\Eloquent\Builder  $query
      * @return \Illuminate\Database\Eloquent\Builder
      */
     public function scopeActive($query)
     {
-        return $query->where('status', 0);
+        return $query->where('status', 0)
+                     ->where('start_date', '<=', now())
+                     ->where('end_date', '>=', now());
     }
 }

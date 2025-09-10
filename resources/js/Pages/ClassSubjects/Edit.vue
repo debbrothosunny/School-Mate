@@ -4,109 +4,105 @@ import InputError from '@/Components/InputError.vue';
 import InputLabel from '@/Components/InputLabel.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import { Head, useForm, Link, usePage } from '@inertiajs/vue3';
-import { computed, watchEffect, ref, watch } from 'vue'; // Added 'ref' and 'watch'
+import { computed, ref, watch, watchEffect } from 'vue';
+import Swal from 'sweetalert2';
 
 const props = defineProps({
-    classSubject: Object, // The class subject assignment object to be edited
-    classes: Array,
-    subjects: Array,
-    teachers: Array,
-    sessions: Array,
-    sections: Array,
-    groups: Array, // NEW: Added groups prop
+  classSubject: Object,
+  classes: Array,
+  subjects: Array,
+  teachers: Array,
+  sessions: Array,
+  sections: Array,
+  groups: Array,
 });
 
 const flash = computed(() => usePage().props.flash || {});
 
-// Reactive references for specific class/group IDs
+// Reactive refs for IDs of special classes and group 'None'
 const class9Id = ref(null);
 const class10Id = ref(null);
 const noneGroupId = ref(null);
 
-// Find these IDs once props are available
 watchEffect(() => {
-    if (props.classes.length > 0) {
-        // Assuming 'name' for class names in ClassName model
-        class9Id.value = props.classes.find(cls => cls.class_name === 'Class 9')?.id;
-        class10Id.value = props.classes.find(cls => cls.name === 'Class 10')?.id;
-    }
-    if (props.groups.length > 0) {
-        noneGroupId.value = props.groups.find(group => group.name === 'None')?.id;
-    }
+  if (props.classes.length) {
+    class9Id.value = props.classes.find(c => c.class_name === 'Class 9')?.id || null;
+    class10Id.value = props.classes.find(c => c.class_name === 'Class 10')?.id || null;
+  }
+  if (props.groups.length) {
+    noneGroupId.value = props.groups.find(g => g.name === 'None')?.id || null;
+  }
 });
 
-
-// Initialize the form with the current class subject's data
 const form = useForm({
-    _method: 'post', // Inertia uses POST for PUT/PATCH with _method field
-    class_name_id: props.classSubject.class_name_id,
-    subject_id: props.classSubject.subject_id,
-    teacher_id: props.classSubject.teacher_id || '', // Convert null to empty string for select
-    session_id: props.classSubject.session_id,
-    section_id: props.classSubject.section_id,
-    group_id: props.classSubject.group_id || '', // NEW: Initialize group_id from existing data or empty string
-    status: props.classSubject.status,
+  _method: 'post', // Use HTTP PUT for update
+  class_name_id: props.classSubject.class_name_id,
+  subject_id: props.classSubject.subject_id,
+  teacher_id: props.classSubject.teacher_id || '',
+  session_id: props.classSubject.session_id,
+  section_id: props.classSubject.section_id,
+  group_id: props.classSubject.group_id || '',
+  status: Number(props.classSubject.status),
 });
 
-// Computed property to check if the selected class is 9 or 10
 const isClass9Or10 = computed(() => {
-    const selectedClassId = form.class_name_id;
-    return selectedClassId === class9Id.value || selectedClassId === class10Id.value;
+  return form.class_name_id === class9Id.value || form.class_name_id === class10Id.value;
 });
 
-// Watch for changes in class_name_id to adjust group_id
-watch(() => form.class_name_id, (newClassId) => {
-    if (newClassId) { // Only run if a class is selected
-        if (!isClass9Or10.value) {
-            // If not Class 9 or 10, set group_id to 'None'
-            form.group_id = noneGroupId.value || ''; // Ensure it's set to the actual ID or empty
-        } else {
-            // If it becomes Class 9 or 10, clear group_id to force selection
-            // unless it's already a valid group (Science/Arts/Commerce)
-            const currentGroup = props.groups.find(g => g.id === form.group_id);
-            if (!currentGroup || currentGroup.name === 'None') {
-                form.group_id = ''; // Clear if it was 'None' or invalid
-            }
-        }
-    } else {
-        // If no class is selected, reset group_id
-        form.group_id = '';
+watch(
+  () => form.class_name_id,
+  (newClassId) => {
+    if (!newClassId) {
+      form.group_id = '';
+      return;
     }
-}, { immediate: true }); // Run immediately on component load to set initial group_id if needed
-
+    if (!isClass9Or10.value) {
+      form.group_id = noneGroupId.value || '';
+    } else {
+      const validGroup = props.groups.some(g => g.id === form.group_id && g.name !== 'None');
+      if (!validGroup) form.group_id = '';
+    }
+  },
+  { immediate: true },
+);
 
 const submit = () => {
-    // Convert empty string for teacher_id to null if not selected
-    const dataToSend = { ...form.data() };
-    dataToSend.teacher_id = dataToSend.teacher_id === '' ? null : dataToSend.teacher_id;
-    // Ensure group_id is null if it's an empty string (e.g., when 'None' is implied but not explicitly selected)
-    dataToSend.group_id = dataToSend.group_id === '' ? null : dataToSend.group_id;
+  const dataToSend = { ...form.data() };
+  dataToSend.teacher_id = dataToSend.teacher_id === '' ? null : dataToSend.teacher_id;
+  dataToSend.group_id = dataToSend.group_id === '' ? null : dataToSend.group_id;
 
-
-    form.post(route('class-subjects.update', props.classSubject.id), {
-        data: dataToSend, // Pass the modified data
-        onSuccess: () => {
-            // Flash messages handled by watchEffect
-        },
-        onError: (errors) => {
-            console.error("Class Subject update failed:", errors);
-        },
-    });
+  form.post(route('class-subjects.update', props.classSubject.id), {
+    onSuccess: () => {
+      Swal.fire({
+        icon: 'success',
+        title: 'Success!',
+        text: 'Class subject assignment updated successfully.',
+        toast: true,
+        position: 'top-end',
+        timer: 3000,
+        timerProgressBar: true,
+        showConfirmButton: false,
+      });
+    },
+    onError: (errors) => {
+      console.error('Class Subject update failed:', errors);
+    },
+  });
 };
 
 watchEffect(() => {
-    if (flash.value && flash.value.message) {
-        Swal.fire({
-            icon: flash.value.type === 'success' ? 'success' : 'error',
-            title: flash.value.type === 'success' ? 'Success!' : 'Error!',
-            text: flash.value.message,
-            toast: true,
-            position: 'top-end',
-            showConfirmButton: false,
-            timer: 3000,
-            timerProgressBar: true,
-        });
-    }
+  if (flash.value.message) {
+    Swal.fire({
+      icon: flash.value.type === 'success' ? 'success' : 'error',
+      title: flash.value.type === 'success' ? 'Success!' : 'Error!',
+      text: flash.value.message,
+      toast: true,
+      position: 'top-end',
+      timer: 3000,
+      timerProgressBar: true,
+      showConfirmButton: false,
+    });
+  }
 });
 </script>
 

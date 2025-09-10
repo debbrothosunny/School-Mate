@@ -15,6 +15,15 @@ const flash = computed(() => usePage().props.flash || {});
 // Format currency as BDT
 const formatCurrency = (amount) => `BDT ${Number(amount).toFixed(2)}`;
 
+// A utility function to format the full date string for display.
+const formatDate = (dateString) => {
+    if (!dateString) {
+        return 'N/A';
+    }
+    const date = new Date(dateString);
+    return date.toISOString().slice(0, 10);
+};
+
 const form = useForm({});
 const showDeleteModal = ref(false);
 const invoiceToDelete = ref(null);
@@ -79,7 +88,7 @@ const closeDeleteModal = () => {
                         {{ flash.message }}
                     </div>
 
-                    <!-- NEW: Clean, responsive list-item design -->
+                    <!-- Clean, responsive list-item design -->
                     <div class="space-y-4">
                         <div
                             v-for="invoice in invoices.data"
@@ -116,7 +125,7 @@ const closeDeleteModal = () => {
                                 </div>
                                 <div class="flex flex-col">
                                     <p class="text-gray-500 dark:text-gray-400">Due Date</p>
-                                    <p class="font-semibold">{{ invoice.due_date }}</p>
+                                    <p class="font-semibold">{{ formatDate(invoice.due_date) }}</p>
                                 </div>
                                 <div class="flex flex-col">
                                     <p class="text-gray-500 dark:text-gray-400">Status</p>
@@ -137,7 +146,21 @@ const closeDeleteModal = () => {
                                 </div>
                             </div>
 
-                            
+                            <!-- New Action Buttons -->
+                            <div class="flex-none mt-4 sm:mt-0 sm:ml-4 flex items-center space-x-2">
+                                <Link
+                                    :href="route('account.invoices.download-pdf', invoice.id)"
+                                    class="inline-flex items-center px-4 py-2 bg-blue-500 text-white text-xs font-semibold rounded-md hover:bg-blue-600 transition-colors "target="_blank"
+                                >
+                                    Download PDF
+                                </Link>
+                                <button
+                                    @click="confirmDelete(invoice)"
+                                    class="inline-flex items-center px-4 py-2 bg-red-600 text-white text-xs font-semibold rounded-md hover:bg-red-700 transition-colors"
+                                >
+                                    Delete
+                                </button>
+                            </div>
                         </div>
                         <p v-if="!invoices.data.length" class="text-center py-4 text-gray-500 dark:text-gray-400">No invoices found.</p>
                     </div>

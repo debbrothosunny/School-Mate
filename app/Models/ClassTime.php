@@ -5,7 +5,8 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-
+// This is the line you need to add!
+use App\Models\ClassTimeSlot;
 class ClassTime extends Model
 {
     use HasFactory;
@@ -40,7 +41,6 @@ class ClassTime extends Model
      * @var array<string, string>
     */
     protected $casts = [
-        // 'start_time' and 'end_time' are now on the ClassTimeSlot model, not here.
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];
@@ -55,7 +55,8 @@ class ClassTime extends Model
 
     /**
      * Get the subject associated with the timetable entry.
-     */
+    */
+    
     public function subject(): BelongsTo
     {
         return $this->belongsTo(Subject::class);
@@ -64,6 +65,7 @@ class ClassTime extends Model
     /**
      * Get the teacher associated with the timetable entry.
     */
+
     public function teacher(): BelongsTo
     {
         return $this->belongsTo(Teacher::class);
@@ -71,7 +73,8 @@ class ClassTime extends Model
 
     /**
      * Get the section associated with the timetable entry.
-     */
+    */
+
     public function section(): BelongsTo
     {
         return $this->belongsTo(Section::class);
@@ -79,7 +82,8 @@ class ClassTime extends Model
 
     /**
      * Get the session associated with the timetable entry.
-     */
+    */
+
     public function session(): BelongsTo
     {
         // Assuming your session model is named ClassSession and maps to 'class_sessions' table
@@ -96,3 +100,4 @@ class ClassTime extends Model
         return $this->belongsTo(ClassTimeSlot::class, 'class_time_slot_id');
     }
 }
+   

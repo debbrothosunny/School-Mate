@@ -6,15 +6,15 @@ import PrimaryButton from '@/Components/PrimaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
 import { Head, useForm, Link, usePage } from '@inertiajs/vue3';
 import { computed, watchEffect } from 'vue';
+import Swal from 'sweetalert2';
 
 const props = defineProps({
-    session: Object, // The session object to be edited
-    errors: Object, // For validation errors
+    session: Object,
+    errors: Object,
 });
 
 const flash = computed(() => usePage().props.flash || {});
 
-// --- START DEBUGGING LOGS ---
 console.log('Sessions/Edit.vue: Component loaded.');
 console.log('Sessions/Edit.vue: props.session:', props.session);
 if (props.session) {
@@ -23,20 +23,27 @@ if (props.session) {
 } else {
     console.log('Sessions/Edit.vue: props.session is null or undefined.');
 }
-// --- END DEBUGGING LOGS ---
 
-
-// Initialize the form with the current session's data
+// Initialize the form with current session data
 const form = useForm({
-    _method: 'post', // Inertia uses POST for PUT/PATCH with _method field
-    name: props.session.name ?? '', // Use nullish coalescing to default to empty string if name is null/undefined
-    status: Number(props.session.status), // Explicitly cast status to a number to ensure strict type matching
+    _method: 'post', 
+    name: props.session.name ?? '',
+    status: Number(props.session.status),
 });
 
 const submit = () => {
     form.post(route('sessions.update', props.session.id), {
         onSuccess: () => {
-            // Flash messages handled by watchEffect
+            Swal.fire({
+                icon: 'success',
+                title: 'Success!',
+                text: 'Session updated successfully.',
+                toast: true,
+                position: 'top-end',
+                showConfirmButton: false,
+                timer: 3000,
+                timerProgressBar: true,
+            });
         },
         onError: (errors) => {
             console.error("Session update failed:", errors);
@@ -62,14 +69,12 @@ watchEffect(() => {
 
 <template>
     <Head :title="`Edit Session: ${session.name}`" />
-
     <AuthenticatedLayout>
         <template #header>
             <h2 class="font-semibold text-xl text-gray-800 leading-tight">
                 Edit Session: {{ session.name }}
             </h2>
         </template>
-
         <div class="container-fluid py-4">
             <div class="card shadow-sm rounded-lg">
                 <div class="card-body p-4">
@@ -79,7 +84,6 @@ watchEffect(() => {
                             Back to Sessions
                         </Link>
                     </div>
-
                     <form @submit.prevent="submit">
                         <div class="row g-3">
                             <div class="col-md-6">
@@ -94,7 +98,6 @@ watchEffect(() => {
                                 />
                                 <InputError class="mt-2" :message="form.errors.name" />
                             </div>
-
                             <div class="col-md-6">
                                 <InputLabel for="status" value="Status" class="form-label" />
                                 <select id="status" class="form-select" v-model.number="form.status" required>
@@ -104,10 +107,10 @@ watchEffect(() => {
                                 <InputError class="mt-2" :message="form.errors.status" />
                             </div>
                         </div>
-
                         <div class="d-flex justify-content-end mt-4">
                             <PrimaryButton :class="{ 'opacity-75': form.processing }" :disabled="form.processing" class="btn btn-primary">
-                                Update Session
+                                <span v-if="form.processing">Updating...</span>
+                                <span v-else>Update Session</span>
                             </PrimaryButton>
                         </div>
                     </form>

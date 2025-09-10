@@ -12,7 +12,9 @@ use App\Models\Room;
 use App\Models\ExamSchedule;
 use App\Models\ClassSession; 
 use App\Models\ExamSeatPlan; 
+use App\Models\ExamTimeSlot; 
 use App\Models\Student; 
+use Illuminate\Support\Facades\Redirect;
 use Inertia\Inertia;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\Log; // For logging
@@ -175,9 +177,10 @@ class ExamController extends Controller
         $teachers = Teacher::where('status', 0)->get(['id', 'name']);
         $subjects = Subject::where('status', 0)->get(['id', 'name']);
         $rooms = Room::where('status', 0)->get(['id', 'name']);
+        $timeSlots = ExamTimeSlot::all(['id', 'name', 'start_time', 'end_time']);
 
         // Build the query to fetch exam schedules with all related models
-        $query = ExamSchedule::with(['exam', 'className', 'section', 'session', 'teacher', 'subject', 'room']);
+        $query = ExamSchedule::with(['exam', 'className', 'section', 'session', 'teacher', 'subject', 'room', 'examSlot']);
 
         // Apply filters based on request input
         if ($request->filled('exam_id')) {
@@ -207,12 +210,14 @@ class ExamController extends Controller
         if ($request->filled('status')) {
             $query->where('status', $request->status);
         }
+        if ($request->filled('exam_slot_id')) {
+            $query->where('exam_slot_id', $request->exam_slot_id);
+        }
 
-        // Order results
+        // Order results and paginate
         $examSchedules = $query->orderBy('exam_date')
-                               ->orderBy('start_time')
-                               ->paginate(10);
-
+                               ->paginate(10); 
+                               
         return Inertia::render('ExamSchedules/Index', [
             'examSchedules' => $examSchedules,
             'exams' => $exams,
@@ -222,7 +227,8 @@ class ExamController extends Controller
             'teachers' => $teachers,
             'subjects' => $subjects,
             'rooms' => $rooms,
-            'selectedFilters' => $request->only(['exam_id', 'class_id', 'section_id', 'session_id', 'teacher_id', 'subject_id', 'room_id', 'exam_date', 'status']),
+            'timeSlots' => $timeSlots,
+            'selectedFilters' => $request->only(['exam_id', 'class_id', 'section_id', 'session_id', 'teacher_id', 'subject_id', 'room_id', 'exam_date', 'status', 'exam_slot_id']),
             'flash' => session('flash'),
         ]);
     }
@@ -230,7 +236,7 @@ class ExamController extends Controller
 
     /**
      * Show the form for creating a new exam schedule.
-     */
+    */
     public function ExamSchdeuleCreate()
     {
         $exams = Exam::where('status', 0)->get(['id', 'exam_name']);
@@ -240,6 +246,7 @@ class ExamController extends Controller
         $teachers = Teacher::where('status', 0)->get(['id', 'name', 'subject_taught']);
         $subjects = Subject::where('status', 0)->get(['id', 'name', 'code']);
         $rooms = Room::where('status', 0)->get(['id', 'name']);
+        $timeSlots = ExamTimeSlot::all(['id', 'name', 'start_time', 'end_time']);
 
         return Inertia::render('ExamSchedules/Create', [
             'exams' => $exams,
@@ -249,6 +256,7 @@ class ExamController extends Controller
             'teachers' => $teachers,
             'subjects' => $subjects,
             'rooms' => $rooms,
+            'exam_slots' => $timeSlots, // CHANGED THIS LINE
         ]);
     }
 
@@ -263,61 +271,31 @@ class ExamController extends Controller
             'teacher_id' => 'required|exists:teachers,id',
             'subject_id' => 'required|exists:subjects,id',
             'room_id' => 'required|exists:rooms,id',
+            'exam_slot_id' => 'required|exists:exam_time_slots,id', // Use the new ID
             'exam_date' => 'required|date|after_or_equal:today',
-            'start_time' => 'required|date_format:H:i',
-            'end_time' => 'required|date_format:H:i|after:start_time',
             'day_of_week' => 'required|string|in:MONDAY,TUESDAY,WEDNESDAY,THURSDAY,FRIDAY,SATURDAY,SUNDAY',
-            'status' => 'required|integer|in:0,1,2', // 0=Active, 1=Canceled, 2=Rescheduled
+            'status' => 'required|integer|in:0,1,2',
         ]);
 
-        // --- CONFLICT DETECTION LOGIC ---
+        // Check for Room, Teacher, or Exam conflict based on the time slot ID
+        $conflict = ExamSchedule::where(function ($query) use ($validatedData) {
+            $query->where('room_id', $validatedData['room_id'])
+                  ->orWhere('teacher_id', $validatedData['teacher_id'])
+                  ->orWhere(function($q) use ($validatedData) {
+                      $q->where('class_id', $validatedData['class_id'])
+                        ->where('section_id', $validatedData['section_id'])
+                        ->where('session_id', $validatedData['session_id'])
+                        ->where('subject_id', $validatedData['subject_id']);
+                  });
+        })
+        ->whereDate('exam_date', $validatedData['exam_date'])
+        ->where('exam_slot_id', $validatedData['exam_slot_id'])
+        ->exists();
 
-        // 1. Check for Room Conflict
-        $roomConflict = ExamSchedule::where('room_id', $validatedData['room_id'])
-            ->whereDate('exam_date', $validatedData['exam_date'])
-            ->where(function ($query) use ($validatedData) {
-                $query->where('start_time', '<', $validatedData['end_time'])
-                      ->where('end_time', '>', $validatedData['start_time']);
-            })
-            ->exists();
-
-        if ($roomConflict) {
-            return redirect()->back()->withErrors([
-                'room_id' => 'The selected room is already booked for another exam at this time on this date.',
-            ])->withInput();
-        }
-
-        // 2. Check for Teacher Conflict
-        $teacherConflict = ExamSchedule::where('teacher_id', $validatedData['teacher_id'])
-            ->whereDate('exam_date', $validatedData['exam_date'])
-            ->where(function ($query) use ($validatedData) {
-                $query->where('start_time', '<', $validatedData['end_time'])
-                      ->where('end_time', '>', $validatedData['start_time']);
-            })
-            ->exists();
-
-        if ($teacherConflict) {
-            return redirect()->back()->withErrors([
-                'teacher_id' => 'The selected teacher is already assigned to another exam at this time on this date.',
-            ])->withInput();
-        }
-
-        // 3. Check for Class/Section/Session/Subject Conflict (prevent same group taking two exams)
-        $examOverlap = ExamSchedule::where('exam_id', $validatedData['exam_id'])
-            ->where('class_id', $validatedData['class_id'])
-            ->where('section_id', $validatedData['section_id'])
-            ->where('session_id', $validatedData['session_id'])
-            ->where('subject_id', $validatedData['subject_id'])
-            ->whereDate('exam_date', $validatedData['exam_date'])
-            ->where(function ($query) use ($validatedData) {
-                $query->where('start_time', '<', $validatedData['end_time'])
-                      ->where('end_time', '>', $validatedData['start_time']);
-            })
-            ->exists();
-
-        if ($examOverlap) {
-            return redirect()->back()->withErrors([
-                'general' => 'An exam for this Class, Section, Session, and Subject is already scheduled at this time on this date.',
+        if ($conflict) {
+            return redirect()->back()->with('flash', [
+                'message' => 'A conflict was detected. Either the room, teacher, or the exam slot is already booked for this time on this date.',
+                'type' => 'error'
             ])->withInput();
         }
 
@@ -340,7 +318,7 @@ class ExamController extends Controller
     public function ExamSchdeuleEdit(ExamSchedule $examSchedule)
     {
         // Eager load all relationships
-        $examSchedule->load(['exam', 'className', 'section', 'session', 'teacher', 'subject', 'room']);
+        $examSchedule->load(['exam', 'className', 'section', 'session', 'teacher', 'subject', 'room', 'examTimeSlot']);
 
         $exams = Exam::where('status', 0)->get(['id', 'exam_name']);
         $classes = ClassName::where('status', 0)->get(['id', 'class_name']);
@@ -349,6 +327,7 @@ class ExamController extends Controller
         $teachers = Teacher::where('status', 0)->get(['id', 'name', 'subject_taught']);
         $subjects = Subject::where('status', 0)->get(['id', 'name', 'code']);
         $rooms = Room::where('status', 0)->get(['id', 'name']);
+        $timeSlots = ExamTimeSlot::all(['id', 'name', 'start_time', 'end_time']);
 
         return Inertia::render('ExamSchedules/Edit', [
             'examSchedule' => $examSchedule,
@@ -359,6 +338,7 @@ class ExamController extends Controller
             'teachers' => $teachers,
             'subjects' => $subjects,
             'rooms' => $rooms,
+            'timeSlots' => $timeSlots,
         ]);
     }
 
@@ -372,64 +352,32 @@ class ExamController extends Controller
             'teacher_id' => 'required|exists:teachers,id',
             'subject_id' => 'required|exists:subjects,id',
             'room_id' => 'required|exists:rooms,id',
+            'exam_slot_id' => 'required|exists:exam_time_slots,id', // Use the new ID
             'exam_date' => 'required|date|after_or_equal:today',
-            'start_time' => 'required|date_format:H:i',
-            'end_time' => 'required|date_format:H:i|after:start_time',
             'day_of_week' => 'required|string|in:MONDAY,TUESDAY,WEDNESDAY,THURSDAY,FRIDAY,SATURDAY,SUNDAY',
             'status' => 'required|integer|in:0,1,2',
         ]);
 
-        // --- CONFLICT DETECTION LOGIC (Excluding current schedule) ---
-
-        // 1. Check for Room Conflict (excluding current examSchedule->id)
-        $roomConflict = ExamSchedule::where('room_id', $validatedData['room_id'])
-            ->whereDate('exam_date', $validatedData['exam_date'])
-            ->where('id', '!=', $examSchedule->id) // Exclude current record
+        // Check for Room, Teacher, or Exam conflict based on the time slot ID
+        $conflict = ExamSchedule::where('id', '!=', $examSchedule->id) // Exclude current record
             ->where(function ($query) use ($validatedData) {
-                $query->where('start_time', '<', $validatedData['end_time'])
-                      ->where('end_time', '>', $validatedData['start_time']);
+                $query->where('room_id', $validatedData['room_id'])
+                      ->orWhere('teacher_id', $validatedData['teacher_id'])
+                      ->orWhere(function($q) use ($validatedData) {
+                          $q->where('class_id', $validatedData['class_id'])
+                            ->where('section_id', $validatedData['section_id'])
+                            ->where('session_id', $validatedData['session_id'])
+                            ->where('subject_id', $validatedData['subject_id']);
+                      });
             })
+            ->whereDate('exam_date', $validatedData['exam_date'])
+            ->where('exam_slot_id', $validatedData['exam_slot_id'])
             ->exists();
 
-        if ($roomConflict) {
-            return redirect()->back()->withErrors([
-                'room_id' => 'The selected room is already booked for another exam at this time on this date.',
-            ])->withInput();
-        }
-
-        // 2. Check for Teacher Conflict (excluding current examSchedule->id)
-        $teacherConflict = ExamSchedule::where('teacher_id', $validatedData['teacher_id'])
-            ->whereDate('exam_date', $validatedData['exam_date'])
-            ->where('id', '!=', $examSchedule->id) // Exclude current record
-            ->where(function ($query) use ($validatedData) {
-                $query->where('start_time', '<', $validatedData['end_time'])
-                      ->where('end_time', '>', $validatedData['start_time']);
-            })
-            ->exists();
-
-        if ($teacherConflict) {
-            return redirect()->back()->withErrors([
-                'teacher_id' => 'The selected teacher is already assigned to another exam at this time on this date.',
-            ])->withInput();
-        }
-
-        // 3. Check for Class/Section/Session/Subject Conflict (excluding current examSchedule->id)
-        $examOverlap = ExamSchedule::where('exam_id', $validatedData['exam_id'])
-            ->where('class_id', $validatedData['class_id'])
-            ->where('section_id', $validatedData['section_id'])
-            ->where('session_id', $validatedData['session_id'])
-            ->where('subject_id', $validatedData['subject_id'])
-            ->whereDate('exam_date', $validatedData['exam_date'])
-            ->where('id', '!=', $examSchedule->id) // Exclude current record
-            ->where(function ($query) use ($validatedData) {
-                $query->where('start_time', '<', $validatedData['end_time'])
-                      ->where('end_time', '>', $validatedData['start_time']);
-            })
-            ->exists();
-
-        if ($examOverlap) {
-            return redirect()->back()->withErrors([
-                'general' => 'An exam for this Class, Section, Session, and Subject is already scheduled at this time on this date.',
+        if ($conflict) {
+            return redirect()->back()->with('flash', [
+                'message' => 'A conflict was detected. Either the room, teacher, or the exam slot is already booked for this time on this date.',
+                'type' => 'error'
             ])->withInput();
         }
 
@@ -449,7 +397,6 @@ class ExamController extends Controller
     }
 
 
-
     public function ExamSchdeuleDestroy(ExamSchedule $examSchedule)
     {
         try {
@@ -467,57 +414,24 @@ class ExamController extends Controller
     }
 
 
-    public function getAvailableResources(Request $request) // Renamed from getAvailableResources for consistency with frontend route
+    public function getAvailableResources(Request $request)
     {
-        Log::info('availableResources endpoint hit for real-time check.', $request->all());
+        // 1. Validate the incoming request data
+        $request->validate([
+            'exam_date' => 'required|date',
+            'exam_slot_id' => 'required|exists:exam_time_slots,id',
+        ]);
 
-        try {
-            $request->validate([
-                'exam_date' => 'required|date_format:Y-m-d', // Ensure correct date format
-                'start_time' => 'required|date_format:H:i',
-                'end_time' => 'required|date_format:H:i|after:start_time',
-               
-            ]);
-        } catch (ValidationException $e) {
-            Log::error('Validation failed for availableResources (real-time):', $e->errors());
-            return response()->json(['errors' => $e->errors()], 422);
-        }
+        // 2. Find all exam schedules that match the provided date and time slot
+        $bookedSchedules = ExamSchedule::where('exam_date', $request->input('exam_date'))
+            ->where('exam_slot_id', $request->input('exam_slot_id'))
+            ->get();
 
-        $examDate = $request->input('exam_date');
-        $startTime = $request->input('start_time');
-        $endTime = $request->input('end_time');
-       
+        // 3. Get the IDs of the occupied rooms and teachers
+        $occupiedRoomIds = $bookedSchedules->pluck('room_id')->unique()->values()->all();
+        $occupiedTeacherIds = $bookedSchedules->pluck('teacher_id')->unique()->values()->all();
 
-        Log::info("Checking availability for Date: $examDate, Start: $startTime, End: $endTime");
-
-        // Find all active exam schedules that conflict with the given date and time range.
-        // A conflict occurs if their time slot overlaps with the proposed new slot.
-        // The condition for overlap is: (startA < endB) AND (endA > startB)
-        $conflictingSchedulesQuery = ExamSchedule::where('exam_date', $examDate)
-            ->where('status', 0) // Assuming '0' means 'Active'
-            ->where(function ($query) use ($startTime, $endTime) {
-                $query->where('start_time', '<', $endTime)
-                      ->where('end_time', '>', $startTime);
-            });
-
-        // If this endpoint is also used for editing an existing schedule,
-        // you would exclude the current schedule from the conflict check.
-        // if ($excludeScheduleId) {
-        //     $conflictingSchedulesQuery->where('id', '!=', $excludeScheduleId);
-        // }
-
-        $conflictingSchedules = $conflictingSchedulesQuery->get();
-
-        Log::info('Conflicting schedules found:', $conflictingSchedules->toArray());
-
-        // Get unique IDs of rooms and teachers that are occupied by these conflicting schedules
-        $occupiedRoomIds = $conflictingSchedules->pluck('room_id')->unique()->values()->toArray();
-        $occupiedTeacherIds = $conflictingSchedules->pluck('teacher_id')->unique()->values()->toArray();
-
-        Log::info('Occupied Room IDs:', $occupiedRoomIds);
-        Log::info('Occupied Teacher IDs:', $occupiedTeacherIds);
-
-        // Return the IDs of occupied resources
+        // 4. Return the IDs as JSON
         return response()->json([
             'occupiedRoomIds' => $occupiedRoomIds,
             'occupiedTeacherIds' => $occupiedTeacherIds,
@@ -527,12 +441,21 @@ class ExamController extends Controller
 
 
 
-    // Seat Plan For Exam Schedule 
 
 
-    /**
-     * Show the seat plan management interface for a specific exam schedule.
-     */
+
+
+
+
+
+
+
+
+
+
+
+
+    
     public function show(ExamSchedule $examSchedule)
     {
         // Load relationships needed for the view
@@ -776,6 +699,109 @@ class ExamController extends Controller
             ]);
         }
     }
+
+
+
+    // Exam Time Slot Management Functions
+    public function examTimeSlotIndex()
+    {
+        $timeSlots = ExamTimeSlot::all();
+
+        return Inertia::render('ExamTimeSlots/Index', [
+            'timeSlots' => $timeSlots,
+            // Pass flash messages explicitly
+            'flash' => [
+                'message' => session('message'),
+                'type' => session('type'),
+            ],
+        ]);
+    }
+
+
+
+    /**
+     * Show the form for creating a new exam time slot.
+     */
+    public function examTimeSlotCreate()
+    {
+        return Inertia::render('ExamTimeSlots/Create');
+    }
+
+    /**
+     * Store a newly created exam time slot in storage.
+     *
+     * After validation and creation, this method redirects the user back to
+     * the index page, which forces Inertia to re-fetch the data.
+     */
+    public function examTimeSlotStore(Request $request)
+    {
+        $validatedData = $request->validate([
+            'name' => 'required|string|max:255|unique:exam_time_slots,name',
+            'start_time' => 'required|date_format:H:i',
+            'end_time' => 'required|date_format:H:i|after:start_time',
+        ]);
+
+        ExamTimeSlot::create($validatedData);
+
+        return Redirect::route('exam-time-slots.index');
+    }
+
+    /**
+     * Display the form for editing the specified exam time slot.
+     *
+     * @param  \App\Models\ExamTimeSlot  $examTimeSlot
+     */
+    public function examTimeSlotEdit(ExamTimeSlot $examTimeSlot)
+    {
+        return Inertia::render('ExamTimeSlots/Edit', [
+            'timeSlot' => $examTimeSlot,
+        ]);
+    }
+
+    /**
+     * Update the specified exam time slot in storage.
+     *
+     * After validation and updating the record, this method redirects the
+     * user to the index page to display the updated list.
+     */
+    public function examTimeSlotUpdate(Request $request, ExamTimeSlot $examTimeSlot)
+    {
+        $validatedData = $request->validate([
+            'name' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('exam_time_slots')->ignore($examTimeSlot->id),
+            ],
+            'start_time' => 'required|date_format:H:i',
+            'end_time' => 'required|date_format:H:i|after:start_time',
+        ]);
+
+        $examTimeSlot->update($validatedData);
+
+        // Redirect to the index page with a flash message
+        return redirect()->route('exam-time-slots.index')->with([
+            'message' => 'Exam time slot updated successfully.',
+            'type' => 'success',
+        ]);
+    }
+
+    /**
+     * Remove the specified exam time slot from storage.
+     *
+     * After deleting the record, this method redirects the user back to the
+     * index page, which will re-render without the deleted item.
+    */
+    public function examTimeSlotDestroy(ExamTimeSlot $examTimeSlot)
+    {
+        $examTimeSlot->delete();
+
+        return Redirect::route('exam-time-slots.index')->with([
+            'message' => 'Exam time slot deleted successfully.',
+            'type' => 'success',
+        ]);
+    }
+
 }
 
 

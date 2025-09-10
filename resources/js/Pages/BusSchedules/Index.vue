@@ -201,13 +201,15 @@ const deleteSchedule = () => {
                                     <svg class="w-5 h-5 mr-2 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
                                     <span>Driver: <span class="font-semibold">{{ schedule.driver_name || 'N/A' }}</span></span>
                                 </div>
+
                                 <div class="flex items-center">
                                     <svg class="w-5 h-5 mr-2 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H2v-2a3 3 0 015.356-1.857M17 20v-2c0-.523-.13-1.03-.356-1.571m0 0A5.002 5.002 0 0110 14.5a5.002 5.002 0 01-6.644 1.643M2 20h20"></path></svg>
                                     <span>Capacity: <span class="font-semibold">{{ schedule.capacity || 'N/A' }}</span></span>
                                 </div>
+
                                 <div class="flex items-center">
                                     <svg class="w-5 h-5 mr-2 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v2a2 2 0 01-2 2H5a2 2 0 01-2-2v-2a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h4a2 2 0 012 2v2M7 7h10"></path></svg>
-                                    <span>Class: <span class="font-semibold">{{ schedule.class_name?.class_name || 'N/A' }}</span></span>
+                                    <span>Class: <span class="font-semibold">{{ schedule.className?.class_name || 'N/A' }}</span></span>
                                 </div>
                             </div>
 

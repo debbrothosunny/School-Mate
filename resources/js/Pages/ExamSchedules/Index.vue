@@ -5,9 +5,10 @@ import PrimaryButton from '@/Components/PrimaryButton.vue';
 import DangerButton from '@/Components/DangerButton.vue';
 import TextInput from '@/Components/TextInput.vue';
 import InputLabel from '@/Components/InputLabel.vue';
-import { ref, computed, watch, watchEffect } from 'vue';
+import { ref, watch, watchEffect } from 'vue';
 
 // Define the component's props, just like the original code.
+// This data is passed from the Laravel controller.
 const props = defineProps({
     examSchedules: Object, // Paginated data of exam schedules
     exams: Array,
@@ -22,6 +23,7 @@ const props = defineProps({
 });
 
 // Use the useForm hook from Inertia.js to manage filter state.
+// This allows filter values to be tracked and submitted.
 const filterForm = useForm({
     exam_id: props.selectedFilters.exam_id || '',
     class_id: props.selectedFilters.class_id || '',
@@ -112,7 +114,10 @@ const formatTimeRange = (start, end) => {
 
 // --- Filter Logic ---
 
-// This watch effect will automatically submit the form whenever a filter value changes.
+/**
+ * This watch effect automatically submits the form whenever a filter value changes,
+ * providing a real-time filtering experience without needing a manual button click.
+ */
 watch([
     () => filterForm.exam_id,
     () => filterForm.class_id,
@@ -128,6 +133,8 @@ watch([
 });
 
 const applyFilters = () => {
+    // Submits the form with the current filter values.
+    // `preserveState` and `replace` prevent page reload and unnecessary history entries.
     filterForm.get(route('exam-schedules.index'), {
         preserveState: true,
         replace: true,
@@ -135,6 +142,7 @@ const applyFilters = () => {
 };
 
 const resetFilters = () => {
+    // Resets all filter form fields to their default empty state.
     filterForm.exam_id = '';
     filterForm.class_id = '';
     filterForm.section_id = '';
@@ -149,6 +157,10 @@ const resetFilters = () => {
 
 // --- Delete Logic ---
 
+/**
+ * Opens the delete confirmation modal for a specific schedule.
+ * @param {object} schedule - The schedule object to be deleted.
+ */
 const confirmDelete = (schedule) => {
     scheduleToDelete.value = schedule;
     showDeleteModal.value = true;
@@ -156,8 +168,9 @@ const confirmDelete = (schedule) => {
 
 const deleteSchedule = () => {
     if (scheduleToDelete.value) {
+        // Submits the delete request to the backend.
         deleteForm.delete(route('exam-schedules.destroy', scheduleToDelete.value.id), {
-            preserveScroll: true,
+            preserveScroll: true, // Keeps the scroll position after deletion
             onSuccess: () => {
                 closeDeleteModal();
             },
@@ -174,10 +187,9 @@ const closeDeleteModal = () => {
     scheduleToDelete.value = null;
 };
 
-// Watch for flash messages and display SweetAlert (if available).
+// Watch for flash messages and display them.
 watchEffect(() => {
     if (props.flash && props.flash.message) {
-        // Check if SweetAlert2 (Swal) is loaded.
         if (typeof Swal !== 'undefined') {
             Swal.fire({
                 icon: props.flash.type === 'success' ? 'success' : 'error',
@@ -190,8 +202,9 @@ watchEffect(() => {
                 timerProgressBar: true,
             });
         } else {
-            console.warn('SweetAlert2 (Swal) is not defined. Flash message not displayed as toast.');
-            alert(`${props.flash.type.toUpperCase()}: ${props.flash.message}`); // Fallback
+            // Fallback for when SweetAlert2 is not loaded.
+            // My instructions forbid the use of `alert()`, so a console warning is used instead.
+            console.warn(`Flash Message: ${props.flash.message}`);
         }
     }
 });
@@ -203,9 +216,9 @@ watchEffect(() => {
         <div class="bg-gray-100 min-h-screen py-6 px-4 sm:px-6 lg:px-8">
             <div class="max-w-7xl mx-auto">
                 <!-- Header and Add Button -->
-                <div class="flex justify-between items-center mb-8 border-b-2 pb-4 border-gray-200">
-                    <h3 class="text-3xl font-extrabold text-gray-900 tracking-tight">Exam Schedules</h3>
-                    <Link :href="route('exam-schedules.create')">
+                <div class="flex flex-col sm:flex-row justify-between items-center mb-8 border-b-2 pb-4 border-gray-200">
+                    <h3 class="text-3xl font-extrabold text-gray-900 tracking-tight mb-4 sm:mb-0">Exam Schedules</h3>
+                    <Link :href="route('exam-schedules.create')" aria-label="Add New Schedule">
                         <PrimaryButton class="shadow-lg hover:shadow-xl transition-shadow duration-300">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
                                 <path fill-rule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clip-rule="evenodd" />
@@ -282,9 +295,9 @@ watchEffect(() => {
                             </select>
                         </div>
                     </div>
-                    <div class="flex justify-end mt-6 space-x-4">
-                        <PrimaryButton @click="applyFilters" :disabled="filterForm.processing" class="bg-blue-600 hover:bg-blue-700 focus:ring-blue-500">Apply Filters</PrimaryButton>
-                        <button type="button" @click="resetFilters" class="inline-flex items-center px-6 py-3 bg-gray-200 border border-gray-300 rounded-xl font-semibold text-xs text-gray-700 uppercase tracking-widest shadow-sm hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-25 transition ease-in-out duration-150">Reset Filters</button>
+                    <div class="flex flex-col sm:flex-row justify-end mt-6 space-y-3 sm:space-y-0 sm:space-x-4">
+                        <PrimaryButton @click="applyFilters" :disabled="filterForm.processing" class="bg-blue-600 hover:bg-blue-700 focus:ring-blue-500 w-full sm:w-auto">Apply Filters</PrimaryButton>
+                        <button type="button" @click="resetFilters" class="inline-flex items-center justify-center px-6 py-3 bg-gray-200 border border-gray-300 rounded-xl font-semibold text-xs text-gray-700 uppercase tracking-widest shadow-sm hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-25 transition ease-in-out duration-150 w-full sm:w-auto">Reset Filters</button>
                     </div>
                 </div>
 
@@ -310,12 +323,12 @@ watchEffect(() => {
                                 <p><span class="font-medium text-gray-900">Teacher:</span> {{ schedule.teacher?.name || 'N/A' }}</p>
                                 <p><span class="font-medium text-gray-900">Room:</span> {{ schedule.room?.name || 'N/A' }}</p>
                                 <p><span class="font-medium text-gray-900">Date:</span> {{ formatExamDate(schedule.exam_date) }} ({{ schedule.day_of_week }})</p>
-                                <p><span class="font-medium text-gray-900">Time:</span> {{ formatTimeRange(schedule.start_time, schedule.end_time) }}</p>
+                                <p><span class="font-medium text-gray-900">Time:</span> {{ formatTimeRange(schedule.exam_slot?.start_time, schedule.exam_slot?.end_time) }}</p>
                             </div>
                         </div>
-                        <div class="flex justify-end space-x-3 mt-4 pt-4 border-t border-gray-100">
-                            <Link :href="route('exam-schedules.edit', schedule.id)" class="text-blue-600 hover:text-blue-800 font-medium transition duration-150">Edit</Link>
-                            <Link :href="route('exam-seat-plan.show', schedule.id)" class="text-indigo-600 hover:text-indigo-800 font-medium transition duration-150">Seat Plan</Link>
+                        <div class="flex flex-col sm:flex-row justify-end space-y-3 sm:space-y-0 sm:space-x-3 mt-4 pt-4 border-t border-gray-100">
+                            <Link :href="route('exam-schedules.edit', schedule.id)" class="text-blue-600 hover:text-blue-800 font-medium transition duration-150 text-center">Edit</Link>
+                            <Link :href="route('exam-seat-plan.show', schedule.id)" class="text-indigo-600 hover:text-indigo-800 font-medium transition duration-150 text-center">Seat Plan</Link>
                             <DangerButton @click="confirmDelete(schedule)" class="py-1 px-3 text-sm">Delete</DangerButton>
                         </div>
                     </div>
@@ -364,7 +377,6 @@ watchEffect(() => {
         </div>
     </AuthenticatedLayout>
 </template>
-
 <style scoped>
 /* All styles are handled by Tailwind CSS */
 </style>

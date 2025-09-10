@@ -24,45 +24,42 @@ class BookController extends Controller
     {
         $query = Book::query();
 
-        // Apply search filter
-        if ($request->has('search') && $request->input('search')) {
+        // Search filter (title, author, isbn)
+        if ($request->filled('search')) {
             $search = $request->input('search');
-            $query->where('title', 'like', '%' . $search . '%')
-                ->orWhere('author', 'like', '%' . $search . '%')
-                ->orWhere('isbn', 'like', '%' . $search . '%');
+            $query->where(function ($q) use ($search) {
+                $q->where('title', 'like', "%{$search}%")
+                  ->orWhere('author', 'like', "%{$search}%")
+                  ->orWhere('isbn', 'like', "%{$search}%");
+            });
         }
 
-        // Apply status filter (expecting '0' or '1' string from frontend)
-        if ($request->has('status')) {
+        // Status filter accepting '0' or '1' as string
+        if ($request->filled('status')) {
             $status = $request->input('status');
-            // Convert '0'/'1' string to boolean for database query
-            $query->where('status', (bool) $status);
+            if ($status === '0' || $status === '1') {
+                $query->where('status', (int) $status);
+            }
         }
 
-        $books = $query->paginate(10) // Adjust pagination limit as needed
-            ->withQueryString(); // Keep filters in pagination links
+        // Pagination with query string preserved
+        $books = $query->paginate(10)->withQueryString();
 
-        return Inertia::render('Books/Index', [
+        return inertia('Books/Index', [
             'books' => $books,
             'filters' => $request->only(['search', 'status']),
-            'flash' => session('flash'), // Ensure flash messages are passed
+            'message' => session('message'),
+            'type' => session('type'),
         ]);
-
     }
 
-
-    /**
-     * Show the form for creating a new book.
-     */
+    // Show create form
     public function create()
     {
-        // Render the create subject form
-        return Inertia::render('Books/Create');
+        return inertia('Books/Create');
     }
 
-
-    /* Store a newly created book in storage.
-     */
+    // Store new book
     public function store(Request $request)
     {
         $validated = $request->validate([
@@ -73,11 +70,10 @@ class BookController extends Controller
             'isbn' => 'nullable|string|max:20|unique:books,isbn',
             'quantity' => 'required|integer|min:0',
             'genre' => 'nullable|string|max:100',
-            'cover_image' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048', // Max 2MB
+            'cover_image' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
             'status' => 'required|integer|in:0,1',
         ]);
 
-        // Handle file upload for cover image
         $imagePath = null;
         if ($request->hasFile('cover_image')) {
             $imagePath = $request->file('cover_image')->store('book_covers', 'public');
@@ -90,35 +86,27 @@ class BookController extends Controller
             'publication_date' => $validated['publication_date'],
             'isbn' => $validated['isbn'],
             'quantity' => $validated['quantity'],
-            'available_quantity' => $validated['quantity'], // Initially, all copies are available
+            'available_quantity' => $validated['quantity'], // Initially all available
             'genre' => $validated['genre'],
             'cover_image_path' => $imagePath,
             'status' => $validated['status'],
         ]);
 
-        return redirect()->route('books.index')->with('flash', [
+        return redirect()->route('books.index')->with([
             'message' => 'Book "' . $book->title . '" added successfully!',
-            'type' => 'success'
+            'type' => 'success',
         ]);
     }
 
-
-    /**
-     * Show the form for editing the specified book.
-    */
+    // Show edit form
     public function edit(Book $book)
     {
-        return Inertia::render('Books/Edit', [
+        return inertia('Books/Edit', [
             'book' => $book,
-            'flash' => session('flash'),
-            'errors' => session('errors') ? session('errors')->getBag('default')->getMessages() : (object)[],
         ]);
     }
 
-
-    /**
-     * Update the specified book in storage.
-    */
+    // Update existing book
     public function update(Request $request, Book $book)
     {
         $validated = $request->validate([
@@ -129,32 +117,24 @@ class BookController extends Controller
             'isbn' => ['nullable', 'string', 'max:20', Rule::unique('books', 'isbn')->ignore($book->id)],
             'quantity' => 'required|integer|min:0',
             'genre' => 'nullable|string|max:100',
-            'cover_image' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048', // Max 2MB
+            'cover_image' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
             'status' => 'required|integer|in:0,1',
         ]);
 
-
-        // dd($request->all());
-        // Calculate the change in quantity to update available_quantity
+        // Adjust available_quantity when quantity changes
         $oldQuantity = $book->quantity;
         $newQuantity = $validated['quantity'];
         $quantityDifference = $newQuantity - $oldQuantity;
 
-        // Update available_quantity based on the change in total quantity
-        $book->available_quantity += $quantityDifference;
-        // Ensure available_quantity doesn't go below zero (if you reduce total quantity below borrowed count)
-        $book->available_quantity = max(0, $book->available_quantity);
+        $newAvailable = max(0, $book->available_quantity + $quantityDifference);
 
-
-        // Handle file upload for cover image
         $imagePath = $book->cover_image_path;
         if ($request->hasFile('cover_image')) {
-            // Delete old image if it exists
             if ($imagePath && Storage::disk('public')->exists($imagePath)) {
                 Storage::disk('public')->delete($imagePath);
             }
             $imagePath = $request->file('cover_image')->store('book_covers', 'public');
-        } elseif ($request->boolean('remove_cover_image')) { // Handle explicit removal
+        } elseif ($request->boolean('remove_cover_image')) {
             if ($imagePath && Storage::disk('public')->exists($imagePath)) {
                 Storage::disk('public')->delete($imagePath);
             }
@@ -167,22 +147,22 @@ class BookController extends Controller
             'publisher' => $validated['publisher'],
             'publication_date' => $validated['publication_date'],
             'isbn' => $validated['isbn'],
-            'quantity' => $validated['quantity'],
-            'available_quantity' => $book->available_quantity, // Use the adjusted value
+            'quantity' => $newQuantity,
+            'available_quantity' => $newAvailable,
             'genre' => $validated['genre'],
             'cover_image_path' => $imagePath,
             'status' => $validated['status'],
         ]);
 
-        return redirect()->route('books.index')->with('flash', [
+        return redirect()->route('books.index')->with([
             'message' => 'Book "' . $book->title . '" updated successfully!',
-            'type' => 'success'
+            'type' => 'success',
         ]);
     }
 
     /**
      * Remove the specified book from storage.
-     */
+    */
     public function destroy(Book $book)
     {
         // Before deleting the book, ensure no active borrow records exist for it

@@ -28,10 +28,10 @@ const isFetchingData = ref(false);
 const fetchError = ref(null);
 
 const invoiceForm = useForm({
-    student_id: '',
+    selected_students: [], // Changed from student_id to an array for multiple students
     due_date: '',
     selected_fee_types: [],
-    billing_period: '', // Added this to the form state
+    billing_period: '',
 });
 
 const totalInvoiceAmount = computed(() => {
@@ -59,25 +59,25 @@ watch(
     ],
     async ([class_id, session_id, section_id, group_id]) => {
         // Only proceed if all academic context fields are selected
-        if (!allAcademicContextSelected.value) { // Use the computed property here
+        if (!allAcademicContextSelected.value) {
             availableStudents.value = [];
             availableFeeTypesWithAmounts.value = [];
-            invoiceForm.student_id = '';
-            invoiceForm.due_date = ''; // Clear due date and billing period too
+            invoiceForm.selected_students = []; // Clear students array
+            invoiceForm.due_date = '';
             invoiceForm.selected_fee_types = [];
-            invoiceForm.billing_period = ''; // Clear billing period
-            fetchError.value = null; // Clear previous errors
+            invoiceForm.billing_period = '';
+            fetchError.value = null;
             return;
         }
 
         isFetchingData.value = true;
-        fetchError.value = null; // Clear previous errors
+        fetchError.value = null;
         availableStudents.value = [];
         availableFeeTypesWithAmounts.value = [];
-        invoiceForm.student_id = '';
-        invoiceForm.due_date = ''; // Clear due date and billing period too
+        invoiceForm.selected_students = [];
+        invoiceForm.due_date = '';
         invoiceForm.selected_fee_types = [];
-        invoiceForm.billing_period = ''; // Clear billing period
+        invoiceForm.billing_period = '';
 
         try {
             const response = await axios.get(route('admin.invoices.get-academic-data'), {
@@ -92,7 +92,7 @@ watch(
             availableStudents.value = response.data.students;
             availableFeeTypesWithAmounts.value = response.data.fee_structures.map(fs => ({
                 id: fs.fee_type_id,
-                name: fs.fee_type ? fs.fee_type.name : 'Unknown Fee Type', // Handle missing feeType relation
+                name: fs.fee_type ? fs.fee_type.name : 'Unknown Fee Type',
                 amount: fs.amount,
                 display_amount: `BDT ${Number(fs.amount).toFixed(2)}`
             }));
@@ -106,7 +106,7 @@ watch(
             isFetchingData.value = false;
         }
     },
-    { immediate: false } // Do not run immediately on component mount
+    { immediate: false }
 );
 
 // --- Toast Notification Logic ---
@@ -134,10 +134,21 @@ watchEffect(() => {
 });
 // --- End Toast Notification Logic ---
 
+// Toggle student selection
+const toggleStudentSelection = (studentId) => {
+    const index = invoiceForm.selected_students.indexOf(studentId);
+    if (index === -1) {
+        invoiceForm.selected_students.push(studentId);
+    } else {
+        invoiceForm.selected_students.splice(index, 1);
+    }
+};
+
 const submitInvoice = () => {
     invoiceForm.post(route('admin.invoices.store'), {
         onSuccess: () => {
-            invoiceForm.reset();
+            // Reset the form after successful submission
+            invoiceForm.reset('selected_students', 'due_date', 'selected_fee_types', 'billing_period');
             // Reset academic context form to clear selections and re-trigger data fetch
             academicContextForm.value = {
                 class_id: '',
@@ -150,7 +161,6 @@ const submitInvoice = () => {
         },
         onError: (errors) => {
             console.error("Invoice creation failed:", errors);
-            // Flash messages for errors are already handled by watchEffect
         },
     });
 };
@@ -219,8 +229,8 @@ const submitInvoice = () => {
                     <template v-else>
                         <!-- Student Selection -->
                         <div class="mb-6">
-                            <InputLabel value="Select Student" />
-                            <InputError :message="invoiceForm.errors.student_id" class="mt-1" />
+                            <InputLabel value="Select Students" />
+                            <InputError :message="invoiceForm.errors.selected_students" class="mt-1" />
                             <div v-if="availableStudents.length === 0" class="text-red-500 mt-2">No students found matching the selected criteria.</div>
                             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
                                 <div
@@ -228,13 +238,13 @@ const submitInvoice = () => {
                                     :key="student.id"
                                     class="p-3 border rounded-md cursor-pointer transition-colors duration-200"
                                     :class="{
-                                        'bg-indigo-600 text-white shadow-md': invoiceForm.student_id === student.id,
-                                        'hover:bg-gray-100': invoiceForm.student_id !== student.id
+                                        'bg-indigo-600 text-white shadow-md': invoiceForm.selected_students.includes(student.id),
+                                        'hover:bg-gray-100': !invoiceForm.selected_students.includes(student.id)
                                     }"
-                                    @click="invoiceForm.student_id = student.id"
+                                    @click="toggleStudentSelection(student.id)"
                                 >
                                     <div class="font-semibold">{{ student.name }}</div>
-                                    <div class="text-sm text-gray-400" :class="{ 'text-indigo-200': invoiceForm.student_id === student.id }">Admission: {{ student.admission_number }}</div>
+                                    <div class="text-sm text-gray-400" :class="{ 'text-indigo-200': invoiceForm.selected_students.includes(student.id) }">Admission: {{ student.admission_number }}</div>
                                 </div>
                             </div>
                         </div>
@@ -290,7 +300,7 @@ const submitInvoice = () => {
                         <div>
                             <Link :href="route('admin.invoices.index')" class="inline-flex items-center px-4 py-2 bg-gray-200 border border-transparent rounded-md font-semibold text-xs text-gray-700 uppercase tracking-widest hover:bg-gray-300 active:bg-gray-400 focus:outline-none focus:border-gray-400 focus:ring ring-gray-300 disabled:opacity-25 transition ease-in-out duration-150 me-3">Cancel</Link>
                             <PrimaryButton
-                                :disabled="invoiceForm.processing || !invoiceForm.student_id || invoiceForm.selected_fee_types.length === 0"
+                                :disabled="invoiceForm.processing || invoiceForm.selected_students.length === 0 || invoiceForm.selected_fee_types.length === 0"
                                 :class="{ 'opacity-50': invoiceForm.processing }"
                             >
                                 Create Invoice

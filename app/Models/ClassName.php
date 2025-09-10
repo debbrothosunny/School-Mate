@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 class ClassName extends Model
 {
@@ -25,10 +26,15 @@ class ClassName extends Model
         return $this->hasMany(ClassTime::class, 'class_name_id');
     }
     // Relationship: A Class belongs to a Teacher
-    public function teachers()
+    public function teachers(): BelongsToMany
     {
-        return $this->belongsToMany(Teacher::class, 'class_subjects', 'class_name_id', 'teacher_id')
-                    ->withPivot('subject_id', 'session_id', 'section_id', 'status');
+        return $this->belongsToMany(
+            Teacher::class, 
+            'class_subjects', // The pivot table name
+            'class_name_id',  // Foreign key on pivot table for this model
+            'teacher_id'      // Foreign key on pivot table for the related model (Teacher)
+        )
+        ->withPivot('subject_id', 'session_id', 'section_id', 'status');
     }
 
     // Relationship: A Class belongs to a Section
@@ -61,7 +67,7 @@ class ClassName extends Model
     /**
      * Get the class schedules for the class in teacher side dashboard.
     */
-     public function classSchedules()
+    public function classSchedules()
     {
         // Assuming a ClassTime model that belongs to a ClassName
         return $this->hasMany(ClassTime::class, 'class_name_id');
@@ -76,11 +82,14 @@ class ClassName extends Model
         return $this->hasMany(ExamSchedule::class, 'class_id');
     }
 
+    // Relationship: A Class belongs to a Teacher for assigning class teacher
 
-    // For Assign Class Teacher
-    public function teacher()
+    public function teacher(): BelongsTo
     {
-        return $this->belongsTo(Teacher::class);
+        return $this->belongsTo(Teacher::class, 'teacher_id');
     }
+
+
+    
     
 }

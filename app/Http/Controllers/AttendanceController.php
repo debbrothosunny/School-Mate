@@ -179,18 +179,19 @@ class AttendanceController extends Controller
         }
 
         // Fetch classes where the authenticated teacher is explicitly the class teacher
-        // Corrected column name from 'class_teacher_id' to 'teacher_id' as per your schema.
         $classes = ClassName::where('teacher_id', $teacher->id)->get(['id', 'class_name']);
         
         $initialMessage = null;
 
-        // Check if the teacher is a class teacher for any class.
-        // If not, set an error message and do not proceed with fetching other data.
+        // If no classes assigned, set a flash error message and render page
         if ($classes->isEmpty()) {
-            $initialMessage = ['text' => 'You are not the class teacher for any class. Attendance management is not available for you.', 'type' => 'error'];
+            session()->flash('message', [
+                'type' => 'error',
+                'text' => 'You are not the class teacher for any class. Attendance management is not available for you.',
+            ]);
             return Inertia::render('TeacherAttendance/Index', [
                 'classes' => $classes,
-                'sessions' => collect(), // Return empty collections to prevent dropdowns from populating
+                'sessions' => collect(),
                 'sections' => collect(),
                 'groups' => collect(),
                 'students' => collect(),
@@ -199,7 +200,6 @@ class AttendanceController extends Controller
                 'selectedSectionId' => null,
                 'selectedGroupId' => null,
                 'selectedAttendanceDate' => null,
-                'initialMessage' => $initialMessage,
             ]);
         }
         
@@ -215,43 +215,56 @@ class AttendanceController extends Controller
         $attendanceDate = $request->input('attendance_date');
 
         $students = collect();
-        
+
         // Authorization check: Ensure the selected class belongs to the authenticated teacher.
-        // This check is still needed in case a teacher has multiple classes.
         if ($classId && !$classes->pluck('id')->contains($classId)) {
-            $initialMessage = ['text' => 'You are not the class teacher for the selected class.', 'type' => 'error'];
+            session()->flash('message', [
+                'type' => 'error',
+                'text' => 'You are not the class teacher for the selected class.',
+            ]);
         }
-        
+
         // Fetch students and their attendance if all required filters are present
-        if ($classId && $sessionId && $sectionId && $groupId && $attendanceDate && $initialMessage === null) {
+        if ($classId && $sessionId && $sectionId && $groupId && $attendanceDate) {
             $students = Student::where('class_id', $classId)
-                               ->where('session_id', $sessionId)
-                               ->where('section_id', $sectionId)
-                               ->where('group_id', $groupId)
-                               ->get();
+                ->where('session_id', $sessionId)
+                ->where('section_id', $sectionId)
+                ->where('group_id', $groupId)
+                ->get();
 
             if ($students->isEmpty()) {
-                $initialMessage = ['text' => 'No students found for the selected criteria.', 'type' => 'info'];
+                session()->flash('message', [
+                    'type' => 'info',
+                    'text' => 'No students found for the selected criteria.',
+                ]);
             } else {
-                // Fetch existing attendance for these students on this date for this class
+                // Check if attendance already collected and set flash info if so
                 $existingAttendances = Attendance::where('date', $attendanceDate)
-                                                ->where('class_id', $classId)
-                                                ->where('session_id', $sessionId)
-                                                ->where('section_id', $sectionId)
-                                                ->where('group_id', $groupId)
-                                                ->whereIn('student_id', $students->pluck('id'))
-                                                ->get()
-                                                ->keyBy('student_id');
+                    ->where('class_id', $classId)
+                    ->where('session_id', $sessionId)
+                    ->where('section_id', $sectionId)
+                    ->where('group_id', $groupId)
+                    ->whereIn('student_id', $students->pluck('id'))
+                    ->get()
+                    ->keyBy('student_id');
+
+                if ($existingAttendances->isNotEmpty()) {
+                    session()->flash('message', [
+                        'type' => 'info',
+                        'text' => "Attendance saved successfully!",
+                    ]);
+                }
 
                 // Attach attendance status to each student
                 foreach ($students as $student) {
-                    $student->attendance_status = $existingAttendances->has($student->id)
-                        ? $existingAttendances[$student->id]->status
-                        : 'absent';
+                    $student->attendance_status = $existingAttendances->has($student->id) ? $existingAttendances[$student->id]->status : 'absent';
                 }
             }
-        } else if (!$initialMessage) {
-            $initialMessage = ['text' => 'Please select all required filters (Class, Session, Section, Group, and Attendance Date) to manage attendance.', 'type' => 'info'];
+        } elseif (!$classId || !$sessionId || !$sectionId || !$groupId || !$attendanceDate) {
+            session()->flash('message', [
+                'type' => 'info',
+                'text' => 'Please select all required filters (Class, Session, Section, Group, and Attendance Date) to manage attendance.',
+            ]);
         }
 
         return Inertia::render('TeacherAttendance/Index', [
@@ -265,7 +278,6 @@ class AttendanceController extends Controller
             'selectedSectionId' => (int)$sectionId,
             'selectedGroupId' => (int)$groupId,
             'selectedAttendanceDate' => $attendanceDate,
-            'initialMessage' => $initialMessage,
         ]);
     }
 
@@ -284,7 +296,6 @@ class AttendanceController extends Controller
             abort(403, 'You are not registered as a teacher or your teacher profile is incomplete.');
         }
 
-        // Validate incoming data
         $request->validate([
             'class_id' => ['required', 'exists:class_names,id'],
             'session_id' => ['required', 'exists:class_sessions,id'],
@@ -302,14 +313,13 @@ class AttendanceController extends Controller
         $groupId = $request->input('group_id');
         $attendanceDate = $request->input('attendance_date');
 
-        // Authorization Check: Ensure the teacher is the class teacher for the submitted class
-        // Corrected column name from 'class_teacher_id' to 'teacher_id'.
+        // Authorization: Check teacher is authorized for the class
         $isAuthorized = ClassName::where('id', $classId)
-                                 ->where('teacher_id', $teacher->id)
-                                 ->exists();
+            ->where('teacher_id', $teacher->id)
+            ->exists();
 
         if (!$isAuthorized) {
-            abort(403, 'You are not authorized to manage attendance for this class as you are not the class teacher.');
+            abort(403, 'You are not authorized to manage attendance for this class.');
         }
 
         foreach ($request->input('attendance_data') as $data) {
@@ -322,14 +332,18 @@ class AttendanceController extends Controller
                     'group_id' => $groupId,
                     'date' => $attendanceDate,
                 ],
-                [
-                    'status' => $data['status'],
-                ]
+                ['status' => $data['status']]
             );
         }
 
-        return redirect()->back()->with('flash', ['success' => 'Attendance saved successfully!']);
+        return redirect()->back()->with('message', [
+            'type' => 'success',
+            'text' => 'Attendance saved successfully!',
+        ]);
+    
     }
+
+
 
 }
 

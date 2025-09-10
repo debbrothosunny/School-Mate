@@ -6,349 +6,398 @@ import PrimaryButton from '@/Components/PrimaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
 import { Head, useForm, Link, usePage } from '@inertiajs/vue3';
 import { computed, ref, watch, watchEffect } from 'vue';
-import axios from 'axios'; // Make sure axios is imported for API calls
+import axios from 'axios';
 
 const props = defineProps({
-    exams: Array, // Your list of exams
-    classes: Array, // Your list of classes
-    sections: Array, // Your list of sections
-    sessions: Array, // Your list of sessions
-    teachers: Array, // All available teachers
-    subjects: Array, // All available subjects
-    rooms: Array, // All available rooms
-    flash: Object,
+  exams: Array,
+  classes: Array,
+  sections: Array,
+  sessions: Array,
+  teachers: Array,
+  subjects: Array,
+  rooms: Array,
+  exam_slots: Array,
+  flash: Object,
 });
 
 const flash = computed(() => usePage().props.flash || {});
 
 const form = useForm({
-    exam_id: '',
-    class_id: '',
-    section_id: '',
-    session_id: '',
-    teacher_id: '',
-    subject_id: '',
-    room_id: '',
-    exam_date: '',
-    start_time: '',
-    end_time: '',
-    status: 0, // Default to Active
-    day_of_week: '', // This should be derived from exam_date
+  exam_id: '',
+  class_id: '',
+  section_id: '',
+  session_id: '',
+  teacher_id: '',
+  subject_id: '',
+  room_id: '',
+  exam_date: '',
+  exam_slot_id: '',
+  status: 0,
+  day_of_week: '',
 });
 
-// Reactive state for tracking loading and updating room/teacher status
+// Reactive state for tracking loading status and resources
 const fetchingResources = ref(false);
-
-// Initialize allRoomsWithStatus and allTeachersWithStatus
-// with all available props, marked as 'Available' initially.
-// This is critical for the dropdowns to render correctly from the start.
 const allRoomsWithStatus = ref([]);
 const allTeachersWithStatus = ref([]);
+const examSlotsWithStatus = ref([]);
 
-// Initialize room and teacher statuses on component load/props change
+// Initialize rooms, teachers, and exam slots with a default 'Available' status on load
 watchEffect(() => {
-    if (props.rooms && props.rooms.length > 0) {
-        allRoomsWithStatus.value = props.rooms.map(room => ({ ...room, status_text: 'Available' }));
-    }
-    if (props.teachers && props.teachers.length > 0) {
-        allTeachersWithStatus.value = props.teachers.map(teacher => ({ ...teacher, status_text: 'Available' }));
-    }
-}, { immediate: true }); // Run immediately to set initial status
+  if (props.rooms && props.rooms.length > 0) {
+    allRoomsWithStatus.value = props.rooms.map(room => ({ ...room, status_text: 'Available' }));
+  }
+  if (props.teachers && props.teachers.length > 0) {
+    allTeachersWithStatus.value = props.teachers.map(teacher => ({ ...teacher, status_text: 'Available' }));
+  }
+  if (props.exam_slots && props.exam_slots.length > 0) {
+    examSlotsWithStatus.value = props.exam_slots.map(slot => ({ ...slot, status_text: 'Available' }));
+  }
+});
 
 // Function to calculate day of week
 const getDayOfWeek = (dateString) => {
-    if (!dateString) return '';
-    const date = new Date(dateString);
-    const days = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
-    return days[date.getDay()];
+  if (!dateString) return '';
+  const date = new Date(dateString);
+  const days = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
+  return days[date.getDay()];
 };
 
-// Watch for changes in exam_date, start_time, end_time to trigger real-time availability check
-watch([() => form.exam_date, () => form.start_time, () => form.end_time], ([newDate, newStartTime, newEndTime]) => {
-    form.day_of_week = getDayOfWeek(newDate); // Update day of week based on selected date
+// Helper function to format a 24-hour time string to 12-hour with AM/PM
+const formatTime = (timeString) => {
+  if (!timeString) return '';
+  const [hours, minutes] = timeString.split(':');
+  let h = parseInt(hours, 10);
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  h = h % 12;
+  h = h ? h : 12; // The hour '0' should be '12'
+  return `${h}:${minutes} ${ampm}`;
+};
 
-    // Only fetch resources if all necessary fields are filled
-    if (newDate && newStartTime && newEndTime) {
-        fetchAvailableResources();
-    } else {
-        // If fields are cleared, reset all to 'Available' status
-        allRoomsWithStatus.value = props.rooms.map(room => ({ ...room, status_text: 'Available' }));
-        allTeachersWithStatus.value = props.teachers.map(teacher => ({ ...teacher, status_text: 'Available' }));
-    }
-}, { immediate: true }); // Ensure this runs on initial component load if initial form values are present
+// Watch for changes in date and room to fetch available time slots
+watch([() => form.exam_date, () => form.room_id], async ([newDate, newRoomId]) => {
+  form.day_of_week = getDayOfWeek(newDate);
+  form.exam_slot_id = '';
+  allTeachersWithStatus.value = props.teachers.map(teacher => ({ ...teacher, status_text: 'Available' }));
+  if (newDate && newRoomId) {
+    await fetchAvailableSlotsForRoom();
+  } else {
+    examSlotsWithStatus.value = props.exam_slots.map(slot => ({ ...slot, status_text: 'Available' }));
+  }
+});
 
-// Function to fetch available rooms and teachers from the backend
-const fetchAvailableResources = async () => {
-    if (!form.exam_date || !form.start_time || !form.end_time) {
-        // Reset if any time field is empty, don't make API call
-        allRoomsWithStatus.value = props.rooms.map(room => ({ ...room, status_text: 'Available' }));
-        allTeachersWithStatus.value = props.teachers.map(teacher => ({ ...teacher, status_text: 'Available' }));
-        return;
-    }
+// Watch for changes in selected exam_slot_id to fetch available teachers
+watch(() => form.exam_slot_id, async (newSlotId) => {
+  allTeachersWithStatus.value = props.teachers.map(teacher => ({ ...teacher, status_text: 'Available' }));
+  if (form.exam_date && newSlotId) {
+    await fetchAvailableTeachers();
+  }
+});
 
-    fetchingResources.value = true;
-    try {
-        const response = await axios.get(route('exam-schedules.available-resources'), {
-            params: {
-                exam_date: form.exam_date,
-                start_time: form.start_time,
-                end_time: form.end_time,
-                // If editing, pass the current exam schedule ID to exclude it from conflict checks:
-                // exclude_schedule_id: form.id, // Assuming form.id holds the current schedule's ID if editing
-            }
-        });
+// Fetch available slots for selected date and room
+const fetchAvailableSlotsForRoom = async () => {
+  if (!form.exam_date || !form.room_id) return;
+  fetchingResources.value = true;
+  try {
+    const fetchPromises = props.exam_slots.map(slot =>
+      axios.get(route('exam-schedules.available-resources'), {
+        params: { exam_date: form.exam_date, exam_slot_id: slot.id },
+      })
+    );
+    const responses = await Promise.all(fetchPromises);
+    examSlotsWithStatus.value = props.exam_slots.map((slot, index) => {
+      const responseData = responses[index].data;
+      const isBooked = responseData.occupiedRoomIds.includes(form.room_id);
+      return {
+        ...slot,
+        status_text: isBooked ? 'Booked' : 'Available',
+      };
+    });
+  } catch (error) {
+    console.error('Error fetching available slots for room:', error);
+    examSlotsWithStatus.value = props.exam_slots.map(slot => ({ ...slot, status_text: 'Available' }));
+  } finally {
+    fetchingResources.value = false;
+  }
+};
 
-        const { occupiedRoomIds, occupiedTeacherIds } = response.data;
-        console.log('Occupied Rooms IDs from backend:', occupiedRoomIds);
-        console.log('Occupied Teachers IDs from backend:', occupiedTeacherIds);
+// Fetch available teachers for specific date and slot
+const fetchAvailableTeachers = async () => {
+  if (!form.exam_date || !form.exam_slot_id) return;
+  fetchingResources.value = true;
+  try {
+    const response = await axios.get(route('exam-schedules.available-resources'), {
+      params: { exam_date: form.exam_date, exam_slot_id: form.exam_slot_id },
+    });
+    const { occupiedTeacherIds } = response.data;
+    allTeachersWithStatus.value = props.teachers.map(teacher => ({
+      ...teacher,
+      status_text: occupiedTeacherIds.includes(teacher.id) ? 'Booked' : 'Available',
+    }));
+  } catch (error) {
+    console.error('Error fetching available teachers:', error);
+    allTeachersWithStatus.value = props.teachers.map(teacher => ({ ...teacher, status_text: 'Available' }));
+  } finally {
+    fetchingResources.value = false;
+  }
+};
 
-        // Reset all statuses to 'Available' first based on original props data
-        let updatedRooms = props.rooms.map(room => ({ ...room, status_text: 'Available' }));
-        let updatedTeachers = props.teachers.map(teacher => ({ ...teacher, status_text: 'Available' }));
-
-        // Mark as 'Ongoing' if their ID is in the occupied list
-        allRoomsWithStatus.value = updatedRooms.map(room => {
-            if (occupiedRoomIds.includes(room.id)) {
-                return { ...room, status_text: 'Ongoing' };
-            }
-            return room;
-        });
-
-        allTeachersWithStatus.value = updatedTeachers.map(teacher => {
-            if (occupiedTeacherIds.includes(teacher.id)) {
-                return { ...teacher, status_text: 'Ongoing' };
-            }
-            return teacher;
-        });
-
-    } catch (error) {
-        console.error("Error fetching available resources:", error);
-        if (error.response) {
-            if (error.response.status === 422) {
-                console.error("Validation Errors from Backend (real-time check):", error.response.data.errors);
-                // Display validation errors in a Swal.fire
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Input Error!',
-                    text: 'Please check your date and time inputs. ' + (error.response.data.message || ''),
-                    toast: true,
-                    position: 'top-end',
-                    showConfirmButton: false,
-                    timer: 5000,
-                    timerProgressBar: true,
-                });
-            } else if (error.response.status === 500) {
-                // Specific handling for 500: this is your internal server error
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Server Error!',
-                    text: 'An internal server error occurred while checking availability. Please check server logs for details.',
-                    toast: true,
-                    position: 'top-end',
-                    showConfirmButton: false,
-                    timer: 5000,
-                    timerProgressBar: true,
-                });
-            } else {
-                // Catch any other HTTP errors (e.g., 404, 403)
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Request Failed!',
-                    text: 'Could not fetch availability data. Status: ' + error.response.status,
-                    toast: true,
-                    position: 'top-end',
-                    showConfirmButton: false,
-                    timer: 5000,
-                    timerProgressBar: true,
-                });
-            }
-        } else {
-            // Network error (e.g., server not reachable)
-            Swal.fire({
-                icon: 'error',
-                title: 'Network Error!',
-                text: 'Could not connect to the server to check availability. Please check your internet connection.',
-                toast: true,
-                position: 'top-end',
-                showConfirmButton: false,
-                timer: 5000,
-                timerProgressBar: true,
-            });
-        }
-        // On any error, reset to show all as available, or handle error gracefully
-        allRoomsWithStatus.value = props.rooms.map(room => ({ ...room, status_text: 'Available' }));
-        allTeachersWithStatus.value = props.teachers.map(teacher => ({ ...teacher, status_text: 'Available' }));
-    } finally {
-        fetchingResources.value = false;
-    }
+const selectExamSlot = (slot) => {
+  form.exam_slot_id = slot.id;
 };
 
 const submit = () => {
-    form.post(route('exam-schedules.store'), { // Ensure this route is correct for your ExamSchedule store
-        onSuccess: () => {
-            form.reset();
-            // Reset status after successful submission
-            allRoomsWithStatus.value = props.rooms.map(room => ({ ...room, status_text: 'Available' }));
-            allTeachersWithStatus.value = props.teachers.map(teacher => ({ ...teacher, status_text: 'Available' }));
-        },
-        onError: (errors) => {
-            console.error("Exam schedule creation failed:", errors);
-            // Handle specific errors returned by the ExamSchdeuleStore method
-        },
-    });
+  form.post(route('exam-schedules.store'), {
+    onSuccess: () => {
+      form.reset();
+      allRoomsWithStatus.value = props.rooms.map(room => ({ ...room, status_text: 'Available' }));
+      allTeachersWithStatus.value = props.teachers.map(teacher => ({ ...teacher, status_text: 'Available' }));
+      examSlotsWithStatus.value = props.exam_slots.map(slot => ({ ...slot, status_text: 'Available' }));
+    },
+    onError: (errors) => {
+      console.error('Exam schedule creation failed:', errors);
+    },
+  });
 };
 
-// ... (watchEffect for flash messages as you had it) ...
 watchEffect(() => {
-    if (flash.value && flash.value.message) {
-        Swal.fire({
-            icon: flash.value.type === 'success' ? 'success' : 'error',
-            title: flash.value.type === 'success' ? 'Success!' : 'Error!',
-            text: flash.value.message,
-            toast: true,
-            position: 'top-end',
-            showConfirmButton: false,
-            timer: 3000,
-            timerProgressBar: true,
-        });
+  if (flash.value && flash.value.message) {
+    if (flash.value.type === 'success') {
+      console.log('Success:', flash.value.message);
+    } else {
+      console.error('Error:', flash.value.message);
     }
+  }
 });
 </script>
 
 <template>
+  <AuthenticatedLayout>
     <Head title="Create Exam Schedule" />
-
-    <AuthenticatedLayout>
-        <template #header>
-            <h2 class="font-semibold text-xl text-gray-800 leading-tight">Create New Exam Schedule</h2>
-        </template>
-
-        <div class="container-fluid py-4">
-            <div class="card shadow-sm rounded-lg">
-                <div class="card-body p-4">
-                    <div class="d-flex justify-content-between align-items-center mb-4">
-                        <h3 class="card-title h5 mb-0">Add Exam Schedule Slot</h3>
-                        <Link :href="route('exam-schedules.index')" class="btn btn-secondary btn-sm rounded">
-                            Back to Exam Schedules
-                        </Link>
-                    </div>
-
-                    <form @submit.prevent="submit">
-                        <div class="row g-3">
-                            <div class="col-md-4">
-                                <InputLabel for="exam_date" value="Exam Date" class="form-label" />
-                                <TextInput id="exam_date" type="date" class="form-control" v-model="form.exam_date" :class="{ 'is-invalid': form.errors.exam_date }" required />
-                                <InputError class="mt-2" :message="form.errors.exam_date" />
-                            </div>
-
-                            <div class="col-md-4">
-                                <InputLabel for="start_time" value="Start Time" class="form-label" />
-                                <TextInput id="start_time" type="time" class="form-control" v-model="form.start_time" :class="{ 'is-invalid': form.errors.start_time }" required />
-                                <InputError class="mt-2" :message="form.errors.start_time" />
-                            </div>
-
-                            <div class="col-md-4">
-                                <InputLabel for="end_time" value="End Time" class="form-label" />
-                                <TextInput id="end_time" type="time" class="form-control" v-model="form.end_time" :class="{ 'is-invalid': form.errors.end_time }" required />
-                                <InputError class="mt-2" :message="form.errors.end_time" />
-                            </div>
-                        </div>
-
-                        <div class="mb-3 mt-3">
-                            <InputLabel for="room_id" value="Select Room" class="form-label" />
-                            <select id="room_id" class="form-select" v-model="form.room_id" :class="{ 'is-invalid': form.errors.room_id }">
-                                <option value="">-- Select Room --</option>
-                                <option v-for="room in allRoomsWithStatus" :key="room.id" :value="room.id" :disabled="room.status_text === 'Ongoing'">
-                                    {{ room.name }} <span v-if="room.status_text === 'Ongoing'">(Ongoing)</span>
-                                </option>
-                                <option v-if="fetchingResources" disabled>Loading rooms...</option>
-                                <option v-else-if="allRoomsWithStatus.length === 0" disabled>No rooms available.</option>
-                            </select>
-                            <InputError class="mt-2" :message="form.errors.room_id" />
-                            <div v-if="fetchingResources" class="text-muted small">Checking room availability...</div>
-                        </div>
-
-                        <div class="mb-3">
-                            <InputLabel for="teacher_id" value="Select Teacher" class="form-label" />
-                                <select id="teacher_id" class="form-select" v-model="form.teacher_id" :class="{ 'is-invalid': form.errors.teacher_id }" required>
-                                    <option value="" disabled>-- Select Teacher --</option>
-                                    <option v-for="teacher in allTeachersWithStatus" :key="teacher.id" :value="teacher.id" :disabled="teacher.status_text === 'Ongoing'">
-                                        {{ teacher.name }} <span v-if="teacher.subject_taught">({{ teacher.subject_taught }})</span> <span v-if="teacher.status_text === 'Ongoing'">(Ongoing)</span>
-                                    </option>
-                                    <option v-if="fetchingResources" disabled>Loading teachers...</option>
-                                    <option v-else-if="allTeachersWithStatus.length === 0 && props.teachers.length > 0" disabled>No teachers available.</option>
-                                    <option v-else-if="props.teachers.length === 0" disabled>No teachers loaded from props.</option>
-                                </select>
-                                <InputError class="mt-2" :message="form.errors.teacher_id" />
-                                <div v-if="fetchingResources" class="text-muted small">Checking teacher availability...</div>
-                        </div>
-
-                        <div class="row g-3">
-                            <div class="col-md-6">
-                                <InputLabel for="exam_id" value="Select Exam" class="form-label" />
-                                <select id="exam_id" class="form-select" v-model="form.exam_id" :class="{ 'is-invalid': form.errors.exam_id }" required>
-                                    <option value="">-- Select Exam --</option>
-                                    <option v-for="exam in exams" :key="exam.id" :value="exam.id">{{ exam.exam_name }}</option>
-                                </select>
-                                <InputError class="mt-2" :message="form.errors.exam_id" />
-                            </div>
-                             <div class="col-md-6">
-                                <InputLabel for="class_id" value="Select Class" class="form-label" />
-                                <select id="class_id" class="form-select" v-model="form.class_id" :class="{ 'is-invalid': form.errors.class_id }" required>
-                                    <option value="" disabled>-- Select Class --</option>
-                                    <option v-for="cls in classes" :key="cls.id" :value="cls.id">{{ cls.class_name }}</option>
-                                </select>
-                                <InputError class="mt-2" :message="form.errors.class_id" />
-                            </div>
-
-                            <div class="col-md-6">
-                                <InputLabel for="session_id" value="Select Session" class="form-label" />
-                                <select id="session_id" class="form-select" v-model="form.session_id" :class="{ 'is-invalid': form.errors.session_id }" required>
-                                    <option value="" disabled>-- Select Session --</option>
-                                    <option v-for="session in sessions" :key="session.id" :value="session.id">{{ session.name }}</option>
-                                </select>
-                                <InputError class="mt-2" :message="form.errors.session_id" />
-                            </div>
-
-                            <div class="col-md-6">
-                                <InputLabel for="section_id" value="Select Section" class="form-label" />
-                                <select id="section_id" class="form-select" v-model="form.section_id" :class="{ 'is-invalid': form.errors.section_id }" required>
-                                    <option value="" disabled>-- Select Section --</option>
-                                    <option v-for="section in sections" :key="section.id" :value="section.id">{{ section.name }}</option>
-                                </select>
-                                <InputError class="mt-2" :message="form.errors.section_id" />
-                            </div>
-                            <div class="col-md-6">
-                                <InputLabel for="subject_id" value="Select Subject" class="form-label" />
-                                <select id="subject_id" class="form-select" v-model="form.subject_id" :class="{ 'is-invalid': form.errors.subject_id }" required>
-                                    <option value="">-- Select Subject --</option>
-                                    <option v-for="subject in subjects" :key="subject.id" :value="subject.id">{{ subject.name }}</option>
-                                </select>
-                                <InputError class="mt-2" :message="form.errors.subject_id" />
-                            </div>
-                             <div class="col-md-6">
-                                <InputLabel for="status" value="Status" class="form-label" />
-                                <select id="status" class="form-select" v-model.number="form.status" :class="{ 'is-invalid': form.errors.status }" required>
-                                    <option :value="0">Active</option>
-                                    <option :value="1">Inactive</option>
-                                    <option :value="2">Rescheduled</option>
-                                </select>
-                                <InputError class="mt-2" :message="form.errors.status" />
-                            </div>
-                        </div>
-
-                        <div class="d-flex justify-content-end mt-4">
-                            <PrimaryButton :class="{ 'opacity-75': form.processing }" :disabled="form.processing" class="btn btn-primary">
-                                Create Exam Schedule
-                            </PrimaryButton>
-                        </div>
-                    </form>
-                </div>
-            </div>
+    <template #header>
+      <h2 class="text-2xl font-semibold text-gray-900">Create New Exam Schedule</h2>
+    </template>
+    <div class="min-h-screen flex items-center justify-center bg-gray-50 py-10 px-6">
+      <div class="bg-white shadow-xl rounded-2xl max-w-5xl w-full p-8">
+        <div class="flex flex-col md:flex-row justify-between items-center mb-8">
+          <h3 class="text-3xl font-extrabold text-gray-800 mb-4 md:mb-0">Add Exam Schedule Slot</h3>
+          <Link
+            :href="route('exam-schedules.index')"
+            class="inline-block bg-gray-200 px-6 py-2 rounded-lg text-gray-700 font-semibold hover:bg-gray-300 transition"
+          >
+            Back to Exam Schedules
+          </Link>
         </div>
-    </AuthenticatedLayout>
-</template>
+        <form @submit.prevent="submit" class="space-y-8">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <InputLabel for="exam_date" value="Exam Date" class="block mb-2 text-sm font-medium text-gray-700" />
+              <TextInput
+                id="exam_date"
+                type="date"
+                class="w-full rounded-lg border border-gray-300 bg-gray-50 text-gray-900 focus:ring-2 focus:ring-blue-500 transition"
+                v-model="form.exam_date"
+                :class="{ 'border-red-500': form.errors.exam_date }"
+                required
+              />
+              <InputError class="mt-1 text-sm text-red-600" :message="form.errors.exam_date" />
+            </div>
+            <div>
+              <InputLabel for="room_id" value="Select Room" class="block mb-2 text-sm font-medium text-gray-700" />
+              <select
+                id="room_id"
+                v-model="form.room_id"
+                :class="[
+                  'w-full rounded-lg border border-gray-300 bg-gray-50 text-gray-900 focus:ring-2 focus:ring-blue-500 transition',
+                  form.errors.room_id ? 'border-red-500' : ''
+                ]"
+                required
+              >
+                <option value="" disabled>-- Select Room --</option>
+                <option
+                  v-for="room in allRoomsWithStatus"
+                  :key="room.id"
+                  :value="room.id"
+                  :disabled="room.status_text === 'Booked'"
+                  :class="room.status_text === 'Booked' ? 'text-gray-400' : ''"
+                >
+                  {{ room.name }} <span v-if="room.status_text === 'Booked'">(Booked)</span>
+                </option>
+              </select>
+              <InputError class="mt-1 text-sm text-red-600" :message="form.errors.room_id" />
+            </div>
+          </div>
 
-<style scoped>
-/* Add any custom styles here */
-</style>
+          <div>
+            <InputLabel value="Select Exam Slot" class="block mb-2 text-sm font-medium text-gray-700" />
+            <div v-if="fetchingResources" class="p-6 bg-gray-100 rounded-lg text-center text-gray-500 animate-pulse">Loading time slots...</div>
+            <div v-else-if="examSlotsWithStatus && examSlotsWithStatus.length > 0" class="grid grid-cols-2 sm:grid-cols-3 gap-4">
+              <button
+                v-for="slot in examSlotsWithStatus"
+                :key="slot.id"
+                type="button"
+                class="relative rounded-lg border p-4 cursor-pointer transition duration-300 flex flex-col"
+                :class="[
+                  form.exam_slot_id === slot.id ? 'bg-blue-600 border-blue-500 text-white shadow-lg' : 'bg-gray-100 border-transparent hover:bg-gray-200',
+                  slot.status_text === 'Booked' && form.exam_slot_id !== slot.id ? 'opacity-60 cursor-not-allowed pointer-events-none' : ''
+                ]"
+                @click="selectExamSlot(slot)"
+              >
+                <h4 class="font-semibold text-lg mb-1 truncate">{{ slot.name }}</h4>
+                <p class="text-sm truncate">Time: {{ formatTime(slot.start_time) }} - {{ formatTime(slot.end_time) }}</p>
+                <p
+                  :class="{
+                    'text-red-600': slot.status_text === 'Booked',
+                    'text-green-700': slot.status_text === 'Available'
+                  }"
+                  class="absolute top-2 right-3 text-xs font-semibold uppercase select-none"
+                >
+                  {{ slot.status_text }}
+                </p>
+              </button>
+            </div>
+            <div v-else class="p-6 bg-gray-100 rounded-lg text-center text-gray-500">No exam slots available.</div>
+            <InputError class="mt-2 text-sm text-red-600" :message="form.errors.exam_slot_id" />
+          </div>
+
+          <div>
+            <InputLabel for="teacher_id" value="Select Teacher" class="block mb-2 text-sm font-medium text-gray-700" />
+            <select
+              id="teacher_id"
+              v-model="form.teacher_id"
+              :disabled="!form.exam_slot_id"
+              :class="[
+                'w-full rounded-lg border border-gray-300 bg-gray-50 text-gray-900 focus:ring-2 focus:ring-blue-500 transition',
+                form.errors.teacher_id ? 'border-red-500' : ''
+              ]"
+              required
+            >
+              <option value="" disabled>-- Select Teacher --</option>
+              <option
+                v-for="teacher in allTeachersWithStatus"
+                :key="teacher.id"
+                :value="teacher.id"
+                :disabled="teacher.status_text === 'Booked'"
+                :class="teacher.status_text === 'Booked' ? 'text-gray-400' : ''"
+              >
+                {{ teacher.name }} <span v-if="teacher.subject_taught">({{ teacher.subject_taught }})</span>
+                <span v-if="teacher.status_text === 'Booked'">(Booked)</span>
+              </option>
+            </select>
+            <InputError class="mt-1 text-sm text-red-600" :message="form.errors.teacher_id" />
+            <p v-if="fetchingResources" class="mt-1 text-xs text-gray-500 italic">Checking teacher availability...</p>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6 mt-6">
+            <div>
+              <InputLabel for="exam_id" value="Select Exam" class="block mb-2 text-sm font-medium text-gray-700" />
+              <select
+                id="exam_id"
+                v-model="form.exam_id"
+                :class="[
+                  'w-full rounded-lg border border-gray-300 bg-gray-50 text-gray-900 focus:ring-2 focus:ring-blue-500 transition',
+                  form.errors.exam_id ? 'border-red-500' : ''
+                ]"
+                required
+              >
+                <option value="">-- Select Exam --</option>
+                <option v-for="exam in exams" :key="exam.id" :value="exam.id">{{ exam.exam_name }}</option>
+              </select>
+              <InputError class="mt-1 text-sm text-red-600" :message="form.errors.exam_id" />
+            </div>
+            <div>
+              <InputLabel for="class_id" value="Select Class" class="block mb-2 text-sm font-medium text-gray-700" />
+              <select
+                id="class_id"
+                v-model="form.class_id"
+                :class="[
+                  'w-full rounded-lg border border-gray-300 bg-gray-50 text-gray-900 focus:ring-2 focus:ring-blue-500 transition',
+                  form.errors.class_id ? 'border-red-500' : ''
+                ]"
+                required
+              >
+                <option value="" disabled>-- Select Class --</option>
+                <option v-for="cls in classes" :key="cls.id" :value="cls.id">{{ cls.class_name }}</option>
+              </select>
+              <InputError class="mt-1 text-sm text-red-600" :message="form.errors.class_id" />
+            </div>
+            <div>
+              <InputLabel for="session_id" value="Select Session" class="block mb-2 text-sm font-medium text-gray-700" />
+              <select
+                id="session_id"
+                v-model="form.session_id"
+                :class="[
+                  'w-full rounded-lg border border-gray-300 bg-gray-50 text-gray-900 focus:ring-2 focus:ring-blue-500 transition',
+                  form.errors.session_id ? 'border-red-500' : ''
+                ]"
+                required
+              >
+                <option value="" disabled>-- Select Session --</option>
+                <option v-for="session in sessions" :key="session.id" :value="session.id">{{ session.name }}</option>
+              </select>
+              <InputError class="mt-1 text-sm text-red-600" :message="form.errors.session_id" />
+            </div>
+            <div>
+              <InputLabel for="section_id" value="Select Section" class="block mb-2 text-sm font-medium text-gray-700" />
+              <select
+                id="section_id"
+                v-model="form.section_id"
+                :class="[
+                  'w-full rounded-lg border border-gray-300 bg-gray-50 text-gray-900 focus:ring-2 focus:ring-blue-500 transition',
+                  form.errors.section_id ? 'border-red-500' : ''
+                ]"
+                required
+              >
+                <option value="" disabled>-- Select Section --</option>
+                <option v-for="section in sections" :key="section.id" :value="section.id">{{ section.name }}</option>
+              </select>
+              <InputError class="mt-1 text-sm text-red-600" :message="form.errors.section_id" />
+            </div>
+            <div>
+              <InputLabel for="subject_id" value="Select Subject" class="block mb-2 text-sm font-medium text-gray-700" />
+              <select
+                id="subject_id"
+                v-model="form.subject_id"
+                :class="[
+                  'w-full rounded-lg border border-gray-300 bg-gray-50 text-gray-900 focus:ring-2 focus:ring-blue-500 transition',
+                  form.errors.subject_id ? 'border-red-500' : ''
+                ]"
+                required
+              >
+                <option value="">-- Select Subject --</option>
+                <option v-for="subject in subjects" :key="subject.id" :value="subject.id">{{ subject.name }}</option>
+              </select>
+              <InputError class="mt-1 text-sm text-red-600" :message="form.errors.subject_id" />
+            </div>
+            <div>
+              <InputLabel for="status" value="Status" class="block mb-2 text-sm font-medium text-gray-700" />
+              <select
+                id="status"
+                v-model.number="form.status"
+                :class="[
+                  'w-full rounded-lg border border-gray-300 bg-gray-50 text-gray-900 focus:ring-2 focus:ring-blue-500 transition',
+                  form.errors.status ? 'border-red-500' : ''
+                ]"
+                required
+              >
+                <option :value="0">Active</option>
+                <option :value="1">Inactive</option>
+                <option :value="2">Rescheduled</option>
+              </select>
+              <InputError class="mt-1 text-sm text-red-600" :message="form.errors.status" />
+            </div>
+          </div>
+          <div class="flex justify-end mt-10">
+            <PrimaryButton
+              :class="{ 'opacity-70 cursor-not-allowed': form.processing }"
+              :disabled="form.processing"
+              class="bg-gradient-to-r from-indigo-600 to-blue-600 text-white font-semibold rounded-lg px-8 py-3 hover:from-indigo-700 hover:to-blue-700 transition"
+            >
+              Create Exam Schedule
+            </PrimaryButton>
+          </div>
+        </form>
+      </div>
+    </div>
+  </AuthenticatedLayout>
+</template>

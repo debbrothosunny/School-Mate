@@ -173,147 +173,6 @@ class ClassTimeController extends Controller
         ->with('flash', ['type'=>'success','message'=>'Class schedule created successfully!']);
     }
 
-    /**
-     * Checks for scheduling conflicts based on the request data.
-     *
-     * @param Request $request
-     * @return \Illuminate\Http\JsonResponse
-    */
-    // public function checkConflicts(Request $request)
-    // {
-    //     try {
-    //         // Log the incoming request data to help with debugging
-    //         Log::info('Incoming request data for conflict check:', ['data' => $request->all()]);
-
-    //         // 1. Validate the incoming data for the conflict check
-    //         $request->validate([
-    //             'class_name_id' => 'required|exists:class_names,id',
-    //             'subject_id' => 'required|exists:subjects,id',
-    //             'teacher_id' => 'required|exists:teachers,id',
-    //             'section_id' => 'required|exists:sections,id',
-    //             'session_id' => 'required|exists:class_sessions,id',
-    //             'day_of_week' => ['required', Rule::in(['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'])],
-    //             'class_time_slot_id' => 'required|exists:class_time_slots,id',
-    //             'room_id' => 'nullable|exists:rooms,id',
-    //         ]);
-
-    //         // 2. Build a comprehensive query to find any conflicting entry based on the class time slot ID
-    //         $conflictingEntry = ClassTime::where('session_id', $request->input('session_id'))
-    //             ->where('day_of_week', $request->input('day_of_week'))
-    //             ->where('class_time_slot_id', $request->input('class_time_slot_id'))
-    //             ->where(function ($query) use ($request) {
-    //                 // Group the OR conditions to check for any one of the three conflicts
-    //                 $query->where(function ($q) use ($request) {
-    //                     // Conflict for class-section
-    //                     $q->where('class_name_id', $request->input('class_name_id'))
-    //                         ->where('section_id', $request->input('section_id'));
-    //                 })->orWhere(function ($q) use ($request) {
-    //                     // Conflict for teacher
-    //                     $q->where('teacher_id', $request->input('teacher_id'));
-    //                 })->orWhere(function ($q) use ($request) {
-    //                     // Conflict for room if provided
-    //                     if (!empty($request->input('room_id'))) {
-    //                         $q->where('room_id', $request->input('room_id'));
-    //                     } else {
-    //                         // This clause ensures the orWhere group doesn't accidentally
-    //                         // return true if room_id is empty, but a conflict is not found.
-    //                         $q->whereRaw('1 = 0');
-    //                     }
-    //                 });
-    //             })
-    //             ->with(['className', 'subject', 'teacher', 'section', 'room', 'classTimeSlot'])
-    //             ->first();
-
-    //         // 3. If a conflict exists, return 409 with details
-    //         if ($conflictingEntry) {
-    //             return response()->json([
-    //                 'isConflict' => true,
-    //                 'type' => 'conflict',
-    //                 'message' => 'This time slot conflicts with an existing entry.',
-    //                 'details' => [
-    //                     'class_name' => optional($conflictingEntry->className)->name ?? 'N/A',
-    //                     'section_name' => optional($conflictingEntry->section)->name ?? 'N/A',
-    //                     'subject_name' => optional($conflictingEntry->subject)->name ?? 'N/A',
-    //                     'teacher_name' => optional($conflictingEntry->teacher)->name ?? 'N/A',
-    //                     'room_name' => optional($conflictingEntry->room)->name ?? 'N/A',
-    //                     'day_of_week' => $conflictingEntry->day_of_week,
-    //                     'start_time' => optional($conflictingEntry->classTimeSlot)->start_time ?? 'N/A',
-    //                     'end_time' => optional($conflictingEntry->classTimeSlot)->end_time ?? 'N/A',
-    //                 ],
-    //             ], 409);
-    //         }
-
-    //         // 4. No conflict found
-    //         return response()->json([
-    //             'isConflict' => false,
-    //             'type' => 'available',
-    //             'message' => 'Time slot is available.',
-    //         ], 200);
-
-    //     } catch (\Exception $e) {
-    //         // Log the real error with more details
-    //         Log::error('Conflict check failed: ' . $e->getMessage(), [
-    //             'trace' => $e->getTraceAsString(),
-    //             'input' => $request->all(),
-    //             'method' => $request->method(),
-    //             'url' => $request->fullUrl(),
-    //         ]);
-
-    //         // Return the specific error message for debugging
-    //         return response()->json([
-    //             'isConflict' => false,
-    //             'type' => 'error',
-    //             'message' => 'An error occurred while checking for conflicts.',
-    //             'exception_message' => $e->getMessage(),
-    //         ], 500);
-    //     }
-    // }
-
-    /**
-     * Gets a list of all occupied time slots for a given day and time range.
-     * This is used for the real-time availability display, now using a time slot ID.
-     *
-     * @param Request $request
-     * @return \Illuminate\Http\JsonResponse
-    */
-    // public function getOccupiedSlots(Request $request)
-    // {
-    //     $request->validate([
-    //         'day_of_week' => ['required', Rule::in(['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'])],
-    //         'session_id' => 'required|exists:class_sessions,id',
-    //         'room_id' => 'nullable|exists:rooms,id',
-    //     ]);
-
-    //     $dayOfWeek = $request->input('day_of_week');
-    //     $roomId = $request->input('room_id', null);
-    //     $sessionId = $request->input('session_id');
-
-    //     $occupiedSlots = ClassTime::query()
-    //         ->where('session_id', $sessionId)
-    //         ->where('day_of_week', $dayOfWeek)
-    //         ->when($roomId, function ($query, $roomId) {
-    //             return $query->where('room_id', $roomId);
-    //         })
-    //         ->with(['className', 'subject', 'teacher', 'section', 'room', 'classTimeSlot']) // Ensure classTimeSlot is loaded
-    //         ->get();
-
-    //     $formattedSlots = $occupiedSlots->map(function ($slot) {
-    //         return [
-    //             'id' => $slot->id,
-    //             'class_name' => optional($slot->className)->name ?? 'N/A',
-    //             'section_name' => optional($slot->section)->name ?? 'N/A',
-    //             'subject_name' => optional($slot->subject)->name ?? 'N/A',
-    //             'teacher_name' => optional($slot->teacher)->name ?? 'N/A',
-    //             'room_name' => optional($slot->room)->name ?? 'N/A',
-    //             'day_of_week' => $slot->day_of_week,
-    //             'class_time_slot_id' => $slot->class_time_slot_id, // NEW: Include the slot ID
-    //             'start_time' => optional($slot->classTimeSlot)->start_time ?? 'N/A', // Get time from the relationship
-    //             'end_time' => optional($slot->classTimeSlot)->end_time ?? 'N/A', // Get time from the relationship
-    //         ];
-    //     });
-    //     return response()->json($formattedSlots);
-    // }
-
 
     /**
      * Show the form for editing the specified timetable entry.
@@ -446,8 +305,12 @@ class ClassTimeController extends Controller
 
         return Inertia::render('ClassTimeSlots/Index', [
             'timeSlots' => $timeSlots,
+            // Pass any flash message explicitly if exists
+            'message' => session('message'),
+            'type' => session('type'),
         ]);
     }
+
 
     // Show the form for creating a new resource.
     public function classTimeSlotCreate()

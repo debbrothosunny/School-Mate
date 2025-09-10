@@ -5,52 +5,51 @@ import InputError from '@/Components/InputError.vue';
 import InputLabel from '@/Components/InputLabel.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import { computed, watchEffect } from 'vue';
-
-
+import Swal from 'sweetalert2';
 
 const props = defineProps({
-    group: Object, // The group object to edit
-    groupTypes: Array, // Array of allowed group names (e.g., ['Science', 'Arts', 'Commerce', 'None'])
-    flash: Object, // Flash messages
-    errors: Object, // Validation errors
+    group: Object,
+    groupTypes: Array,
+    errors: Object,
 });
 
-// Computed property for flash messages, ensuring reactivity
-const flash = computed(() => usePage().props.flash || {});
+// Use usePage to access all page props (including flash)
+const page = usePage();
 
-// Form data using Inertia's useForm helper, initialized with existing group data
+// Build flash reactive computed with explicit keys for clarity
+const flash = computed(() => ({
+    message: page.props.message || '',
+    type: page.props.type || '',
+}));
+
+// Initialize form with correct method override: 'put' for updates, not 'post'
 const form = useForm({
-    _method: 'post', 
-    name: props.group.name,
-    status: props.group.status, // Boolean (0/1) from Laravel will be handled by select correctly
+    _method: 'post',
+    name: props.group.name || '',
+    status: Number(props.group.status || 0), // Ensure status numeric and default to 0
 });
 
-// Watch for flash messages and display SweetAlert
+// Watch flash messages and show SweetAlert notifications
 watchEffect(() => {
-    if (flash.value && flash.value.message) {
-        if (typeof Swal !== 'undefined') {
-            Swal.fire({
-                icon: flash.value.type === 'success' ? 'success' : 'error',
-                title: flash.value.type === 'success' ? 'Success!' : 'Error!',
-                text: flash.value.message,
-                toast: true,
-                position: 'top-end',
-                showConfirmButton: false,
-                timer: 3000,
-                timerProgressBar: true,
-            });
-        } else {
-            console.warn('Swal (SweetAlert2) is not defined. Flash messages will not be displayed via Swal.');
-            alert(flash.value.message);
-        }
+    if (flash.value.message) {
+        Swal.fire({
+            icon: flash.value.type === 'success' ? 'success' : 'error',
+            title: flash.value.type === 'success' ? 'Success!' : 'Error!',
+            text: flash.value.message,
+            toast: true,
+            position: 'top-end',
+            showConfirmButton: false,
+            timer: 3000,
+            timerProgressBar: true,
+        });
     }
 });
 
-// Function to handle form submission
+// Submit handler sends form data correctly using the update route
 const submit = () => {
     form.post(route('groups.update', props.group.id), {
         onSuccess: () => {
-            // No need to reset form on edit success, data should persist
+            // No reset needed, keep form data intact after update
         },
         onError: (errors) => {
             console.error("Group update failed:", errors);
@@ -59,14 +58,13 @@ const submit = () => {
 };
 </script>
 
+
 <template>
     <Head :title="`Edit Group: ${group.name}`" />
-
     <AuthenticatedLayout>
         <template #header>
             <h2 class="font-semibold text-xl text-gray-800 leading-tight">Edit Group: {{ group.name }}</h2>
         </template>
-
         <div class="py-12">
             <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
                 <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-6">
@@ -84,7 +82,6 @@ const submit = () => {
                             </select>
                             <InputError class="mt-2" :message="form.errors.name" />
                         </div>
-
                         <div>
                             <InputLabel for="status" value="Status" />
                             <select
@@ -98,11 +95,11 @@ const submit = () => {
                             </select>
                             <InputError class="mt-2" :message="form.errors.status" />
                         </div>
-
                         <div class="flex items-center justify-end mt-4">
                             <Link :href="route('groups.index')" class="text-gray-600 hover:text-gray-900 mr-4">Cancel</Link>
                             <PrimaryButton :class="{ 'opacity-25': form.processing }" :disabled="form.processing">
-                                Update Group
+                                <span v-if="form.processing">Updating...</span>
+                                <span v-else>Update Group</span>
                             </PrimaryButton>
                         </div>
                     </form>
@@ -113,5 +110,5 @@ const submit = () => {
 </template>
 
 <style scoped>
-/* No specific styles needed beyond TailwindCSS for this component */
+/* No additional styles beyond Tailwind CSS used */
 </style>

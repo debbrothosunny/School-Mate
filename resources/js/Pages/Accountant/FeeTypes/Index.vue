@@ -94,9 +94,9 @@ const formatCurrency = (amountInPaisa) => {
                                 {{ feeType.name }}
                                 <span :class="[
                                     'inline-flex px-3 py-1 text-xs font-semibold rounded-full uppercase tracking-wide',
-                                    feeType.status === 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                                    feeType.status == 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
                                 ]">
-                                    {{ feeType.status === 0 ? 'Active' : 'Inactive' }}
+                                    {{ feeType.status == 0 ? 'Active' : 'Inactive' }}
                                 </span>
                             </h3>
                             <p class="text-sm text-gray-500">{{ feeType.frequency }}</p>

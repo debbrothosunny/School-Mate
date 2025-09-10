@@ -36,7 +36,7 @@ class AccountsController extends Controller
         $overallTotalBalanceDue = Invoice::sum('balance_due');
 
         $accountsDashboardData = [
-            'message' => 'Welcome, Accounts Staff! This is your financial overview dashboard.',
+          
             'totalStudents' => Student::count(),
             
             'pendingFeesCount' => Invoice::where('status', '!=', 'paid')
