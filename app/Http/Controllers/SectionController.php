@@ -5,12 +5,16 @@ namespace App\Http\Controllers;
 use App\Models\Section;
 use App\Models\ClassSession;
 use Illuminate\Http\Request;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Foundation\Validation\ValidatesRequests;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 class SectionController extends Controller
 {
+     // Make sure this trait is here!
+    use AuthorizesRequests, ValidatesRequests;
     /**
      * Display a listing of the sections.
     */
@@ -41,9 +45,11 @@ class SectionController extends Controller
             Section::create($validated);
             DB::commit();
 
-        // 5. Redirect with a success message
-        return redirect()->route('sections.index')
-        ->with('flash', ['type'=>'success','message'=>'Section created successfully!']);
+        return redirect()->route('sections.index')->with('flash', [
+                'message' => 'Session "' . $validated['name'] . '" created successfully!',
+                'type' => 'success'
+            ]);
+
 
 
             
@@ -94,9 +100,18 @@ class SectionController extends Controller
 
     public function destroy(Section $section)
     {
+        // 1. CRITICAL SECURITY CHECK (Authorization)
+        // This immediately stops the request if the user is not allowed to delete this section.
+        // It prevents unauthorized access, regardless of front-end tampering.
+        $this->authorize('delete', $section); // Will throw 403 Forbidden if not authorized
+
         DB::beginTransaction();
+        
         try {
+            // 2. Database Operation
             $section->delete();
+            
+            // 3. Commit Transaction
             DB::commit();
 
             return redirect()->back()->with('flash', [
@@ -104,8 +119,16 @@ class SectionController extends Controller
                 'type' => 'success'
             ]);
         } catch (\Exception $e) {
+            // 4. Rollback Transaction on Failure
             DB::rollBack();
-            Log::error('Section deletion failed: ' . $e->getMessage());
+            
+            // Log the actual error for debugging
+            Log::error('Section deletion failed: ' . $e->getMessage()); 
+            
+            // Note: You should generally avoid catching a 403 exception here.
+            // If the exception came from $this->authorize(), it will typically
+            // propagate before DB::beginTransaction() is called.
+            
             return redirect()->back()->with('flash', [
                 'message' => 'An error occurred while deleting the section. Please try again.',
                 'type' => 'error'

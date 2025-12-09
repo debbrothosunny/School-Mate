@@ -37,7 +37,7 @@ const submit = () => {
             Swal.fire({
                 icon: 'success',
                 title: 'Success!',
-                text: 'Session updated successfully.',
+                text: 'সেশন সফলভাবে আপডেট করা হয়েছে!',
                 toast: true,
                 position: 'top-end',
                 showConfirmButton: false,

@@ -12,14 +12,13 @@ class StudentFeeAssignment extends Model
     protected $fillable = [
         'student_id',
         'fee_type_id',
-        'applies_from',
-        'applies_to',
-        'status', // Corresponds to the 'status' column
+        'class_id',   // <-- Added to fix the SQL error
+        'section_id', // <-- Added to fix the SQL error
+        'session_id', // <-- Added to fix the SQL error
+        'status', 
     ];
 
     protected $casts = [
-        'applies_from' => 'date',
-        'applies_to' => 'date',
         'status' => 'boolean',
     ];
 
@@ -34,6 +33,20 @@ class StudentFeeAssignment extends Model
         return $this->belongsTo(FeeType::class);
     }
 
+    public function class()
+    {
+        // Assuming your class table model is named ClassName
+        return $this->belongsTo(ClassName::class, 'class_id');
+    }
 
+    public function section()
+    {
+        return $this->belongsTo(Section::class, 'section_id');
+    }
 
+    public function session()
+    {
+        // Assuming your session table model is named ClassSession
+        return $this->belongsTo(ClassSession::class, 'session_id');
+    }
 }

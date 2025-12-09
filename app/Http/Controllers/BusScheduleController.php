@@ -13,23 +13,25 @@ use Illuminate\Support\Facades\Log;
 
 class BusScheduleController extends Controller
 {
-    /**
+    /**  
      * Display a listing of the bus schedules.
-     */
+    */
     public function index(Request $request)
     {
-        $query = BusSchedule::with('className'); // Eager load the related ClassName
+        $query = BusSchedule::with(['className' => function ($q) {
+            $q->where('status', 0)->select('id', 'class_name');
+        }]); // Eager load the related ClassName with status = 0
 
         // Filtering logic
         if ($request->filled('search')) {
             $searchTerm = '%' . $request->search . '%';
             $query->where(function ($q) use ($searchTerm) {
                 $q->where('bus_number', 'like', $searchTerm)
-                  ->orWhere('route_name', 'like', $searchTerm)
-                  ->orWhere('driver_name', 'like', $searchTerm)
-                  ->orWhereHas('className', function ($classQuery) use ($searchTerm) {
-                      $classQuery->where('class_name', 'like', $searchTerm);
-                  });
+                    ->orWhere('route_name', 'like', $searchTerm)
+                    ->orWhere('driver_name', 'like', $searchTerm)
+                    ->orWhereHas('className', function ($classQuery) use ($searchTerm) {
+                        $classQuery->where('status', 0)->where('class_name', 'like', $searchTerm);
+                    });
             });
         }
 
@@ -37,21 +39,29 @@ class BusScheduleController extends Controller
             $query->where('status', $request->status);
         }
 
-        // Added filtering by class_name_id if present in request
+        // Added filtering by class_id if present in request
         if ($request->filled('class_id') && $request->class_id !== '') {
             $query->where('class_id', $request->class_id);
         }
 
         $busSchedules = $query->orderBy('departure_time')->paginate(10);
 
-        // Fetch all class names to populate the filter dropdown
-        $classNames = ClassName::orderBy('class_name')->get(['id', 'class_name']);
-
+        // Fetch unique class names with the first corresponding id, sorted by class_name
+        $classNames = ClassName::where('status', 0)
+            ->select('id', 'class_name')
+            ->whereIn('id', function ($query) {
+                $query->select(DB::raw('MIN(id)'))
+                    ->from('class_names')
+                    ->where('status', 0)
+                    ->groupBy('class_name');
+            })
+            ->orderBy('class_name')
+            ->get();
 
         return Inertia::render('BusSchedules/Index', [
             'busSchedules' => $busSchedules,
-            'filters' => $request->only(['search', 'status', 'class_id']), // Pass class_name_id filter
-            'classNames' => $classNames, // <-- IMPORTANT: Pass classNames to the Vue component
+            'filters' => $request->only(['search', 'status', 'class_id']), // Pass class_id filter
+            'classNames' => $classNames, // Pass classNames to the Vue component
             'flash' => session('flash'),
         ]);
     }
@@ -61,8 +71,17 @@ class BusScheduleController extends Controller
     */
     public function create()
     {
-        // Changed 'name' to 'class_name' for ordering and selection
-        $classNames = ClassName::orderBy('class_name')->get(['id', 'class_name']); // Fetch all class names
+        // Fetch unique class names with the first corresponding id, sorted by class_name
+        $classNames = ClassName::where('status', 0)
+            ->select('id', 'class_name')
+            ->whereIn('id', function ($query) {
+                $query->select(DB::raw('MIN(id)'))
+                    ->from('class_names')
+                    ->where('status', 0)
+                    ->groupBy('class_name');
+            })
+            ->orderBy('class_name')
+            ->get();
 
         return Inertia::render('BusSchedules/Create', [
             'classNames' => $classNames,
@@ -111,8 +130,17 @@ class BusScheduleController extends Controller
     */
     public function edit(BusSchedule $busSchedule)
     {
-        // Changed 'name' to 'class_name' for ordering and selection
-        $classNames = ClassName::orderBy('class_name')->get(['id', 'class_name']); // Fetch all class names
+        // Fetch unique class names with the first corresponding id, sorted by class_name
+        $classNames = ClassName::where('status', 0)
+            ->select('id', 'class_name')
+            ->whereIn('id', function ($query) {
+                $query->select(DB::raw('MIN(id)'))
+                    ->from('class_names')
+                    ->where('status', 0)
+                    ->groupBy('class_name');
+            })
+            ->orderBy('class_name')
+            ->get();
 
         return Inertia::render('BusSchedules/Edit', [
             'busSchedule' => $busSchedule,

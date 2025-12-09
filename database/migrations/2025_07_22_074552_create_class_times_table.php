@@ -8,7 +8,7 @@ return new class extends Migration
 {
     /**
      * Run the migrations.
-     */
+    */
     public function up(): void
     {
         Schema::create('class_times', function (Blueprint $table) {
@@ -21,10 +21,15 @@ return new class extends Migration
             $table->foreignId('section_id')->constrained('sections')->onDelete('cascade');
             $table->foreignId('session_id')->constrained('class_sessions')->onDelete('cascade');
 
+            // --- NEW: Add foreign key for group_id ---
+            // This links the timetable entry to the specific subject group (Science/Arts/None).
+            // It must be nullable or default to the 'None' ID if classes below 9 don't require it. 
+            // We will make it non-nullable here, relying on the 'None' group ID being used for non-group classes.
+            $table->foreignId('group_id')->constrained('groups')->onDelete('cascade'); 
+
             // Timetable specific fields
             $table->string('day_of_week');
 
-            // --- NEW: Add foreign key for class_time_slots ---
             $table->foreignId('class_time_slot_id')->constrained('class_time_slots')->onDelete('cascade');
 
             $table->foreignId('room_id')->nullable()->constrained('rooms')->onDelete('cascade');
@@ -33,21 +38,22 @@ return new class extends Migration
 
             $table->timestamps();
 
-            // --- UPDATED UNIQUE CONSTRAINTS ---
+            // --- UPDATED UNIQUE CONSTRAINTS (Constraint 1 MUST be updated) ---
 
-            // Constraint 1: A specific class and section can only have one subject at a given time slot.
+            // Constraint 1: A specific class, section, AND group can only have one subject at a given time slot.
+            // This is the essential change! For Class 9 (Science), this constraint prevents another subject being assigned to Class 9 (Science) at the same time.
             $table->unique(
-                ['class_name_id', 'section_id', 'session_id', 'day_of_week', 'class_time_slot_id'],
-                'unique_class_section_timeslot'
+                ['class_name_id', 'section_id', 'group_id', 'session_id', 'day_of_week', 'class_time_slot_id'],
+                'unique_class_section_group_timeslot' // Updated name to reflect change
             );
 
-            // Constraint 2: A teacher can only be assigned to one class at a given time slot.
+            // Constraint 2: A teacher can only be assigned to one class at a given time slot. (No change needed here)
             $table->unique(
                 ['teacher_id', 'session_id', 'day_of_week', 'class_time_slot_id'],
                 'unique_teacher_timeslot'
             );
 
-            // Constraint 3: A room can only be used by one class at a given time slot.
+            // Constraint 3: A room can only be used by one class at a given time slot. (No change needed here)
             $table->unique(
                 ['room_id', 'session_id', 'day_of_week', 'class_time_slot_id'],
                 'unique_room_timeslot'
@@ -57,7 +63,7 @@ return new class extends Migration
 
     /**
      * Reverse the migrations.
-     */
+    */
     public function down(): void
     {
         Schema::dropIfExists('class_times');

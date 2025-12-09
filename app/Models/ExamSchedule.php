@@ -28,6 +28,7 @@ class ExamSchedule extends Model
         'class_id',
         'section_id',
         'session_id',
+        'group_id',     // ⬅️ NEW: Added group_id
         'teacher_id',
         'subject_id',
         'exam_slot_id',
@@ -57,7 +58,7 @@ class ExamSchedule extends Model
 
     /**
      * Get the ClassName that this schedule belongs to.
-     */
+    */
     public function className(): BelongsTo
     {
         return $this->belongsTo(ClassName::class, 'class_id');
@@ -65,7 +66,7 @@ class ExamSchedule extends Model
 
     /**
      * Get the Section that this schedule belongs to.
-     */
+    */
     public function section(): BelongsTo
     {
         return $this->belongsTo(Section::class);
@@ -73,10 +74,19 @@ class ExamSchedule extends Model
 
     /**
      * Get the ClassSession that this schedule belongs to.
-     */
+    */
     public function session(): BelongsTo
     {
         return $this->belongsTo(ClassSession::class);
+    }
+    
+    /**
+     * Get the Group that this schedule belongs to.
+     * * ⬅️ NEW: Added Group Relationship
+     */
+    public function group(): BelongsTo
+    {
+        return $this->belongsTo(Group::class);
     }
 
     /**
@@ -97,7 +107,7 @@ class ExamSchedule extends Model
 
     /**
      * Get the Room for this schedule.
-    */
+     */
     public function room(): BelongsTo
     {
         return $this->belongsTo(Room::class);
@@ -105,9 +115,10 @@ class ExamSchedule extends Model
 
     /**
      * Get the ExamSlot that this schedule belongs to.
-    */
-    public function examSlot()
+     */
+    public function examSlot(): BelongsTo
     {
+        // Explicitly type the return for better clarity and type hinting
         return $this->belongsTo(ExamTimeSlot::class, 'exam_slot_id');
     }
 

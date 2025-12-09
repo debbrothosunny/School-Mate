@@ -14,6 +14,7 @@ class InvoiceItem extends Model
         'fee_type_id',
         'description',
         'amount',
+        'balance_due',
     ];
 
     protected $casts = [

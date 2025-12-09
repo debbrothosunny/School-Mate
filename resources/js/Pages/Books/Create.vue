@@ -8,7 +8,7 @@ import TextInput from '@/Components/TextInput.vue';
 import { computed, watchEffect } from 'vue';
 import Swal from 'sweetalert2';
 
-// Form state
+// Form state (removed cover_image)
 const form = useForm({
     title: '',
     author: '',
@@ -18,19 +18,12 @@ const form = useForm({
     quantity: 1,
     available_quantity: 1,
     genre: '',
-    cover_image: null,
     status: 0,
 });
-
-// Handle file input change
-const handleCoverImageChange = (event) => {
-    form.cover_image = event.target.files[0];
-};
 
 // Submit handler using Inertia
 const submit = () => {
     form.post(route('books.store'), {
-        forceFormData: true, // important for file uploads
         onSuccess: () => form.reset(),
         onError: (errors) => {
             console.error('Book creation failed:', errors);
@@ -38,7 +31,7 @@ const submit = () => {
     });
 };
 
-// Access flash messages from Inertia page props explicitly mapping message and type
+// Access flash messages from Inertia page props
 const page = usePage();
 const flash = computed(() => ({
     message: page.props.message || '',
@@ -61,7 +54,6 @@ watchEffect(() => {
     }
 });
 </script>
-
 
 <template>
     <Head title="Add New Book" />
@@ -170,17 +162,6 @@ watchEffect(() => {
                                     v-model="form.genre"
                                 />
                                 <InputError class="mt-2" :message="form.errors.genre" />
-                            </div>
-                            <!-- Cover Image -->
-                            <div class="col-12">
-                                <InputLabel for="cover_image" value="Cover Image" class="form-label" />
-                                <input
-                                    type="file"
-                                    id="cover_image"
-                                    @change="handleCoverImageChange"
-                                    class="form-control"
-                                />
-                                <InputError class="mt-2" :message="form.errors.cover_image" />
                             </div>
                             <!-- Status -->
                             <div class="col-12">

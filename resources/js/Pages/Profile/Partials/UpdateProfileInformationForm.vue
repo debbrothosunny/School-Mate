@@ -25,7 +25,7 @@ const user = usePage().props.auth.user;
 // --- Profile Form ---
 const profileForm = useForm({
     name: user.name,
-    email: user.email,
+    // email removed
 });
 
 // --- Password Form ---
@@ -53,7 +53,6 @@ const updatePassword = () => {
     passwordForm.put(route('password.update'), {
         preserveScroll: true,
         onSuccess: () => {
-            // Reset forms after success
             passwordForm.reset();
             showCurrentPassword.value = false;
             showNewPassword.value = false;
@@ -73,21 +72,17 @@ const updatePassword = () => {
 };
 </script>
 
-
 <template>
   <div class="max-w-4xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
-    <!-- Main header -->
     <h1 class="text-5xl font-extrabold text-gray-900 tracking-tight mb-8 text-center">Your Account</h1>
     <p class="text-center text-lg text-gray-600 mb-12">Manage your profile information and password in one place.</p>
 
-    <!-- Main card -->
     <div class="bg-white p-8 sm:p-12 rounded-3xl shadow-2xl border border-gray-100 space-y-12 animate-fade-in-up">
 
-      <!-- Profile Information -->
       <div class="space-y-6">
         <header>
           <h2 class="text-3xl font-bold text-gray-800 tracking-tight mb-2">Profile Details</h2>
-          <p class="text-md text-gray-500">Update your account's name and email address.</p>
+          <p class="text-md text-gray-500">Update your account's name.</p>
         </header>
 
         <form @submit.prevent="updateProfileInformation" class="space-y-6">
@@ -98,27 +93,8 @@ const updatePassword = () => {
               v-model="profileForm.name" required autofocus autocomplete="name" />
             <InputError class="mt-2" :message="profileForm.errors.name" />
           </div>
-          <!-- Email -->
-          <div>
-            <InputLabel for="email" value="Email" class="text-gray-700 font-semibold" />
-            <TextInput id="email" type="email" class="mt-1 block w-full"
-              v-model="profileForm.email" required autocomplete="username" />
-            <InputError class="mt-2" :message="profileForm.errors.email" />
-          </div>
 
-          <!-- Email Verification Notice -->
-          <div v-if="mustVerifyEmail && user.email_verified_at === null"
-               class="border border-yellow-200 bg-yellow-50 p-4 rounded-lg">
-            <p class="text-sm text-yellow-700">
-              Your email address is unverified.
-              <Link :href="route('verification.send')" method="post" as="button"
-                class="underline text-yellow-600 hover:text-yellow-800">Click here to re-send the verification email.</Link>
-            </p>
-            <div v-show="status === 'verification-link-sent'"
-                 class="mt-2 text-sm font-medium text-green-700">
-              A new verification link has been sent to your email address.
-            </div>
-          </div>
+          <!-- Email field removed -->
 
           <!-- Save -->
           <div class="flex items-center gap-4">
@@ -147,45 +123,46 @@ const updatePassword = () => {
       <div class="space-y-6">
         <header>
           <h2 class="text-3xl font-bold text-gray-800 tracking-tight mb-2">Update Password</h2>
-          <p class="text-md text-gray-500">Ensure your account is using a long, random password to stay secure.Minimum (8 Charecter)</p>
+          <p class="text-md text-gray-500">Ensure your account is using a long, random password to stay secure.Minimum (8 Characters)</p>
         </header>
 
+        <!-- Password update form as before without change -->
+
         <form @submit.prevent="updatePassword" class="space-y-6">
-        
-        <!-- Current Password -->
-        <div>
-        <InputLabel for="current_password" value="Current Password" class="text-gray-700 font-semibold" />
-        <div class="relative">
-            <input
-            :type="showCurrentPassword ? 'text' : 'password'"
-            id="current_password"
-            ref="currentPasswordInput"
-            v-model="passwordForm.current_password"
-            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 pr-10"
-            autocomplete="current-password"
-            />
-            <button
-            type="button"
-            @click="showCurrentPassword = !showCurrentPassword"
-            class="absolute inset-y-0 right-0 px-3 flex items-center text-gray-500 hover:text-gray-700"
-            >
-            <i :class="showCurrentPassword ? 'fa fa-eye-slash' : 'fa fa-eye'"></i>
-            </button>
-        </div>
-        <InputError :message="passwordForm.errors.current_password" class="mt-2" />
-        </div>
-
-
+          <!-- Current Password -->
+          <div>
+            <InputLabel for="current_password" value="Current Password" class="text-gray-700 font-semibold" />
+            <div class="relative">
+              <input
+                :type="showCurrentPassword ? 'text' : 'password'"
+                id="current_password"
+                ref="currentPasswordInput"
+                v-model="passwordForm.current_password"
+                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 pr-10"
+                autocomplete="current-password"
+              />
+              <button
+                type="button"
+                @click="showCurrentPassword = !showCurrentPassword"
+                class="absolute inset-y-0 right-0 px-3 flex items-center text-gray-500 hover:text-gray-700"
+              >
+                <i :class="showCurrentPassword ? 'fa fa-eye-slash' : 'fa fa-eye'"></i>
+              </button>
+            </div>
+            <InputError :message="passwordForm.errors.current_password" class="mt-2" />
+          </div>
 
           <!-- New Password -->
           <div>
             <InputLabel for="password" value="New Password" class="text-gray-700 font-semibold" />
             <div class="relative">
-              <input :type="showNewPassword ? 'text' : 'password'"
-                     id="password"
-                     v-model="passwordForm.password"
-                     class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 pr-10"
-                     autocomplete="new-password" />
+              <input
+                :type="showNewPassword ? 'text' : 'password'"
+                id="password"
+                v-model="passwordForm.password"
+                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 pr-10"
+                autocomplete="new-password"
+              />
               <button type="button" @click="showNewPassword = !showNewPassword"
                       class="absolute inset-y-0 right-0 px-3 text-gray-500 hover:text-gray-700">
                 <i :class="showNewPassword ? 'fa fa-eye-slash' : 'fa fa-eye'"></i>
@@ -198,11 +175,13 @@ const updatePassword = () => {
           <div>
             <InputLabel for="password_confirmation" value="Confirm Password" class="text-gray-700 font-semibold" />
             <div class="relative">
-              <input :type="showConfirmPassword ? 'text' : 'password'"
-                     id="password_confirmation"
-                     v-model="passwordForm.password_confirmation"
-                     class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 pr-10"
-                     autocomplete="new-password" />
+              <input
+                :type="showConfirmPassword ? 'text' : 'password'"
+                id="password_confirmation"
+                v-model="passwordForm.password_confirmation"
+                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 pr-10"
+                autocomplete="new-password"
+              />
               <button type="button" @click="showConfirmPassword = !showConfirmPassword"
                       class="absolute inset-y-0 right-0 px-3 text-gray-500 hover:text-gray-700">
                 <i :class="showConfirmPassword ? 'fa fa-eye-slash' : 'fa fa-eye'"></i>
@@ -236,7 +215,6 @@ const updatePassword = () => {
 </template>
 
 <style scoped>
-/* Custom keyframes for a simple fade-in effect on the main container */
 @keyframes fade-in-up {
     from {
         opacity: 0;

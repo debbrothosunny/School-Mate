@@ -15,6 +15,7 @@ use App\Models\Invoice;
 use App\Models\ClassSession;
 use App\Models\Group;
 use App\Models\User;
+use App\Models\PayrollRecord; // **Crucial for your payroll data**
 use Illuminate\Support\Facades\LOG;
 use Illuminate\Support\Facades\DB; // For raw queries if needed, though Eloquent is better
 use Illuminate\Support\Facades\Auth;
@@ -27,109 +28,144 @@ class DashboardController extends Controller
 
     public function index(Request $request)
     {
-        $user  = $request->user();
-        $roles = $user->getRoleNames();
+        
 
-        // role‐based redirects
-        if ($roles->contains('accounts')) {
-            return redirect()->route('accounts.dashboard');
-        }
-        if ($roles->contains('teacher')) {
-            return redirect()->route('teacher.dashboard');
-        }
-        if ($roles->contains('student')) {
-            return redirect()->route('student.dashboard');
-        }
+        $user = $request->user();
+    $roles = $user->getRoleNames();
 
-        // prepare default dashboard data
-        $dashboardData = [
-            'cards' => [
-                'totalTeachers'             => 0,
-                'totalSections'             => 0,
-                'totalStudents'             => 0,
-                'totalActiveClasses'        => 0,
-                'totalSessions'             => 0,
-                'totalGroups'               => 0,
-                'monthlyCollection'         => 0,
-                'monthlyDue'                => 0,
-                'yearlyCollection'          => 0,
-                'yearlyDue'                 => 0,
-                'totalCollection'           => 0,
-                'totalDue'                  => 0,
-                'totalPendingRegistrations' => 0,
-            ],
-            'attendanceStats' => [
-                'labels' => ['Present', 'Absent', 'Late'],
-                'data'   => [0, 0, 0],
-            ],
-            'message'  => "Good to have you back, Admin. Let's explore your school's data today.",
-            'userName' => $user->name,
-        ];
-
-        $startOfMonth = Carbon::now()->startOfMonth();
-        $endOfMonth   = Carbon::now()->endOfMonth();
-        $startOfYear  = Carbon::now()->startOfYear();
-        $endOfYear    = Carbon::now()->endOfYear();
-
-        // only admins see full overview
-        if ($roles->contains('admin')) {
-            // entity counts
-            $dashboardData['cards']['totalTeachers']      = Teacher::count();
-            $dashboardData['cards']['totalSections']      = Section::count();
-            $dashboardData['cards']['totalStudents']      = Student::count();
-            $dashboardData['cards']['totalActiveClasses'] = ClassName::where('status', 0)->count();
-            $dashboardData['cards']['totalSessions']      = ClassSession::count();
-            $dashboardData['cards']['totalGroups']        = Group::count();
-
-            // pending student registrations
-            $dashboardData['cards']['totalPendingRegistrations'] = User::role('student')
-                ->whereDoesntHave('roles', fn($q) =>
-                    $q->whereIn('name', ['admin','teacher','accounts'])
-                )->count();
-
-            // attendance this month
-            $presentCount = Attendance::whereBetween('date', [$startOfMonth, $endOfMonth])
-                ->where('status', 'present')->count();
-            $absentCount  = Attendance::whereBetween('date', [$startOfMonth, $endOfMonth])
-                ->where('status', 'absent')->count();
-            $lateCount    = Attendance::whereBetween('date', [$startOfMonth, $endOfMonth])
-                ->where('status', 'late')->count();
-
-            $dashboardData['attendanceStats']['data'] = [
-                $presentCount,
-                $absentCount,
-                $lateCount,
-            ];
-
-            // invoice-based collections & dues
-            $dashboardData['cards']['monthlyCollection'] = Invoice::whereBetween('issued_at', [$startOfMonth, $endOfMonth])
-                ->sum('amount_paid');
-            $dashboardData['cards']['monthlyDue']        = Invoice::whereBetween('issued_at', [$startOfMonth, $endOfMonth])
-                ->sum('balance_due');
-
-            $dashboardData['cards']['yearlyCollection'] = Invoice::whereBetween('issued_at', [$startOfYear, $endOfYear])
-                ->sum('amount_paid');
-            $dashboardData['cards']['yearlyDue']        = Invoice::whereBetween('issued_at', [$startOfYear, $endOfYear])
-                ->sum('balance_due');
-
-            $dashboardData['cards']['totalCollection'] = Invoice::sum('amount_paid');
-            $dashboardData['cards']['totalDue']        = Invoice::sum('balance_due');
-
-            // customized welcome message
-            $dashboardData['message'] = 'Welcome, Admin! Here’s a complete school overview.';
-
-            return Inertia::render('Dashboard', $dashboardData);
-        }
-
-        // fallback for users without a specific dashboard
-        $dashboardData['message'] =
-            'Your account is awaiting role assignment. Please wait for an administrator to review your registration.';
-
-        return Inertia::render('UnassignedUserDashboard', $dashboardData);
+    // --- Role-Based Redirects ---
+    if ($roles->contains('accounts')) {
+        return redirect()->route('accounts.dashboard');
+    }
+    if ($roles->contains('teacher')) {
+        return redirect()->route('teacher.dashboard');
+    }
+    if ($roles->contains('student')) {
+        return redirect()->route('student.dashboard');
+    }
+    if ($roles->contains('front-desk')) {
+        return redirect()->route('front-desk.dashboard');
     }
 
- 
-                 
+    // --- Prepare Default Dashboard Data ---
+    $dashboardData = [
+        'cards' => [
+            'totalTeachers' => 0,
+            'totalSections' => 0,
+            'totalStudents' => 0,
+            'totalActiveClasses' => 0,
+            'totalSessions' => 0,
+            'totalGroups' => 0,
+            'monthlyCollection' => 0,
+            'monthlyDue' => 0,
+            'monthlyProfit' => 0, 
+            'yearlyCollection' => 0,
+            'yearlyDue' => 0,
+            'yearlyProfit' => 0,
+            'totalCollection' => 0,
+            'totalDue' => 0,
+            'overallProfit' => 0,
+            'totalPendingRegistrations' => 0,
+            'totalAdmissionFeeCollected' => 0, // 💡 NEW: Added default value for the new card
+        ],
+        'attendanceStats' => [
+            'labels' => ['Present', 'Absent', 'Late'],
+            'data' => [0, 0, 0],
+        ],
+        'message' => "Good to have you back, Admin. Let's explore your school's data today.",
+        'userName' => $user->name,
+    ];
+
+    // --- Define Time Boundaries ---
+    $startOfMonth = Carbon::now()->startOfMonth();
+    $endOfMonth = Carbon::now()->endOfMonth();
+    $startOfYear = Carbon::now()->startOfYear();
+    $endOfYear = Carbon::now()->endOfYear();
+
+    // --- Admin Dashboard Logic (Full Overview) ---
+    if ($roles->contains('admin')) {
+        // Entity Counts 
+        $dashboardData['cards']['totalTeachers'] = Teacher::count();
+        $dashboardData['cards']['totalSections'] = Section::count();
+        $dashboardData['cards']['totalStudents'] = Student::count();
+        $dashboardData['cards']['totalActiveClasses'] = ClassName::where('status', 0)->count();
+        $dashboardData['cards']['totalSessions'] = ClassSession::count();
+        $dashboardData['cards']['totalGroups'] = Group::count();
+        
+        // Pending student registrations
+        $dashboardData['cards']['totalPendingRegistrations'] = User::role('student')
+            ->whereDoesntHave('roles', fn($q) =>
+                $q->whereIn('name', ['admin','teacher','accounts'])
+            )->count();
+        
+        // Attendance this month
+        $presentCount = Attendance::whereBetween('date', [$startOfMonth, $endOfMonth])
+            ->where('status', 'present')->count();
+        $absentCount = Attendance::whereBetween('date', [$startOfMonth, $endOfMonth])
+            ->where('status', 'absent')->count();
+        $lateCount = Attendance::whereBetween('date', [$startOfMonth, $endOfMonth])
+            ->where('status', 'late')->count();
+        $dashboardData['attendanceStats']['data'] = [
+            $presentCount,
+            $absentCount,
+            $lateCount,
+        ];
+        
+        // 1. REVENUE (Collection) Calculation (from Invoices)
+        $monthlyCollection = Invoice::whereBetween('issued_at', [$startOfMonth, $endOfMonth])->sum('amount_paid');
+        $yearlyCollection = Invoice::whereBetween('issued_at', [$startOfYear, $endOfYear])->sum('amount_paid');
+        $totalCollection = Invoice::sum('amount_paid');
+        
+        // 2. EXPENSE (Payroll) Calculation
+        $monthlyExpense = PayrollRecord::whereBetween('payment_date', [$startOfMonth, $endOfMonth])
+            ->sum('net_payable');
+        $yearlyExpense = PayrollRecord::whereBetween('payment_date', [$startOfYear, $endOfYear])
+            ->sum('net_payable');
+        $overallExpense = PayrollRecord::sum('net_payable');
+        
+        // 3. PROFIT Calculation
+        $monthlyProfit = $monthlyCollection - $monthlyExpense;
+        $yearlyProfit = $yearlyCollection - $yearlyExpense;
+        $overallProfit = $totalCollection - $overallExpense;
+        
+        // 4. 💡 NEW: Admission Fee Collection Calculation
+        // Sum the admission_fee_amount only for students who have paid (admission_fee_paid = true/1)
+        $totalAdmissionFeeCollectedInSubunits = Student::where('admission_fee_paid', true)
+            ->sum('admission_fee_amount');
+        
+        $totalAdmissionFeeCollected = $totalAdmissionFeeCollectedInSubunits / 100; // Convert from subunits
+        
+        // --- Map Financial Results to the dashboardData array ---
+        
+        // Collections & Dues
+        $dashboardData['cards']['monthlyCollection'] = $monthlyCollection;
+        $dashboardData['cards']['monthlyDue'] = Invoice::whereBetween('issued_at', [$startOfMonth, $endOfMonth])->sum('balance_due');
+        $dashboardData['cards']['yearlyCollection'] = $yearlyCollection;
+        $dashboardData['cards']['yearlyDue'] = Invoice::whereBetween('issued_at', [$startOfYear, $endOfYear])->sum('balance_due');
+        $dashboardData['cards']['totalCollection'] = $totalCollection;
+        $dashboardData['cards']['totalDue'] = Invoice::sum('balance_due');
+        
+        // PROFIT
+        $dashboardData['cards']['monthlyProfit'] = $monthlyProfit;
+        $dashboardData['cards']['yearlyProfit'] = $yearlyProfit;
+        $dashboardData['cards']['overallProfit'] = $overallProfit;
+
+        // 💡 NEW MAPPING
+        $dashboardData['cards']['totalAdmissionFeeCollected'] = $totalAdmissionFeeCollected;
+        
+        // customized welcome message
+        $dashboardData['message'] = 'Welcome, Sir! Here’s a complete school overview.';
+        return Inertia::render('Dashboard', $dashboardData);
+    }
+
+    // --- Fallback for Unassigned Users ---
+    $dashboardData['message'] =
+        'Your account is awaiting role assignment. Please wait for an administrator to review your registration.';
+    return Inertia::render('UnassignedUserDashboard', $dashboardData);
+    }
+
+    
+    //  Teacher Dashboard
     public function teacherIndex()
     {
         $userId = Auth::user()->id;
@@ -174,9 +210,6 @@ class DashboardController extends Controller
             'myClasses' => $myClasses,
         ]);
     }
-
-
-
 
     
     //  Student Dashboard 
@@ -281,5 +314,66 @@ class DashboardController extends Controller
         }
 
         return Inertia::render('StudentDashboard', $dashboardData);
+    }
+
+
+    //  frontDesk Dashboard 
+    public function frontDeskIndex()
+    {
+        $user = Auth::user();
+        
+        // Prepare the base dashboard data for the front desk
+        $dashboardData = [
+            'message' => 'Welcome, ' . $user->name . '! Here’s a quick overview of your front desk tasks.',
+            'userName' => $user->name,
+            'cards' => [
+                'totalStudents' => 0,
+                'totalTeachers' => 0,
+                'totalPendingRegistrations' => 0,
+                'totalActiveClasses' => 0,
+            ],
+            'recentStudents' => [],
+            'recentTeachers' => [],
+            'recentInvoices' => [],
+        ];
+
+        try {
+            // Get total counts
+            $dashboardData['cards']['totalStudents'] = Student::count();
+            $dashboardData['cards']['totalTeachers'] = Teacher::count();
+            $dashboardData['cards']['totalActiveClasses'] = ClassName::where('status', 0)->count();
+
+            // Get pending student registrations.
+
+            // This queries for users with the 'student' role that do not have any other administrator-level roles.
+            $dashboardData['cards']['totalPendingRegistrations'] = User::role('student')
+                ->whereDoesntHave('roles', fn($q) =>
+                    $q->whereIn('name', ['admin', 'teacher', 'accounts'])
+                )
+                ->count();
+
+            // Fetch recent student and teacher records
+            $dashboardData['recentStudents'] = Student::with('user', 'className', 'section')
+                ->orderBy('created_at', 'desc')
+                ->take(5)
+                ->get();
+            
+            $dashboardData['recentTeachers'] = Teacher::with('user')
+                ->orderBy('created_at', 'desc')
+                ->take(5)
+                ->get();
+
+            // Fetch recent invoices
+            $dashboardData['recentInvoices'] = Invoice::with('student')
+                ->orderBy('issued_at', 'desc')
+                ->take(5)
+                ->get();
+
+        } catch (\Exception $e) {
+            Log::error("Error fetching front desk dashboard data: " . $e->getMessage());
+            $dashboardData['message'] = 'An error occurred while loading your dashboard data.';
+        }
+
+        return Inertia::render('FrontDeskDashboard', $dashboardData);
     }
 }

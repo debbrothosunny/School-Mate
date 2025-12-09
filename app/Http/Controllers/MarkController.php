@@ -124,12 +124,10 @@ class MarkController extends Controller
     ]);
     }
 
-    /**
-     * Store or update marks for students.
-     */
+    // Store or update marks for students.
     public function store(Request $request)
     {
-        // 1. Validate incoming data, including the new 'exam_marks' field
+        // 1. Validate incoming data
         $request->validate([
             'class_id' => ['required', 'exists:class_names,id'],
             'session_id' => ['required', 'exists:class_sessions,id'],
@@ -139,9 +137,12 @@ class MarkController extends Controller
             'subject_id' => ['required', 'exists:subjects,id'],
             'marks_data' => ['required', 'array'],
             'marks_data.*.student_id' => ['required', 'exists:students,id'],
-            'marks_data.*.class_test_marks' => ['nullable', 'numeric', 'min:0', 'max:100'],
-            'marks_data.*.assignment_marks' => ['nullable', 'numeric', 'min:0', 'max:100'],
-            'marks_data.*.exam_marks' => ['nullable', 'integer', 'min:0', 'max:100'],
+
+            // Updated Mark Component Fields
+            'marks_data.*.subjective_marks' => ['nullable', 'numeric', 'min:0'],
+            'marks_data.*.objective_marks' => ['nullable', 'numeric', 'min:0'],
+            'marks_data.*.practical_marks' => ['nullable', 'numeric', 'min:0'],
+            // Note: 'attendance_marks' is calculated, not directly validated here.
         ]);
 
         $classId = $request->input('class_id');
@@ -151,38 +152,26 @@ class MarkController extends Controller
         $examId = $request->input('exam_id');
         $subjectId = $request->input('subject_id'); // Subject for which marks are being saved
 
-        // ✨ CORRECTED LOGIC FOR totalClassDays START ✨
-        // Get the ClassName instance using only class_id.
-        // The 'total_classes' column is directly on the 'class_names' table.
+        // Retrieve total class days from the ClassName model
         $className = ClassName::find($classId);
-
-        // Use the total_classes from the ClassName model.
-        // Provide a fallback (e.g., 26) if the column is null or ClassName not found.
         $totalClassDays = $className ? ($className->total_classes ?? 26) : 26;
-        // This will retrieve the value from the 'total_classes' column in your 'class_names' table.
-        // The 'session_id' is NOT used when querying the ClassName model here,
-        // as it's not a column on the 'class_names' table.
-        // ✨ CORRECTED LOGIC FOR totalClassDays END ✨
-
-        // Define the maximum attendance marks for this exam/subject.
-        $maxAttendanceMarksForExam = 10; // This remains 10 as per your requirement
+        $maxAttendanceMarksForExam = 10;
 
         // 2. Loop through each student's marks data to store/update
         foreach ($request->input('marks_data') as $markData) {
             $studentId = $markData['student_id'];
 
             // Calculate student's present days for the SPECIFIC SUBJECT.
-            // This is still subject-specific because attendance is usually recorded per subject.
             $presentDays = Attendance::where('student_id', $studentId)
-                                     ->where('class_id', $classId)
-                                     ->where('session_id', $sessionId)
-                                     ->where('section_id', $sectionId)
-                                     ->where('group_id', $groupId)
-                                     ->where('subject_id', $subjectId) // Crucial: Filters by selected subject (e.g., Bangla)
-                                     ->where('status', 'present') // Counts only 'present' records
-                                     ->count();
+                                            ->where('class_id', $classId)
+                                            ->where('session_id', $sessionId)
+                                            ->where('section_id', $sectionId)
+                                            ->where('group_id', $groupId)
+                                            ->where('subject_id', $subjectId)
+                                            ->where('status', 'present')
+                                            ->count();
 
-            // Calculate attendance marks based on percentage for the SPECIFIC SUBJECT
+            // Calculate attendance marks based on percentage
             $attendanceMarks = 0;
             if ($totalClassDays > 0) {
                 $attendancePercentage = ($presentDays / $totalClassDays);
@@ -190,7 +179,7 @@ class MarkController extends Controller
             }
 
             // 3. Update or create the Mark record
-            Mark::updateOrCreate(
+            $markRecord = Mark::updateOrCreate(
                 [
                     'student_id' => $studentId,
                     'class_id' => $classId,
@@ -201,26 +190,28 @@ class MarkController extends Controller
                     'subject_id' => $subjectId,
                 ],
                 [
-                    'class_test_marks' => $markData['class_test_marks'],
-                    'assignment_marks' => $markData['assignment_marks'],
-                    'exam_marks' => $markData['exam_marks'],
+                    // Use the new component fields
+                    'subjective_marks' => $markData['subjective_marks'] ?? null,
+                    'objective_marks' => $markData['objective_marks'] ?? null,
+                    'practical_marks' => $markData['practical_marks'] ?? null,
                     'attendance_marks' => $attendanceMarks, // Save calculated attendance marks
+                    'is_absent' => $markData['is_absent'] ?? false, // Assuming is_absent flag is also passed
                 ]
             );
+
+            // 4. Recalculate and cache the total marks using the model's accessor.
+            // This ensures the cached column 'total_marks_obtained' is always up-to-date.
+            $markRecord->total_marks_obtained = $markRecord->total_subject_marks_obtained; // Accessor handles the calculation
+            $markRecord->save();
         }
 
-        // 4. Redirect with a success message
+        // 5. Redirect with a success message
         return redirect()->back()->with('flash', ['success' => 'Marks saved successfully!']);
     }
 
 
 
-
-
-
-
     // Teacher Side To create his class Mark Add
-
 
     public function teacherMarksIndex(Request $request)
     {
@@ -247,8 +238,8 @@ class MarkController extends Controller
         $sessions = ClassSession::whereIn('id', $assignedSessionIds)->get(['id', 'name']);
         $sections = Section::whereIn('id', $assignedSectionIds)->get(['id', 'name']);
         $groups = Group::all(['id', 'name']);
-        $exams = Exam::all(['id', 'exam_name', 'total_marks']);
-        $subjects = Subject::whereIn('id', $assignedSubjectIds)->get(['id', 'name']);
+        $exams = Exam::all(['id', 'exam_name']);
+        $subjects = Subject::whereIn('id', $assignedSubjectIds)->get(['id', 'name', 'full_marks', 'subjective_full_marks', 'objective_full_marks', 'practical_full_marks']);
 
         $classId = $request->input('class_id');
         $sessionId = $request->input('session_id');
@@ -259,7 +250,11 @@ class MarkController extends Controller
 
         $students = collect();
         $initialMessage = null;
-        $selectedExamTotalMarks = 0;
+
+        // Default max marks for display (will be updated if a subject is selected)
+        $selectedExamTotalMarks = 0; 
+        $maxAttendanceMarksForExam = 10;
+        $selectedSubject = null;
 
         // Validate selected filters against teacher's assignments
         if ($classId && !in_array($classId, $assignedClassIds)) {
@@ -274,6 +269,10 @@ class MarkController extends Controller
         if ($subjectId && !in_array($subjectId, $assignedSubjectIds)) {
             abort(403, 'Unauthorized subject selection.');
         }
+        
+        if ($subjectId) {
+            $selectedSubject = Subject::find($subjectId);
+        }
 
         if ($classId && $sessionId && $sectionId && $groupId && $examId && $subjectId) {
             $specificAssignmentExists = ClassSubject::where('teacher_id', $teacherId)
@@ -286,9 +285,18 @@ class MarkController extends Controller
             if (!$specificAssignmentExists) {
                 $initialMessage = ['text' => 'You are not assigned to this specific Class, Session, Section, and Subject combination.', 'type' => 'error'];
             } else {
-                $selectedExam = Exam::find($examId);
-                if ($selectedExam) {
-                    $selectedExamTotalMarks = $selectedExam->total_marks; // e.g., 30 or 40
+                // Calculate dynamic total marks based on subject config for display
+                if ($selectedSubject) {
+                    $subjectiveMax = (float)($selectedSubject->subjective_full_marks ?? 0);
+                    $objectiveMax = (float)($selectedSubject->objective_full_marks ?? 0);
+                    $practicalMax = (float)($selectedSubject->practical_full_marks ?? 0);
+                    
+                    $selectedExamTotalMarks = $subjectiveMax + $objectiveMax + $practicalMax + $maxAttendanceMarksForExam;
+
+                    // Fallback to the overall full_marks if component marks are not set
+                    if ($selectedExamTotalMarks <= $maxAttendanceMarksForExam) {
+                        $selectedExamTotalMarks = (float)($selectedSubject->full_marks ?? 100);
+                    }
                 }
 
                 $students = Student::where('class_id', $classId)
@@ -303,8 +311,6 @@ class MarkController extends Controller
                     $className = ClassName::find($classId);
                     $totalClassDays = $className ? ($className->total_classes ?? 26) : 26;
 
-                    $maxAttendanceMarksForExam = 10;
-
                     foreach ($students as $student) {
                         // Count attendance WITHOUT subject filter to calculate class-wise attendance
                         $presentDays = Attendance::where('student_id', $student->id)
@@ -312,6 +318,7 @@ class MarkController extends Controller
                             ->where('session_id', $sessionId)
                             ->where('section_id', $sectionId)
                             ->where('group_id', $groupId)
+                            // The subject_id filter is intentionally excluded here to count class-wise attendance
                             ->where('status', 'present')
                             ->count();
 
@@ -320,6 +327,8 @@ class MarkController extends Controller
                             $attendancePercentage = ($presentDays / $totalClassDays);
                             $attendanceMarks = round($attendancePercentage * $maxAttendanceMarksForExam, 2);
                         }
+                        $attendanceMarks = min($attendanceMarks, $maxAttendanceMarksForExam);
+
 
                         $existingMark = Mark::where('student_id', $student->id)
                             ->where('class_id', $classId)
@@ -330,10 +339,12 @@ class MarkController extends Controller
                             ->where('subject_id', $subjectId)
                             ->first();
 
-                        $student->class_test_marks = $existingMark ? $existingMark->class_test_marks : null;
-                        $student->assignment_marks = $existingMark ? $existingMark->assignment_marks : null;
+                        // Map the new mark component fields
+                        $student->subjective_marks = $existingMark ? $existingMark->subjective_marks : null;
+                        $student->objective_marks = $existingMark ? $existingMark->objective_marks : null;
+                        $student->practical_marks = $existingMark ? $existingMark->practical_marks : null;
+
                         $student->attendance_marks = $attendanceMarks;
-                        $student->exam_marks = $existingMark ? $existingMark->exam_marks : null;
                         $student->marks_id = $existingMark ? $existingMark->id : null;
                     }
                 }
@@ -357,19 +368,18 @@ class MarkController extends Controller
             'selectedSubjectId' => (int)$subjectId,
             'students' => $students,
             'initialMessage' => $initialMessage,
-            'selectedExamTotalMarks' => (int)$selectedExamTotalMarks,
+            'selectedExamTotalMarks' => (int)$selectedExamTotalMarks, // Updated to dynamic value
         ]);
     }
 
 
-    /**
-     * Store or update marks for students.
-    */
-
+    // Teacher Side To Store his class Mark Add
     public function teacherMarksStore(Request $request)
     {
+        // 1. Authentication and Teacher Profile Check
         $user = Auth::user();
         if (!$user) {
+            // Log this or handle it better, but for now, simple abort
             abort(403, 'Unauthorized. Please log in.');
         }
 
@@ -379,14 +389,20 @@ class MarkController extends Controller
         }
         $teacherId = $teacher->id;
 
+        // Fetch exam and subject models early to use for validation
         $examId = $request->input('exam_id');
+        $subjectId = $request->input('subject_id');
         $selectedExam = Exam::find($examId);
-        $examSpecificMaxMarks = $selectedExam ? $selectedExam->total_marks : 0;
+        $selectedSubject = Subject::find($subjectId);
 
-        $maxClassTestMarks = 5;
-        $maxAssignmentMarks = 5;
-        $maxAttendanceMarks = 10;
+        if (!$selectedSubject) {
+            return redirect()->back()->withErrors(['subject_id' => 'The selected subject could not be found or is invalid.'])->withInput();
+        }
 
+        // Using 100 as a safe upper bound for individual components if not configured
+        $examSpecificMaxMarks = 100;
+
+        // 2. Initial Validation (using Validator::make to allow for custom 'after' hook)
         $validator = Validator::make($request->all(), [
             'class_id' => ['required', 'exists:class_names,id'],
             'session_id' => ['required', 'exists:class_sessions,id'],
@@ -396,47 +412,49 @@ class MarkController extends Controller
             'subject_id' => ['required', 'exists:subjects,id'],
             'marks_data' => ['required', 'array'],
             'marks_data.*.student_id' => ['required', 'exists:students,id'],
-            'marks_data.*.class_test_marks' => ['nullable', 'numeric', 'min:0', 'max:' . $maxClassTestMarks],
-            'marks_data.*.assignment_marks' => ['nullable', 'numeric', 'min:0', 'max:' . $maxAssignmentMarks],
-            'marks_data.*.exam_marks' => ['nullable', 'integer', 'min:0', 'max:' . $examSpecificMaxMarks],
+
+            // Validate component fields against the subject's maximum configured marks
+            // Note: The 'max' here prevents marks > component max.
+            'marks_data.*.subjective_marks' => ['nullable', 'numeric', 'min:0', 'max:' . ((float)($selectedSubject->subjective_full_marks ?? $examSpecificMaxMarks))],
+            'marks_data.*.objective_marks' => ['nullable', 'numeric', 'min:0', 'max:' . ((float)($selectedSubject->objective_full_marks ?? $examSpecificMaxMarks))],
+            'marks_data.*.practical_marks' => ['nullable', 'numeric', 'min:0', 'max:' . ((float)($selectedSubject->practical_full_marks ?? $examSpecificMaxMarks))],
+            'marks_data.*.is_absent' => ['nullable', 'boolean'],
         ]);
 
-        $validator->after(function ($validator) use ($request, $maxClassTestMarks, $maxAssignmentMarks, $maxAttendanceMarks, $examSpecificMaxMarks) {
+        // 3. Custom Validation (Total Marks Constraint: subjective + objective + practical <= Subject's Total Full Marks)
+        $validator->after(function ($validator) use ($request, $selectedSubject) {
+
+            // --- DYNAMIC MAX TOTAL CALCULATION ---
+            $subjectiveMax = (float)($selectedSubject->subjective_full_marks ?? 0);
+            $objectiveMax = (float)($selectedSubject->objective_full_marks ?? 0);
+            $practicalMax = (float)($selectedSubject->practical_full_marks ?? 0);
+
+            // Calculate the total based on component full marks
+            $maxTotal = $subjectiveMax + $objectiveMax + $practicalMax;
+
+            // Fallback: If component marks are zeroed out, use the overall full_marks for the limit.
+            if ($maxTotal <= 0 && (float)($selectedSubject->full_marks ?? 0) > 0) {
+                $maxTotal = (float)($selectedSubject->full_marks);
+            }
+            // --- END DYNAMIC MAX TOTAL CALCULATION ---
+
             foreach ($request->input('marks_data') as $index => $markData) {
-                $classTest = $markData['class_test_marks'] ?? 0;
-                $assignment = $markData['assignment_marks'] ?? 0;
-                $examMarks = $markData['exam_marks'] ?? 0;
 
-                $studentId = $markData['student_id'];
-                $classId = $request->input('class_id');
-                $sessionId = $request->input('session_id');
-                $sectionId = $request->input('section_id');
-                $groupId = $request->input('group_id');
-                $subjectId = $request->input('subject_id');
-
-                $className = ClassName::find($classId);
-                $totalClassDays = $className ? ($className->total_classes ?? 26) : 26;
-
-                $presentDays = Attendance::where('student_id', $studentId)
-                    ->where('class_id', $classId)
-                    ->where('session_id', $sessionId)
-                    ->where('section_id', $sectionId)
-                    ->where('group_id', $groupId)
-                // Note: **NO subject_id filter here** for class-wise attendance
-                    ->where('status', 'present')
-                    ->count();
-
-                $calculatedAttendanceMarks = 0;
-                if ($totalClassDays > 0) {
-                    $attendancePercentage = ($presentDays / $totalClassDays);
-                    $calculatedAttendanceMarks = round($attendancePercentage * $maxAttendanceMarks, 2);
+                // Skip total validation if student is marked absent
+                if ($markData['is_absent'] ?? false) {
+                    continue;
                 }
-                $calculatedAttendanceMarks = min($calculatedAttendanceMarks, $maxAttendanceMarks);
 
-                $totalObtainedMarks = (float)$classTest + (float)$assignment + (float)$examMarks + (float)$calculatedAttendanceMarks;
+                $subjective = $markData['subjective_marks'] ?? 0;
+                $objective = $markData['objective_marks'] ?? 0;
+                $practical = $markData['practical_marks'] ?? 0;
 
-                if ($totalObtainedMarks > 50) {
-                    $validator->errors()->add("marks_data.{$index}.total_marks", "Total marks for this student (Class Test + Assignment + Exam + Attendance) cannot exceed 50. Current total: " . $totalObtainedMarks);
+                // Sum all components
+                $totalObtainedMarks = (float)$subjective + (float)$objective + (float)$practical;
+
+                if ($totalObtainedMarks > $maxTotal) {
+                    // This error is crucial for the front-end to show the total marks issue
+                    $validator->errors()->add("marks_data.{$index}.total_marks", "Total marks for this student (Subjective + Objective + Practical) cannot exceed {$maxTotal} (Max Subject Total). Current total: " . $totalObtainedMarks);
                 }
             }
         });
@@ -447,18 +465,18 @@ class MarkController extends Controller
                 ->withInput();
         }
 
-        // Authorization check
+        // 4. Authorization Check (Teacher must be assigned to this Class/Subject)
         $classId = $request->input('class_id');
         $sessionId = $request->input('session_id');
         $sectionId = $request->input('section_id');
         $groupId = $request->input('group_id');
-        $examId = $request->input('exam_id');
         $subjectId = $request->input('subject_id');
 
         $isAuthorized = ClassSubject::where('teacher_id', $teacherId)
             ->where('class_name_id', $classId)
             ->where('session_id', $sessionId)
             ->where('section_id', $sectionId)
+            ->where('group_id', $groupId)
             ->where('subject_id', $subjectId)
             ->exists();
 
@@ -466,30 +484,12 @@ class MarkController extends Controller
             abort(403, 'You are not authorized to add/update marks for this class/subject combination.');
         }
 
-        $className = ClassName::find($classId);
-        $totalClassDays = $className ? ($className->total_classes ?? 26) : 26;
-        $maxAttendanceMarksForExam = 10;
-
+        // 5. Data Saving Loop
         foreach ($request->input('marks_data') as $markData) {
             $studentId = $markData['student_id'];
 
-            $presentDays = Attendance::where('student_id', $studentId)
-                ->where('class_id', $classId)
-                ->where('session_id', $sessionId)
-                ->where('section_id', $sectionId)
-                ->where('group_id', $groupId)
-            // **No subject_id filter here**
-                ->where('status', 'present')
-                ->count();
-
-            $attendanceMarks = 0;
-            if ($totalClassDays > 0) {
-                $attendancePercentage = ($presentDays / $totalClassDays);
-                $attendanceMarks = round($attendancePercentage * $maxAttendanceMarksForExam, 2);
-            }
-            $attendanceMarks = min($attendanceMarks, $maxAttendanceMarksForExam);
-
-            Mark::updateOrCreate(
+            // Update or create the Mark record
+            $markRecord = Mark::updateOrCreate(
                 [
                     'student_id' => $studentId,
                     'class_id' => $classId,
@@ -500,17 +500,26 @@ class MarkController extends Controller
                     'subject_id' => $subjectId,
                 ],
                 [
-                    'class_test_marks' => $markData['class_test_marks'],
-                    'assignment_marks' => $markData['assignment_marks'],
-                    'exam_marks' => $markData['exam_marks'],
-                    'attendance_marks' => $attendanceMarks,
+                    // Use the new component fields
+                    'subjective_marks' => $markData['subjective_marks'] ?? null,
+                    'objective_marks' => $markData['objective_marks'] ?? null,
+                    'practical_marks' => $markData['practical_marks'] ?? null,
+                    'is_absent' => $markData['is_absent'] ?? false,
                 ]
             );
+
+            // Assuming your Mark model has a total_subject_marks_obtained accessor/mutator
+            // that calculates the total from the components (subjective + objective + practical).
+            $markRecord->total_marks_obtained = $markRecord->total_subject_marks_obtained;
+            $markRecord->save();
         }
 
-        return redirect()->back()->with('flash', ['success' => 'Marks saved successfully!']);
-
+        // 6. Redirect with a success message
+        // FIX: Changed from with('flash', ['success' => ...]) to the standard with('success', ...)
+        return redirect()->back()->with('success', 'Marks saved successfully!');
     }
 
+
+   
 }
 

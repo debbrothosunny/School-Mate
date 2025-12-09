@@ -1,92 +1,125 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import InputError from '@/Components/InputError.vue';
-import InputLabel from '@/Components/InputLabel.vue';
-import PrimaryButton from '@/Components/PrimaryButton.vue';
-import TextInput from '@/Components/TextInput.vue';
 import { Head, useForm, Link } from '@inertiajs/vue3';
+import PrimaryButton from '@/Components/PrimaryButton.vue';
+import InputError from '@/Components/InputError.vue';
+import TextInput from '@/Components/TextInput.vue';
+import InputLabel from '@/Components/InputLabel.vue';
 import Checkbox from '@/Components/Checkbox.vue';
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 
 const props = defineProps({
-    teacher: Object, // The teacher object passed from the controller
-    availableUsers: Array, // Users available to be linked, passed from controller
+    teacher: Object,
+    classes: Array,
+    sections: Array,
+    groups: Array,
 });
+
+// Helper function to generate correct image URL
+const getImageUrl = (imagePath) => {
+    if (!imagePath) return null;
+    if (imagePath.startsWith('http')) return imagePath;
+    const filename = imagePath.split('/').pop();
+    return route('teachers.image.serve', { filename });
+};
 
 const form = useForm({
     _method: 'post',
     name: props.teacher.name,
-    user_id: props.teacher.user_id || '', // Pre-fill, or empty string if null
     subject_taught: props.teacher.subject_taught,
-    image: null, // For new file upload
-    status: props.teacher.status, // Use the actual numeric status from the database
-    current_image_path: props.teacher.image, // To display current image and check for removal
-    clear_image: false, // Checkbox to explicitly clear the image
+    address: props.teacher.address,
+    phone_number: props.teacher.phone_number || '',
+    qualification: props.teacher.qualification || '',
+    joining_date: props.teacher.joining_date || '',
+    status: props.teacher.status,
+    designation: props.teacher.designation || 'Junior Teacher',
+    password: '',
+    password_confirmation: '',
+    image: null,
+    current_image_path: props.teacher.image,
+    clear_image: false,
+    is_class_teacher: props.teacher.is_class_teacher || false,
+    class_id: props.teacher.class_id || '',
+    section_id: props.teacher.section_id || '',
+    group_id: props.teacher.group_id || '',
 });
 
-// Reactive variable for image preview (current or new)
-const imagePreviewUrl = ref(props.teacher.image ? `/storage/${props.teacher.image}` : null);
+const imagePreviewUrl = ref(getImageUrl(props.teacher.image));
+const showClassTeacherFields = ref(props.teacher.is_class_teacher);
 
 const handleImageChange = (event) => {
     const file = event.target.files[0];
     if (file) {
         form.image = file;
-        form.clear_image = false; // If new image is selected, don't clear old one
+        form.clear_image = false;
         const reader = new FileReader();
         reader.onload = (e) => {
             imagePreviewUrl.value = e.target.result;
         };
         reader.readAsDataURL(file);
-    } else {
-        form.image = null; // No file selected, clear the form.image
-        // If the user cleared the file input, but didn't check "clear_image",
-        // we should show the original image unless it was explicitly removed.
-        if (!form.clear_image) {
-            imagePreviewUrl.value = props.teacher.image ? `/storage/${props.teacher.image}` : null;
-        } else {
-             imagePreviewUrl.value = null; // If clear_image is true and input is empty
-        }
     }
 };
 
-const handleClearImageCheckbox = () => {
+const handleClearImage = () => {
     if (form.clear_image) {
-        form.image = null; // Clear the selected new image if checkbox is checked
-        imagePreviewUrl.value = null; // Clear image preview
+        form.image = null;
+        imagePreviewUrl.value = null;
     } else {
-        // If unchecking "clear_image", revert to original image if one existed
-        imagePreviewUrl.value = props.teacher.image ? `/storage/${props.teacher.image}` : null;
+        imagePreviewUrl.value = getImageUrl(props.teacher.image);
     }
-    // Also clear file input element itself if clearing the image
-    const fileInput = document.getElementById('image');
-    if (fileInput) {
-        fileInput.value = null;
-    }
+    const input = document.getElementById('image');
+    if (input) input.value = '';
 };
+
+// Watch Class Teacher checkbox
+watch(() => form.is_class_teacher, (val) => {
+    showClassTeacherFields.value = val;
+    if (!val) {
+        form.class_id = '';
+        form.section_id = '';
+        form.group_id = '';
+    }
+});
 
 const submit = () => {
-    // Prepare data for submission.
-    const dataToSend = { ...form.data() };
-
-    dataToSend.user_id = dataToSend.user_id === '' ? null : dataToSend.user_id; // Convert empty string to null
-
-    form.post(route('teachers.update', props.teacher.id), dataToSend, {
-        // Inertia automatically handles _method: 'put' when using form.post for files
-        // For file uploads, we must use POST method, and Inertia will spoof PUT.
+    form.post(route('teachers.update', props.teacher.id), {
+        forceFormData: true,
         onSuccess: () => {
-            // Flash message will appear from controller redirect
-            // Optionally, reset only the image field if you want to allow re-upload easily
-            form.image = null;
-            // If update was successful and image was cleared, update the current_image_path prop
-            if (form.clear_image) {
-                form.current_image_path = null;
-                // Note: props.teacher.image_path will be refreshed by the controller's redirect after update.
-            }
+            Swal.fire({
+                icon: 'success',
+                title: 'Success!',
+                text: 'তথ্য সফলভাবে আপডেট করা হয়েছে!',
+                toast: true,
+                position: 'top-end',
+                showConfirmButton: false,
+                timer: 3000,
+            });
+
+            // Clear sensitive fields
+            form.password = '';
+            form.password_confirmation = '';
+
+            // Clear image preview if you have one
+            imagePreviewUrl.value = getImageUrl(props.teacher.image);
+
+            // Clear HTML file input manually if using a ref
+            if (imageInput.value) imageInput.value.value = '';
         },
         onError: (errors) => {
+            Swal.fire({
+                icon: 'error',
+                title: 'Failed!',
+                text: 'Could not update teacher. Please check the fields.',
+                toast: true,
+                position: 'top-end',
+                showConfirmButton: false,
+                timer: 3000,
+            });
+
             console.error("Teacher update failed:", errors);
         },
     });
+
 };
 </script>
 
@@ -95,104 +128,164 @@ const submit = () => {
 
     <AuthenticatedLayout>
         <template #header>
-            <h2 class="font-semibold text-xl text-gray-800 leading-tight">Edit Teacher: {{ teacher.name }}</h2>
+            <div class="flex items-center justify-between">
+                <h2 class="font-semibold text-xl text-gray-800 dark:text-white leading-tight">
+                    Edit Teacher: {{ teacher.name }}
+                </h2>
+                <Link :href="route('teachers.index')" class="text-sm text-gray-600 hover:text-gray-900 dark:text-gray-400">
+                    Back to Teachers
+                </Link>
+            </div>
         </template>
 
-        <!-- Removed the redundant py-12 div.
-             Changed max-w-xl mx-auto sm:px-6 lg:px-8 to max-w-md and removed mx-auto and explicit px classes. -->
-        <div class="max-w-md sm:px-0 lg:px-0"> <!-- Now relies on AuthenticatedLayout for outer padding -->
-            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
-                <!-- Adjusted inner padding from p-6 to p-4 for a more compact layout -->
-                <div class="p-4 text-gray-900">
-                    <form @submit.prevent="submit" enctype="multipart/form-data">
-                        <div class="mb-4">
-                            <InputLabel for="name" value="Teacher Name" />
-                            <TextInput
-                                id="name"
-                                type="text"
-                                class="mt-1 block w-full"
-                                v-model="form.name"
-                                required
-                                autofocus
-                            />
-                            <InputError class="mt-2" :message="form.errors.name" />
-                        </div>
+        <div class="py-12">
+            <div class="max-w-4xl mx-auto sm:px-6 lg:px-8">
+                <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-2xl sm:rounded-2xl p-8">
+                    <form @submit.prevent="submit" class="space-y-8">
 
-                        <div class="mb-4">
-                            <InputLabel for="user_id" value="Link to Existing User (Optional)" />
-                            <select
-                                id="user_id"
-                                class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm"
-                                v-model="form.user_id"
-                            >
-                                <option value="">-- Select User --</option>
-                                <option v-if="teacher.user_id && !availableUsers.some(u => u.id === teacher.user_id)" :value="teacher.user_id">
-                                    {{ teacher.user.name }} (Currently Linked)
-                                </option>
-                                <option v-for="user in availableUsers" :key="user.id" :value="user.id">
-                                    {{ user.name }}
-                                </option>
-                            </select>
-                            <InputError class="mt-2" :message="form.errors.user_id" />
-                        </div>
-
-                        <div class="mb-4">
-                            <InputLabel for="subject_taught" value="Subject Taught" />
-                            <TextInput
-                                id="subject_taught"
-                                type="text"
-                                class="mt-1 block w-full"
-                                v-model="form.subject_taught"
-                                required
-                            />
-                            <InputError class="mt-2" :message="form.errors.subject_taught" />
-                        </div>
-
-                        <div class="mb-4">
-                            <InputLabel for="image" value="Teacher Image (Optional)" />
-                            <input
-                                type="file"
-                                id="image"
-                                @change="handleImageChange"
-                                class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
-                                accept="image/*"
-                            />
-                            <InputError class="mt-2" :message="form.errors.image" />
-
-                            <div v-if="imagePreviewUrl" class="mt-2">
-                                <p class="text-sm text-gray-600 mb-1">Current Image:</p>
-                                <img :src="imagePreviewUrl" alt="Current Image" class="w-32 h-32 object-cover rounded-md" />
+                        <!-- Personal Information -->
+                        <div class="bg-gray-50 dark:bg-gray-900/50 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
+                            <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-6">Personal Information</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <InputLabel for="name" value="Full Name *" />
+                                    <TextInput id="name" v-model="form.name" type="text" class="mt-1 block w-full" required autofocus />
+                                    <InputError :message="form.errors.name" class="mt-2" />
+                                </div>
+                                <div>
+                                    <InputLabel for="subject_taught" value="Subject Taught *" />
+                                    <TextInput id="subject_taught" v-model="form.subject_taught" type="text" class="mt-1 block w-full" required />
+                                    <InputError :message="form.errors.subject_taught" class="mt-2" />
+                                </div>
+                                <div>
+                                    <InputLabel for="address" value="Address *" />
+                                    <TextInput id="address" v-model="form.address" type="text" class="mt-1 block w-full" required />
+                                    <InputError :message="form.errors.address" class="mt-2" />
+                                </div>
+                                <div>
+                                    <InputLabel for="phone_number" value="Phone Number" />
+                                    <TextInput id="phone_number" v-model="form.phone_number" type="text" class="mt-1 block w-full" />
+                                    <InputError :message="form.errors.phone_number" class="mt-2" />
+                                </div>
+                                <div>
+                                    <InputLabel for="qualification" value="Qualification" />
+                                    <TextInput id="qualification" v-model="form.qualification" type="text" class="mt-1 block w-full" />
+                                    <InputError :message="form.errors.qualification" class="mt-2" />
+                                </div>
+                                <div>
+                                    <InputLabel for="joining_date" value="Joining Date" />
+                                    <TextInput id="joining_date" v-model="form.joining_date" type="date" class="mt-1 block w-full" />
+                                    <InputError :message="form.errors.joining_date" class="mt-2" />
+                                </div>
+                                <div>
+                                    <InputLabel for="designation" value="Designation *" />
+                                    <select v-model="form.designation" required
+                                        class="mt-1 block w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-md shadow-sm focus:ring-teal-500 focus:border-teal-500">
+                                        <option value="Head Teacher">Head Teacher</option>
+                                        <option value="Senior Teacher">Senior Teacher</option>
+                                        <option value="Junior Teacher">Junior Teacher</option>
+                                        <option value="Assistant Teacher">Assistant Teacher</option>
+                                    </select>
+                                    <InputError :message="form.errors.designation" class="mt-2" />
+                                </div>
+                                <div>
+                                    <InputLabel for="status" value="Status *" />
+                                    <select v-model="form.status" required
+                                        class="mt-1 block w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-md shadow-sm focus:ring-teal-500 focus:border-teal-500">
+                                        <option :value="0">Active</option>
+                                        <option :value="1">Inactive</option>
+                                    </select>
+                                    <InputError :message="form.errors.status" class="mt-2" />
+                                </div>
                             </div>
-                            <div v-else-if="!form.image && !form.current_image_path" class="mt-2 text-sm text-gray-500">
-                                No image uploaded.
+                        </div>
+
+                        <!-- Class Teacher Assignment -->
+                        <div class="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-xl p-6">
+                            <label class="flex items-center gap-3 cursor-pointer">
+                                <input type="checkbox" v-model="form.is_class_teacher" class="w-5 h-5 text-emerald-600 rounded focus:ring-emerald-500" />
+                                <span class="text-lg font-medium text-emerald-900 dark:text-emerald-300">
+                                    Is this teacher a <strong>Class Teacher</strong>?
+                                </span>
+                            </label>
+
+                            <div v-if="showClassTeacherFields" class="mt-6 grid grid-cols-1 md:grid-cols-3 gap-6 animate-fade-in">
+                                <div>
+                                    <InputLabel for="class_id" value="Class *" />
+                                    <select v-model="form.class_id" :required="form.is_class_teacher"
+                                        class="mt-1 block w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-md shadow-sm focus:ring-teal-500 focus:border-teal-500">
+                                        <option value="">Select Class</option>
+                                        <option v-for="cls in props.classes" :key="cls.id" :value="cls.id">{{ cls.class_name }}</option>
+                                    </select>
+                                    <InputError :message="form.errors.class_id" class="mt-2" />
+                                </div>
+                                <div>
+                                    <InputLabel for="section_id" value="Section *" />
+                                    <select v-model="form.section_id" :required="form.is_class_teacher"
+                                        class="mt-1 block w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-md shadow-sm focus:ring-teal-500 focus:border-teal-500">
+                                        <option value="">Select Section</option>
+                                        <option v-for="sec in props.sections" :key="sec.id" :value="sec.id">{{ sec.name }}</option>
+                                    </select>
+                                    <InputError :message="form.errors.section_id" class="mt-2" />
+                                </div>
+                                <div>
+                                    <InputLabel for="group_id" value="Group (Optional)" />
+                                    <select v-model="form.group_id"
+                                        class="mt-1 block w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-md shadow-sm focus:ring-teal-500 focus:border-teal-500">
+                                        <option value="">No Group</option>
+                                        <option v-for="grp in props.groups" :key="grp.id" :value="grp.id">{{ grp.name }}</option>
+                                    </select>
+                                    <InputError :message="form.errors.group_id" class="mt-2" />
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Password Update -->
+                        <div class="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-6">
+                            <h3 class="text-lg font-semibold text-amber-900 dark:text-amber-300 mb-6">Update Password (Optional)</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <InputLabel for="password" value="New Password" />
+                                    <TextInput id="password" v-model="form.password" type="password" placeholder="Leave blank to keep current" class="mt-1 block w-full" />
+                                    <InputError :message="form.errors.password" class="mt-2" />
+                                </div>
+                                <div>
+                                    <InputLabel for="password_confirmation" value="Confirm Password" />
+                                    <TextInput id="password_confirmation" v-model="form.password_confirmation" type="password" class="mt-1 block w-full" />
+                                    <InputError :message="form.errors.password_confirmation" class="mt-2" />
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Image Upload -->
+                        <div class="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-xl p-6">
+                            <h3 class="text-lg font-semibold text-purple-900 dark:text-purple-300 mb-4">Teacher Photo</h3>
+                            <input type="file" id="image" @change="handleImageChange" accept="image/*"
+                                class="block w-full text-sm text-gray-900 border border-gray-300 rounded-lg cursor-pointer bg-white dark:bg-gray-700 focus:outline-none file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100" />
+
+                            <div v-if="imagePreviewUrl" class="mt-4">
+                                <p class="text-sm text-gray-600 dark:text-gray-400 mb-2">Current Preview:</p>
+                                <img :src="imagePreviewUrl" alt="Preview" class="w-32 h-32 object-cover rounded-lg shadow-lg border-4 border-white dark:border-gray-800" />
                             </div>
 
-                            <div v-if="form.image" class="mt-2">
-                                <label class="flex items-center">
-                                    <Checkbox v-model:checked="form.clear_image" name="clear_image" @change="handleClearImageCheckbox" />
-                                    <span class="ms-2 text-sm text-gray-600">Remove Current Image</span>
+                            <div v-if="props.teacher.image || form.image" class="mt-4">
+                                <label class="flex items-center cursor-pointer">
+                                    <Checkbox v-model:checked="form.clear_image" @change="handleClearImage" />
+                                    <span class="ml-3 text-sm text-gray-700 dark:text-gray-300">Remove current photo</span>
                                 </label>
                             </div>
+
+                            <InputError :message="form.errors.image" class="mt-2" />
                         </div>
 
-                        <div class="mt-4">
-                            <InputLabel for="status" value="Status" />
-                            <select
-                                id="status"
-                                class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm"
-                                v-model="form.status"
-                                required
-                            >
-                                <option :value="0">Active</option>
-                                <option :value="1">Inactive</option>
-                            </select>
-                            <InputError class="mt-2" :message="form.errors.status" />
-                        </div>
-
-                        <div class="flex items-center justify-end mt-4">
-                            <Link :href="route('teachers.index')" class="text-gray-600 hover:text-gray-900 mr-4">Cancel</Link>
-                            <PrimaryButton :class="{ 'opacity-25': form.processing }" :disabled="form.processing">
-                                Update Teacher
+                        <!-- Submit -->
+                        <div class="flex items-center justify-end gap-4 pt-6 border-t border-gray-200 dark:border-gray-700">
+                            <Link :href="route('teachers.index')" class="text-sm text-gray-600 hover:text-gray-900 dark:text-gray-400">
+                                Cancel
+                            </Link>
+                            <PrimaryButton :disabled="form.processing"
+                                class="bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white font-medium px-8">
+                                {{ form.processing ? 'Updating...' : 'Update Teacher' }}
                             </PrimaryButton>
                         </div>
                     </form>
@@ -203,5 +296,11 @@ const submit = () => {
 </template>
 
 <style scoped>
-/* No specific styles needed beyond TailwindCSS for this component */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in {
+    animation: fadeIn 0.4s ease-out;
+}
 </style>

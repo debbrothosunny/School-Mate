@@ -20,6 +20,8 @@ return new class extends Migration
             
             $table->string('description'); // e.g., "Tuition Fee - July 2025", "Annual Lab Fee", "Late Fee for July Tuition"
             $table->integer('amount'); // Amount for this specific item
+            // CRITICAL ADDITION: Tracks how much of this specific line item is still due.
+            $table->integer('balance_due')->comment('Amount remaining due for this specific item.');
 
             $table->timestamps();
         });

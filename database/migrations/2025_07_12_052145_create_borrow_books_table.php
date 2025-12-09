@@ -13,16 +13,24 @@ return new class extends Migration
     {
         Schema::create('borrow_books', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('book_id')->constrained('books')->onDelete('cascade');
-            $table->foreignId('student_id')->constrained('students')->onDelete('cascade'); // Assuming students table exists
-            $table->date('borrow_date');
-            $table->date('return_date')->nullable(); // Null if not yet returned
-            $table->integer('status')->default('0'); // '(0)borrowed', '(1)returned', '(2)overdue', '(3)lost'
 
-            // Optional: Add unique constraint to prevent a student from borrowing the same book multiple times simultaneously
-            // This would require a more complex check if a student can borrow multiple copies of the same book
-            // For simplicity, this unique constraint means one student can borrow one copy at a time.
-            $table->unique(['book_id', 'student_id', 'return_date'], 'unique_borrow_per_student_book');
+            // Book Details
+            $table->foreignId('book_id')->constrained()->onDelete('cascade');
+            
+            // Student Details (as input by the admin)
+            $table->string('student_name', 255);
+            $table->string('admission_number', 50)->index();
+            $table->string('class_name', 50); // e.g., '10-A'
+
+            // Borrow Details
+            $table->unsignedSmallInteger('quantity')->default(1); // How many copies are borrowed
+            $table->date('borrow_date');
+            $table->date('due_date');
+            $table->date('return_date')->nullable(); // Null until the book is returned
+            
+            // Status: 0=Borrowed, 1=Returned, 2=Overdue, 3=Cancelled/Lost
+            $table->unsignedTinyInteger('status')->default(0); 
+
             $table->timestamps();
         });
     }

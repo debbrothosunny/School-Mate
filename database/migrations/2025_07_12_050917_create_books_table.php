@@ -21,7 +21,6 @@ return new class extends Migration
             $table->integer('quantity')->default(0); // Total number of copies
             $table->integer('available_quantity')->default(0); // Number of currently available copies
             $table->string('genre')->nullable(); // e.g., Fiction, Science, History
-            $table->string('cover_image_path')->nullable(); // Path to book cover image
             $table->boolean('status')->default(0); // 0 for active, 1 for inactive
             $table->timestamps();
         });

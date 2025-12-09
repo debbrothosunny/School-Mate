@@ -22,6 +22,7 @@ class BusSchedule extends Model
     // Define relationship with ClassName model
     public function className()
     {
-        return $this->belongsTo(ClassName::class);
+        // The second argument specifies the foreign key column.
+        return $this->belongsTo(ClassName::class, 'class_id');
     }
 }

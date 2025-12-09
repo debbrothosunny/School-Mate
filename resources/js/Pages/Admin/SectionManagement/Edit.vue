@@ -5,9 +5,7 @@ import InputLabel from '@/Components/InputLabel.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
 import { Head, useForm, Link } from '@inertiajs/vue3';
-import { useTheme } from '@/Composables/useTheme';
 
-const { isDark } = useTheme();
 
 const props = defineProps({
   section: Object,
@@ -20,14 +18,34 @@ const form = useForm({
 
 const submit = () => {
   form.post(route('sections.update', props.section.id), {
+    forceFormData: true, // Optional, in case you add file inputs later
     onSuccess: () => {
-      // Optional success handling
+      Swal.fire({
+        icon: 'success',
+        title: 'Success!',
+        text: 'সেকশন সফলভাবে আপডেট করা হয়েছে!',
+        toast: true,
+        position: 'top-end',
+        showConfirmButton: false,
+        timer: 3000,
+      });
+      form.reset(); // Optional: reset the form fields after update
     },
     onError: (errors) => {
-      console.error("Update failed:", errors);
+      Swal.fire({
+        icon: 'error',
+        title: 'Failed!',
+        text: 'Could not update section. Please check the fields.',
+        toast: true,
+        position: 'top-end',
+        showConfirmButton: false,
+        timer: 3000,
+      });
+      console.error("Section update failed:", errors);
     },
   });
 };
+
 </script>
 
 <template>

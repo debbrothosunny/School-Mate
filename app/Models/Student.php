@@ -34,6 +34,7 @@ class Student extends Model
         'admission_fee_amount',
         'admission_fee_paid',
         'payment_method',
+        'blood_group', 
     ];
 
     /**
@@ -47,7 +48,7 @@ class Student extends Model
         'status' => 'integer',
     ];
 
-    
+
 
     // Relationship: A Student belongs to a ClassName (e.g., 'Class 1')
     public function className(): BelongsTo
@@ -85,9 +86,10 @@ class Student extends Model
         return $this->belongsTo(User::class);
     }
 
-        /**
+    /**
      * Get the borrow records for the student.
-     */
+    */
+    
     public function borrowRecords(): HasMany
     {
         return $this->hasMany(BorrowBook::class);
@@ -124,6 +126,41 @@ class Student extends Model
     {
         return $this->hasMany(ExamResult::class, 'student_id');
     }
+
+
+    // In Student Model
+public function getBase64ImageAttribute()
+{
+    $imageFile = $this->image;
+    $studentImagePath = public_path('uploads/students/' . $imageFile);
+
+    // Check if image is set AND file exists
+    if (!empty($imageFile) && file_exists($studentImagePath)) {
+        $path = $studentImagePath;
+    } else {
+        // Fallback: This path must exist or the PDF will break again!
+        // For production, you must ensure this fallback image exists.
+        $path = public_path('images/placeholder.png'); 
+    }
+    
+    // Safety check for file_get_contents
+    if (!file_exists($path)) {
+        // If even the fallback is missing, return empty data
+        return [
+            'src' => '',
+            'alt' => 'Image missing on server.',
+        ];
+    }
+
+    $imageData = base64_encode(file_get_contents($path));
+    $imageExtension = pathinfo($path, PATHINFO_EXTENSION);
+    $mimeType = ($imageExtension == 'png' ? 'image/png' : 'image/jpeg');
+
+    return [
+        'src' => 'data:' . $mimeType . ';base64,' . $imageData,
+        'alt' => $this->name . ' Photo',
+    ];
+}
 
     
 }

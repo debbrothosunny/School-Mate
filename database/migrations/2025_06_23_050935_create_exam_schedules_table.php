@@ -17,6 +17,10 @@ return new class extends Migration
             $table->foreignId('class_id')->constrained('class_names')->onDelete('cascade');
             $table->foreignId('section_id')->constrained('sections')->onDelete('cascade');
             $table->foreignId('session_id')->constrained('class_sessions')->onDelete('cascade');
+            
+            // NEW: Added group_id foreign key
+            $table->foreignId('group_id')->nullable()->constrained('groups')->onDelete('set null');
+            
             $table->foreignId('teacher_id')->nullable()->constrained('teachers')->onDelete('set null');
             $table->foreignId('subject_id')->constrained('subjects')->onDelete('cascade');
             $table->foreignId('room_id')->nullable()->constrained('rooms')->onDelete('set null');
@@ -26,7 +30,9 @@ return new class extends Migration
 
             $table->date('exam_date');
             $table->string('day_of_week');
-            $table->tinyInteger('status')->default(0)->comment('0=Active, 1=Canceled, 2=Rescheduled');
+            
+            // ADJUSTED: Status column (0=Active, 1=Inactive)
+            $table->tinyInteger('status')->default(0);
 
             $table->timestamps();
 
@@ -35,8 +41,12 @@ return new class extends Migration
             $table->unique(['room_id', 'exam_date', 'exam_slot_id'], 'exam_schedule_room_time_unique');
             // 2. A teacher cannot be assigned to two exams at the same time on the same date.
             $table->unique(['teacher_id', 'exam_date', 'exam_slot_id'], 'exam_schedule_teacher_time_unique');
-            // 3. A specific exam cannot be scheduled multiple times for the same date and time slot.
-            $table->unique(['exam_id', 'class_id', 'section_id', 'session_id', 'subject_id', 'exam_date', 'exam_slot_id'], 'exam_schedule_exam_time_unique');
+            // 3. A specific exam cannot be scheduled multiple times for the same date and time slot 
+            //    (Group ID added to the constraint).
+            $table->unique(
+                ['exam_id', 'class_id', 'section_id', 'session_id', 'group_id', 'subject_id', 'exam_date', 'exam_slot_id'], 
+                'exam_schedule_exam_time_unique'
+            );
         });
     }
 

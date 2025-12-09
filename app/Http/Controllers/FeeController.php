@@ -8,17 +8,18 @@ use App\Models\ClassName;
 use App\Models\ClassSession;
 use App\Models\Group;
 use App\Models\Section;
+use App\Models\Setting;
 use App\Models\User;
 use App\FeeFrequency; 
 use App\Notifications\InvoiceCreated;
 use App\Notifications\StudentPaymentReceived;
 use App\Models\StudentFeeAssignment;
+use Illuminate\Validation\ValidationException;
 use App\Models\FeeType;
 use App\Models\Student;
 use App\Models\Invoice;
 use App\Models\Payment;
 use Inertia\Inertia;
-use Illuminate\Support\Facades\Redirect;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -26,6 +27,8 @@ use Barryvdh\DomPDF\Facade\Pdf; // Import the DomPDF Facade
 use Illuminate\Validation\Rule; // For unique validation
 class FeeController extends Controller
 {
+
+    // Class Fee Structure Functions
     public function index()
     {
         // Fetch all class fee structures with their relationships for display
@@ -46,11 +49,21 @@ class FeeController extends Controller
     */
     public function create()
     {
-        // Provide necessary data for dropdowns
-        $classes = ClassName::orderBy('class_name')->get(); // Adjust 'class_name' if your column is different
-        $sessions = ClassSession::orderBy('name')->get();
-        $groups = Group::orderBy('name')->get();
-        $sections = Section::orderBy('name')->get();
+        // Fetch unique class names with the first corresponding id, sorted by class_name
+        $classes = ClassName::where('status', 0)
+            ->select('id', 'class_name')
+            ->whereIn('id', function ($query) {
+                $query->select(DB::raw('MIN(id)'))
+                    ->from('class_names')
+                    ->where('status', 0)
+                    ->groupBy('class_name');
+            })
+            ->orderBy('class_name')
+            ->get();
+
+        $sessions = ClassSession::where('status', 0)->orderBy('name')->get(['id', 'name']);
+        $groups = Group::where('status', 0)->orderBy('name')->get(['id', 'name']);
+        $sections = Section::where('status', 0)->orderBy('name')->get(['id', 'name']);
         $feeTypes = FeeType::where('status', 0)->orderBy('name')->get(); // Only active fee types
 
         return Inertia::render('Accountant/ClassFeeStructures/Create', [
@@ -101,13 +114,25 @@ class FeeController extends Controller
     /**
      * Show the form for editing the specified class fee structure.
     */
+
     public function edit(ClassFeeStructure $classFeeStructure)
     {
-        $classes = ClassName::orderBy('class_name')->get();
-        $sessions = ClassSession::orderBy('name')->get();
-        $groups = Group::orderBy('name')->get();
-        $sections = Section::orderBy('name')->get();
-        $feeTypes = FeeType::where('status', 0)->orderBy('name')->get();
+        // Fetch unique class names with the first corresponding id, sorted by class_name
+        $classes = ClassName::where('status', 0)
+            ->select('id', 'class_name')
+            ->whereIn('id', function ($query) {
+                $query->select(DB::raw('MIN(id)'))
+                    ->from('class_names')
+                    ->where('status', 0)
+                    ->groupBy('class_name');
+            })
+            ->orderBy('class_name')
+            ->get();
+
+        $sessions = ClassSession::where('status', 0)->orderBy('name')->get(['id', 'name']);
+        $groups = Group::where('status', 0)->orderBy('name')->get(['id', 'name']);
+        $sections = Section::where('status', 0)->orderBy('name')->get(['id', 'name']);
+        $feeTypes = FeeType::where('status', 0)->orderBy('name')->get(); // Only active fee types
 
         return Inertia::render('Accountant/ClassFeeStructures/Edit', [
             'classFeeStructure' => $classFeeStructure,
@@ -176,15 +201,15 @@ class FeeController extends Controller
 
 
 
-    // 
+    // Student Fee Assignment Functions
 
     public function StudentFeeAssignmentIndex()
     {
         // Fetch all student fee assignments with their relationships for display
-        $studentFeeAssignments = StudentFeeAssignment::with('student', 'feeType')
-                                                    ->orderBy('student_id')
-                                                    ->orderBy('fee_type_id')
-                                                    ->paginate(10); // Or adjust pagination limit
+        $studentFeeAssignments = StudentFeeAssignment::with('student', 'feeType', 'class', 'section', 'session')
+        ->orderBy('student_id')
+        ->orderBy('fee_type_id')
+        ->paginate(10);
 
         return Inertia::render('Accountant/StudentFeeAssignments/Index', [
             'studentFeeAssignments' => $studentFeeAssignments,
@@ -198,11 +223,21 @@ class FeeController extends Controller
     */
     public function StudentFeeAssignmentCreate()
     {
-        // Provide all necessary data for the filter dropdowns in the bulk assignment form
-        $classes = ClassName::orderBy('class_name')->get(); // Adjust 'name' if your column is 'class_name'
-        $sessions = ClassSession::orderBy('name')->get();
-        $groups = Group::orderBy('name')->get();
-        $sections = Section::orderBy('name')->get();
+        // Fetch unique class names with the first corresponding id, sorted by class_name
+        $classes = ClassName::where('status', 0)
+            ->select('id', 'class_name')
+            ->whereIn('id', function ($query) {
+                $query->select(DB::raw('MIN(id)'))
+                    ->from('class_names')
+                    ->where('status', 0)
+                    ->groupBy('class_name');
+            })
+            ->orderBy('class_name')
+            ->get();
+
+        $sessions = ClassSession::where('status', 0)->orderBy('name')->get(['id', 'name']);
+        $groups = Group::where('status', 0)->orderBy('name')->get(['id', 'name']);
+        $sections = Section::where('status', 0)->orderBy('name')->get(['id', 'name']);
         $feeTypes = FeeType::where('status', 0)->orderBy('name')->get(); // Only active fee types
 
         // Render the new bulk assignment component
@@ -212,7 +247,6 @@ class FeeController extends Controller
             'groups' => $groups,
             'sections' => $sections,
             'feeTypes' => $feeTypes,
-          
         ]);
     }
 
@@ -221,21 +255,76 @@ class FeeController extends Controller
      * This method is for your original single assignment form if it still exists.
      * If you are fully switching to bulk, you might remove the old single assignment form/route.
     */
-    public function StudentFeeAssignmentStore(Request $request)
+    public function StudentFeeAssignmentBulkStore(Request $request)
     {
+        // 1. Validate the bulk request
         $validated = $request->validate([
-            'student_id' => 'required|exists:students,id',
+            'student_ids' => 'required|array', // Expect an array of student IDs
+            'student_ids.*' => 'required|exists:students,id', // Each ID must exist
             'fee_type_id' => 'required|exists:fee_types,id',
-            'applies_from' => 'required|date',
-            'applies_to' => 'nullable|date|after_or_equal:applies_from',
-            'status' => 'required|boolean', // 0 for active, 1 for inactive
+            'session_id' => 'required|exists:class_sessions,id',
+            'class_id' => 'required|exists:class_names,id',
+            'section_id' => 'required|exists:sections,id',
+            'status' => 'required|boolean',
         ]);
 
-        StudentFeeAssignment::create($validated);
+        $studentIdsToAssign = $validated['student_ids'];
+        $assignmentData = [
+            'fee_type_id' => $validated['fee_type_id'],
+            'session_id' => $validated['session_id'],
+            'class_id' => $validated['class_id'],
+            'section_id' => $validated['section_id'],
+            'status' => $validated['status'],
+        ];
 
+        // 2. Check for existing assignments (the core of your request)
+        $existingAssignments = StudentFeeAssignment::where('fee_type_id', $assignmentData['fee_type_id'])
+            ->where('session_id', $assignmentData['session_id'])
+            ->where('class_id', $assignmentData['class_id'])
+            ->where('section_id', $assignmentData['section_id'])
+            ->whereIn('student_id', $studentIdsToAssign)
+            ->pluck('student_id')
+            ->toArray();
+
+        // Determine which student IDs are *not* already assigned
+        $newStudentIds = array_diff($studentIdsToAssign, $existingAssignments);
+
+        $assignmentsToCreate = [];
+        foreach ($newStudentIds as $studentId) {
+            $assignmentsToCreate[] = array_merge($assignmentData, ['student_id' => $studentId]);
+        }
+
+        $totalStudentsAssigned = count($newStudentIds);
+        $totalStudentsSkipped = count($existingAssignments);
+        $message = '';
+        
+        // 3. Insert the new assignments
+        if ($totalStudentsAssigned > 0) {
+            // Use insert for efficiency with multiple records
+            StudentFeeAssignment::insert($assignmentsToCreate);
+            $message = "Successfully assigned fees to {$totalStudentsAssigned} students.";
+        }
+
+        if ($totalStudentsSkipped > 0) {
+            $skippedMessage = "Skipped {$totalStudentsSkipped} students as the fee was already assigned.";
+            // Append a warning if some were skipped
+            $message .= ($message ? ' ' : '') . $skippedMessage;
+            $flashType = ($totalStudentsAssigned > 0) ? 'warning' : 'error';
+        } else {
+            $flashType = 'success';
+        }
+
+        if ($totalStudentsAssigned == 0 && $totalStudentsSkipped == 0) {
+            // Should not happen if validation passes, but good to handle.
+            return redirect()->back()->with('flash', [
+                'type' => 'error',
+                'message' => 'No students selected for assignment.',
+            ]);
+        }
+        
         return redirect()->route('student-fee-assignments.index')->with('flash', [
-            'type' => 'success',
-            'message' => 'Student Fee Assignment created successfully!',
+            'type' => $flashType,
+            'message' => $message,
         ]);
     }
 
@@ -262,8 +351,6 @@ class FeeController extends Controller
         $validated = $request->validate([
             'student_id' => 'required|exists:students,id',
             'fee_type_id' => 'required|exists:fee_types,id',
-            'applies_from' => 'required|date',
-            'applies_to' => 'nullable|date|after_or_equal:applies_from',
             'status' => 'required|boolean',
         ]);
 
@@ -293,6 +380,7 @@ class FeeController extends Controller
             ]);
         }
     }
+
 
     /**
      * API function to fetch students by their academic context.
@@ -327,36 +415,88 @@ class FeeController extends Controller
     /**
      * API function to handle the bulk creation of student fee assignments.
      * This will be called when you submit the new bulk assignment form.
-     */
+    */
     public function bulkStoreAssignments(Request $request)
     {
+        // 1. Validate the bulk request: Must include all required foreign keys
         $validated = $request->validate([
             'student_ids' => 'required|array',
             'student_ids.*' => 'exists:students,id',
             'fee_type_id' => 'required|exists:fee_types,id',
-            'applies_from' => 'required|date',
-            'applies_to' => 'nullable|date|after_or_equal:applies_from',
+            'session_id' => 'required|exists:class_sessions,id',
+            'class_id' => 'required|exists:class_names,id',
+            'section_id' => 'required|exists:sections,id',
             'status' => 'required|boolean',
         ]);
 
-        // Loop through each student to create an assignment
-        foreach ($validated['student_ids'] as $studentId) {
-            StudentFeeAssignment::create([
+        $studentIdsToAssign = $validated['student_ids'];
+        
+        // Base data for the assignment (excluding student_id, timestamps)
+        $assignmentData = [
+            'fee_type_id' => $validated['fee_type_id'],
+            'session_id' => $validated['session_id'],
+            'class_id' => $validated['class_id'],
+            'section_id' => $validated['section_id'],
+            'status' => $validated['status'],
+        ];
+
+        // 2. Check for existing assignments (Duplicate Check)
+        $existingAssignments = StudentFeeAssignment::where('fee_type_id', $assignmentData['fee_type_id'])
+            ->where('session_id', $assignmentData['session_id'])
+            ->where('class_id', $assignmentData['class_id'])
+            ->where('section_id', $assignmentData['section_id'])
+            ->whereIn('student_id', $studentIdsToAssign)
+            ->pluck('student_id')
+            ->toArray();
+
+        // Determine which student IDs are *not* already assigned
+        $newStudentIds = array_diff($studentIdsToAssign, $existingAssignments);
+
+        $assignmentsToCreate = [];
+        $now = now(); // *** CRITICAL: Get the timestamp once ***
+
+        foreach ($newStudentIds as $studentId) {
+            $assignmentsToCreate[] = array_merge($assignmentData, [
                 'student_id' => $studentId,
-                'fee_type_id' => $validated['fee_type_id'],
-                'applies_from' => $validated['applies_from'],
-                'applies_to' => $validated['applies_to'],
-                'status' => $validated['status'],
+                'created_at' => $now, // *** CRITICAL: Manually add timestamps for insert() ***
+                'updated_at' => $now, // *** CRITICAL: Manually add timestamps for insert() ***
             ]);
         }
 
+        $totalStudentsAssigned = count($newStudentIds);
+        $totalStudentsSkipped = count($existingAssignments);
+        $message = '';
+        $flashType = 'success';
+
+        // 3. Insert the new assignments efficiently (Bulk Insert)
+        if ($totalStudentsAssigned > 0) {
+            StudentFeeAssignment::insert($assignmentsToCreate);
+            $message = "Successfully assigned fees to {$totalStudentsAssigned} students.";
+        }
+
+        // 4. Handle feedback for skipped students
+        if ($totalStudentsSkipped > 0) {
+            $skippedMessage = "Skipped {$totalStudentsSkipped} students as the fee was already assigned.";
+            
+            if ($totalStudentsAssigned > 0) {
+                $message .= " " . $skippedMessage;
+                $flashType = 'warning';
+            } else {
+                $message = $skippedMessage . " No new assignments were created.";
+                $flashType = 'error';
+            }
+        }
+        
+        if (empty($message)) {
+             $message = 'No students were selected for assignment.';
+             $flashType = 'error';
+        }
+
         return redirect()->route('student-fee-assignments.index')->with('flash', [
-            'type' => 'success',
-            'message' => 'student fee assignments created successfully!',
+            'type' => $flashType,
+            'message' => $message,
         ]);
     }
-
-
 
 
 
@@ -482,20 +622,34 @@ class FeeController extends Controller
     // ==========================INVOICE========================================= 
     // ====================================================================
 
-
     public function invoiceIndex()
     {
-        $paginator = Invoice::with([
-            'student:id,name,class_id,section_id,session_id,group_id',
+        // Get the class_name filter from the request, if any
+        $classNameFilter = request()->query('class_name');
+
+        // Build the invoice query with eager loading
+        $query = Invoice::with([
+            'student:id,name,class_id,section_id,session_id,group_id', // Fixed: session_id
             'student.className:id,class_name',
             'student.section:id,name',
             'student.session:id,name',
             'student.group:id,name',
             'invoiceItems.feeType:id,name',
             'payments:id,invoice_id,amount',
-        ])->orderBy('issued_at', 'desc')->paginate(10);
+        ])->orderBy('issued_at', 'desc');
 
-        // Transform each item (Laravel 10+ supports through() on paginator)
+        // Apply class_name filter if provided
+        if ($classNameFilter) {
+            $query->whereHas('student.className', function ($q) use ($classNameFilter) {
+                $q->whereRaw('LOWER(class_name) = ?', [strtolower($classNameFilter)]);
+            });
+            \Log::info('Filtered invoices count for class_name ' . $classNameFilter . ': ' . $query->count());
+        }
+
+        // Paginate the results
+        $paginator = $query->paginate(10)->withQueryString();
+
+        // Transform the invoices
         $invoices = $paginator->through(function ($invoice) {
             return [
                 'id' => $invoice->id,
@@ -506,11 +660,10 @@ class FeeController extends Controller
                 'total_amount_due' => $invoice->total_amount_due,
                 'amount_paid' => $invoice->amount_paid,
                 'balance_due' => $invoice->balance_due,
-
                 'student' => [
                     'id' => optional($invoice->student)->id,
                     'name' => optional($invoice->student)->name,
-                    'class_name' => optional(optional($invoice->student)->className)->name,
+                    'class_name' => optional(optional($invoice->student)->className)->class_name,
                     'section_name' => optional(optional($invoice->student)->section)->name,
                     'session_name' => optional(optional($invoice->student)->session)->name,
                     'group_name' => optional(optional($invoice->student)->group)->name,
@@ -518,9 +671,17 @@ class FeeController extends Controller
             ];
         });
 
+        // Fetch all class names for the filter dropdown
+        $classNames = ClassName::orderBy('class_name')->pluck('class_name')->unique()->values();
+        \Log::info('Class names for dropdown: ' . json_encode($classNames));
+
         return Inertia::render('Accountant/Invoice/InvoiceIndex', [
             'invoices' => $invoices,
+            'classNames' => $classNames,
             'flash' => session('flash'),
+            'filters' => [
+                'class_name' => $classNameFilter,
+            ],
         ]);
     }
 
@@ -529,12 +690,24 @@ class FeeController extends Controller
      * Renders the page for creating a new invoice.
      * This method now passes the necessary data for the academic context dropdowns.
     */
+
     public function invoiceCreate()
     {
-        $classes = ClassName::all(['id', 'class_name']);
-        $sessions = ClassSession::all(['id', 'name']);
-        $groups = Group::all(['id', 'name']);
-        $sections = Section::all(['id', 'name']);
+        // Fetch unique class names with the first corresponding id
+        $classes = ClassName::where('status', 0)
+            ->select('id', 'class_name')
+            ->whereIn('id', function ($query) {
+                $query->select(DB::raw('MIN(id)'))
+                    ->from('class_names')
+                    ->where('status', 0)
+                    ->groupBy('class_name');
+            })
+            ->orderBy('class_name')
+            ->get();
+
+        $sessions = ClassSession::where('status', 0)->get(['id', 'name']);
+        $groups = Group::where('status', 0)->get(['id', 'name']);
+        $sections = Section::where('status', 0)->get(['id', 'name']);
 
         return Inertia::render('Accountant/Invoice/CreateInvoice', [
             'classes' => $classes,
@@ -543,6 +716,7 @@ class FeeController extends Controller
             'sections' => $sections,
         ]);
     }
+
 
     /**
      * Handles the form submission to create the invoice.
@@ -592,6 +766,8 @@ class FeeController extends Controller
                         'fee_type_id' => $feeTypeId,
                         'description' => $description,
                         'amount' => $amount,
+                        // ✨ CRITICAL FIX: Set balance_due to the full amount initially.
+                        'balance_due' => $amount,
                     ];
                     $totalAmount += $amount;
                 } else {
@@ -617,6 +793,7 @@ class FeeController extends Controller
                     'billing_period' => $validated['billing_period'] ?? now()->format('F Y'),
                 ]);
 
+                // This should now successfully create line items with the correct balance_due
                 $invoice->invoiceItems()->createMany($invoiceItemsData);
             });
 
@@ -635,6 +812,128 @@ class FeeController extends Controller
         }
     }
 
+
+    public function invoiceEdit(Invoice $invoice)
+    {
+        // Eager load necessary data for the edit form, matching the relationships
+        // used in your invoiceIndex method for visibility.
+        $invoice->load([
+            // Student details and their related academic names
+            'student:id,name,class_id,section_id,session_id,group_id', 
+            'student.className:id,class_name',
+            'student.section:id,name',
+            'student.session:id,name',
+            'student.group:id,name',
+
+            // Invoice Items and the Fee Type name for display
+            'invoiceItems.feeType:id,name', 
+        ]);
+
+        // Fetch all lists needed for dropdowns (Fee Types and academic context)
+        $feeTypes = FeeType::where('status', 0)->get(['id', 'name']);
+        
+        $classes = ClassName::where('status', 0)->get(['id', 'class_name']);
+        $sessions = ClassSession::where('status', 0)->get(['id', 'name']);
+        $groups = Group::where('status', 0)->get(['id', 'name']);
+        $sections = Section::where('status', 0)->get(['id', 'name']);
+        
+        return Inertia::render('Accountant/Invoice/InvoiceEdit', [
+            'invoice' => $invoice,
+            'feeTypes' => $feeTypes,
+            'classes' => $classes,
+            'sessions' => $sessions,
+            'groups' => $groups,
+            'sections' => $sections,
+        ]);
+    }
+
+
+    public function invoiceUpdate(Request $request, Invoice $invoice) // <-- CHANGED: Now using base Request
+    {
+        // 1. MANUAL VALIDATION: Replace $request->validated() with $request->validate()
+        $validated = $request->validate([
+            'due_date' => ['required', 'date'],
+            // Although removed from Vue, kept for completeness based on your provided block:
+            // The request will fail if the front-end doesn't send this data and it's required.
+            'issued_at' => ['nullable', 'date'], 
+
+            // Validation for invoice items array
+            'items' => ['required', 'array', 'min:1'],
+            'items.*.id' => ['nullable', 'integer', 'exists:invoice_items,id'],
+            'items.*.fee_type_id' => ['required', 'integer', 'exists:fee_types,id'],
+            'items.*.amount' => ['required', 'numeric', 'min:0'],
+        ]);
+        
+        // Use a database transaction to ensure atomicity
+        DB::beginTransaction();
+
+        try {
+            // 2. Update the main invoice header fields
+            $invoice->update([
+                'due_date' => $validated['due_date'],
+                // These fields are included based on the validation rules we defined above
+                'issued_at' => $validated['issued_at'] ?? null, 
+            ]);
+
+            // 3. Sync Invoice Items (Fixed Items from Vue component are sent here)
+            $invoiceItemsData = [];
+            $newTotalAmountDue = 0;
+
+            // $validated['items'] is now available
+            foreach ($validated['items'] as $item) {
+                $amount = (float) $item['amount'];
+                $newTotalAmountDue += $amount;
+
+                // Ensure only existing IDs are passed for syncing existing items
+                if (isset($item['id'])) {
+                    $invoiceItemsData[] = [
+                        'id' => $item['id'],
+                        'fee_type_id' => $item['fee_type_id'],
+                        'amount' => $amount,
+                    ];
+                }
+            }
+            
+            // Update the existing items
+            foreach ($invoiceItemsData as $itemData) {
+                if (isset($itemData['id'])) {
+                    $invoice->invoiceItems()->where('id', $itemData['id'])->update($itemData);
+                }
+            }
+            
+            // 4. Update final calculated totals on the main invoice
+            $invoice->update([
+                'total_amount_due' => $newTotalAmountDue,
+                // balance_due must be recalculated: new total - amount already paid
+                'balance_due' => $newTotalAmountDue - $invoice->amount_paid,
+            ]);
+            
+            DB::commit();
+
+            // Success Response
+            return redirect()->route('admin.invoices.index', $invoice)
+                ->with('flash', [
+                    'message' => "Invoice #{$invoice->invoice_number} successfully updated.",
+                    'type' => 'success'
+                ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error("Invoice update failed for #{$invoice->invoice_number}: " . $e->getMessage());
+
+            // Error Response
+            return redirect()->back()
+                ->with('flash', [
+                    'message' => 'Failed to update invoice. Please check logs for details.',
+                    'type' => 'error'
+                ]);
+        }
+    }
+
+
+
+
+    
 
 
     
@@ -700,31 +999,201 @@ class FeeController extends Controller
 
 
 
+    // Accountant Payment Collection Functions
+    // In your controller's collectPayment method
+
+    public function collectPayment(Request $request)
+    {
+        $search = $request->input('search');
+
+        $students = Student::query()
+            ->with([
+                'invoices' => function($query) {
+                    // Eager load the payments for each invoice
+                    $query->with('payments');
+                }, 
+                'className',  // Ensure this matches your relationship method name
+                'section', 
+                'group', 
+                'session'
+            ])
+            ->when($search, function ($query, $search) {
+                $query->where('name', 'like', "%{$search}%")
+                    ->orWhere('admission_number', 'like', "%{$search}%");
+            })
+            ->get()
+            ->map(function ($student) {
+                return [
+                    'id' => $student->id,
+                    'name' => $student->name,
+                    'admission_number' => $student->admission_number,
+                    'class_name' => optional($student->studentClass)->name, 
+                    'section' => optional($student->section)->name,
+                    'session' => optional($student->session)->name,
+                    'group' => optional($student->group)->name,
+                    'invoices' => $student->invoices->map(function ($invoice) {
+                        return [
+                            'id' => $invoice->id,
+                            'invoice_number' => $invoice->invoice_number,
+                            'total_amount_due' => $invoice->total_amount_due,
+                            'amount_paid' => $invoice->amount_paid,
+                            'balance_due' => $invoice->balance_due,
+                            'status' => $invoice->status,
+                            // Include the payments data here
+                            'payments' => $invoice->payments->map(function ($payment) {
+                                return [
+                                    'id' => $payment->id,
+                                    'amount' => $payment->amount,
+                                    'method' => $payment->method,
+                                    'payment_date' => $payment->payment_date,
+                                ];
+                            })
+                        ];
+                    })
+                ];
+            });
+
+        return Inertia::render('Accountant/Payments/CollectPayment', [
+            'students' => $students,
+            'filters' => [
+                'search' => $search,
+            ],
+            'flash' => session('flash'),
+        ]);
+    }
 
 
-    
-    // You can add more functions here to show all invoices, edit them, etc.
+
+
+    public function storePayment(Request $request)
+    {
+        // Find the invoice first to get its current balance.
+        $invoice = Invoice::findOrFail($request->invoice_id);
+        $currentBalanceDue = $invoice->balance_due;
+
+        // Validate the incoming request data, including the custom rule.
+        try {
+            $validated = $request->validate([
+                'invoice_id' => 'required|exists:invoices,id',
+                'amount' => [
+                    'required',
+                    'numeric',
+                    'min:1',
+                    function ($attribute, $value, $fail) use ($currentBalanceDue) {
+                        if ($value > $currentBalanceDue) {
+                            $fail("The payment amount cannot exceed the invoice balance of {$currentBalanceDue} TK.");
+                        }
+                    },
+                ],
+                'payment_method' => 'required|string',
+                'student_id' => 'required|exists:students,id',
+            ]);
+        } catch (ValidationException $e) {
+            // Return back with validation errors
+            return redirect()->back()->withErrors($e->errors());
+        }
+
+        // Check for existing full payment to prevent double payment issues
+        if ($invoice->balance_due <= 0) {
+            // Use a different flash message key for errors
+            return redirect()->back()->with('flash', ['type' => 'error', 'message' => 'This invoice has already been fully paid.']);
+        }
+
+        $newStatus = '';
+        DB::transaction(function () use ($validated, $invoice, &$newStatus) {
+            Payment::create([
+                'student_id' => $validated['student_id'],
+                'invoice_id' => $invoice->id,
+                'amount' => $validated['amount'],
+                'method' => $validated['payment_method'],
+                'payment_date' => now(),
+                'received_by' => auth()->id(),
+            ]);
+
+            $newAmountPaid = $invoice->amount_paid + $validated['amount'];
+            $newBalanceDue = $invoice->total_amount_due - $newAmountPaid;
+            $newBalanceDue = max(0, $newBalanceDue);
+
+            $newStatus = ($newBalanceDue <= 0) ? 'paid' : 'partially_paid';
+
+            $invoice->update([
+                'amount_paid' => $newAmountPaid,
+                'balance_due' => $newBalanceDue,
+                'status' => $newStatus,
+                'paid_at' => ($newStatus === 'paid') ? now() : null,
+            ]);
+        });
+
+        // Determine the final message based on the new status
+        $message = ($newStatus === 'paid') 
+            ? 'Full payment collected. Invoice is now fully paid.' 
+            : 'Partial payment collected successfully. Remaining balance: ' . $invoice->balance_due . ' TK.';
+
+        // Return back with a success flash message
+      return redirect()->route('accountant.payments.collect')->with('flash', ['type' => 'success', 'message' => $message]);
+
+
+    }
+
+
+
+
+    // Student Invoice PDF Download Function
+
+    public function downloadInvoicePdf(Invoice $invoice)
+    {
+        // Eager load related data to avoid multiple queries
+        $invoice->load('student', 'payments');
+
+        // Make sure the invoice is paid or partially paid before generating
+        if ($invoice->status === 'paid' || $invoice->status === 'partially_paid') {
+
+            // Fetch the school settings data
+            $settings = Setting::first();
+
+            // Pass both the invoice and settings data to the Blade view
+            $pdf = Pdf::loadView('pdfs.invoice', compact('invoice', 'settings'));
+
+            return $pdf->download('invoice-' . $invoice->invoice_number . '.pdf');
+        }
+
+        // Redirect back with an error if the invoice isn't paid
+        return redirect()->back()->with('error', 'The invoice must be paid or partially paid to download.');
+    }
+
+
     // For now, a show method to verify creation
+
     public function invoiceShow(Invoice $invoice)
     {
-        $invoice->load(['student', 'invoiceItems.feeType', 'payments.receivedBy']);
+        // Eager load the relationships needed for the detailed view
+        $invoice->load([
+            // Load the 'class' relationship on the 'student' model
+            'student.className', 
+            
+            // Load the 'feeType' relationship for each 'invoiceItem'
+            'invoiceItems.feeType', 
+            
+            // Load payment history
+            'payments', 
+        ]);
 
-        return Inertia::render('Admin/ShowInvoice', [
+        return Inertia::render('Accountant/Invoice/InvoiceShow', [
             'invoice' => $invoice,
         ]);
     }
 
 
 
-    public function markAllAsRead()
-    {
-        Auth::user()->unreadNotifications->markAsRead();
+    // public function markAllAsRead()
+    // {
+    //     Auth::user()->unreadNotifications->markAsRead();
 
-        return redirect()->back()->with('flash', [
-            'type' => 'success',
-            'message' => 'All notifications marked as read!',
-        ]);
-    }
+    //     return redirect()->back()->with('flash', [
+    //         'type' => 'success',
+    //         'message' => 'All notifications marked as read!',
+    //     ]);
+    // }
 
 
 
@@ -740,31 +1209,31 @@ class FeeController extends Controller
     // ======================  Student Functions (Invoice Viewing & Payment Submission) ======================================
 
 
-    public function studentInvoices(Request $request)
-    {
-        $user = $request->user();
-        $student = $user->student;
+    // public function studentInvoices(Request $request)
+    // {
+    //     $user = $request->user();
+    //     $student = $user->student;
 
-        if (!$student) {
-            return redirect()->route('dashboard')->with('flash', [
-                'type' => 'error',
-                'message' => 'Student profile not found.'
-            ]);
-        }
+    //     if (!$student) {
+    //         return redirect()->route('dashboard')->with('flash', [
+    //             'type' => 'error',
+    //             'message' => 'Student profile not found.'
+    //         ]);
+    //     }
 
-        // Fetch invoices for this specific student, and eager-load the related
-        // invoice items and their corresponding fee types.
-        $studentInvoices = Invoice::where('student_id', $student->id)
-                                 ->with('invoiceItems.feeType') // Eager load the relationships
-                                 ->orderBy('due_date', 'desc')
-                                 ->get();
+    //     // Fetch invoices for this specific student, and eager-load the related
+    //     // invoice items and their corresponding fee types.
+    //     $studentInvoices = Invoice::where('student_id', $student->id)
+    //                              ->with('invoiceItems.feeType') // Eager load the relationships
+    //                              ->orderBy('due_date', 'desc')
+    //                              ->get();
 
-        // Pass the student's invoices and name to the Inertia view.
-        return Inertia::render('Student/StudentInvoice', [
-            'studentInvoices' => $studentInvoices,
-            'userName' => $user->name,
-        ]);
-    }
+    //     // Pass the student's invoices and name to the Inertia view.
+    //     return Inertia::render('Student/StudentInvoice', [
+    //         'studentInvoices' => $studentInvoices,
+    //         'userName' => $user->name,
+    //     ]);
+    // }
 
 
 
@@ -860,16 +1329,6 @@ class FeeController extends Controller
 
 
 
-
-
-
-
-
-
-
-
-
-
     // Student PDF Generation Function
     public function generatePdf($id)
     {
@@ -887,8 +1346,6 @@ class FeeController extends Controller
 
 
 
-
-    
 
     // ===================================================
     // Admin Functions (Payment Approval)============================
@@ -984,6 +1441,75 @@ class FeeController extends Controller
             Log::error("Payment rejection failed for invoice {$invoiceId}: " . $e->getMessage());
             return redirect()->back()->with('flash', ['type' => 'error', 'message' => 'An error occurred during payment rejection. Please try again.']);
         }
+    }
+
+
+
+
+     /**
+     * Display the payment history with filters.
+     */
+    public function paymentHistoryindex(Request $request)
+    {
+        // Fetch unique class names with the first corresponding id, sorted by class_name
+        $classes = ClassName::where('status', 0)
+            ->select('id', 'class_name AS name')
+            ->whereIn('id', function ($query) {
+                $query->select(DB::raw('MIN(id)'))
+                    ->from('class_names')
+                    ->where('status', 0)
+                    ->groupBy('class_name');
+            })
+            ->orderBy('class_name')
+            ->get();
+
+        $classId = $request->get('class_id');
+        $statusFilter = $request->get('status');
+        $invoices = Invoice::query()
+            // ... existing filters ...
+            ->when($classId, function ($query, $classId) {
+                $query->whereHas('student', function ($q) use ($classId) {
+                    $q->where('class_id', $classId);
+                });
+            })
+            ->when($statusFilter, function ($query, $statusFilter) {
+                $query->where('status', $statusFilter);
+            })
+            ->with([
+                // Keep existing Student relationship
+                'student' => function ($query) {
+                    $query->select('id', 'name', 'admission_number', 'class_id')
+                        ->with(['className' => function ($q) {
+                            $q->where('status', 0)
+                            ->select('id', 'class_name AS name');
+                        }]);
+                },
+                // ✨ NEW: Eager load invoice items and their fee type/category
+                'invoiceItems' => function ($query) {
+                    // Select only the item details needed to show the due category
+                    $query->select('invoice_id', 'fee_type_id', 'description', 'balance_due')
+                        // Only load items that actually have a balance due (> 0)
+                        ->where('balance_due', '>', 0)
+                        ->with(['feeType' => function ($q) {
+                            // Select the ID and Name from the fee_types table
+                            $q->select('id', 'name');
+                        }]);
+                }
+            ])
+            // Select core invoice fields
+            ->select('id', 'invoice_number', 'total_amount_due', 'amount_paid', 'status', 'due_date', 'issued_at', 'student_id')
+            // Your existing calculation for the main invoice balance_due
+            ->addSelect(DB::raw('CAST(COALESCE(total_amount_due - amount_paid, total_amount_due) AS SIGNED) as balance_due'))
+            ->latest('issued_at')
+            ->paginate(20)
+            ->withQueryString();
+
+        return Inertia::render('Admin/Payment/PaymentHistory', [
+            'invoices' => $invoices,
+            'classes' => $classes,
+            'selectedClassId' => (int) $classId,
+            'selectedStatus' => $statusFilter,
+        ]);
     }
 
 

@@ -21,23 +21,24 @@ return new class extends Migration
             $table->string('gender');
             $table->date('admission_date');
             $table->integer('age');
+            $table->string('blood_group')->nullable();
             $table->unsignedBigInteger('session_id');
             $table->foreign('session_id')->references('id')->on('class_sessions')->onDelete('cascade');
             $table->foreignId('section_id')->references('id')->on('sections')->onDelete('cascade');
             $table->unsignedBigInteger('group_id');
             $table->foreign('group_id')->references('id')->on('groups')->onDelete('cascade');
-            $table->foreignId('user_id');
-            $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
+            
+            $table->foreignId('user_id')->nullable()->constrained()->onDelete('cascade'); // Link to users table
 
             // Existing student details
             $table->string('admission_number')->unique();
-            $table->integer('roll_number')->unique();
+            $table->integer('roll_number');
             $table->string('parent_name');
             $table->string('address');
             $table->string('contact');
             $table->string('image')->nullable();
             $table->tinyInteger('status')->default(0)->comment('0: Active (Enrolled), 1: Inactive (Left/Graduated)');
-            $table->string('enrollment_status')->default('applied')->comment('e.g., applied, under_review, admitted, enrolled, rejected, waitlisted');
+            $table->string('enrollment_status')->default('admitted')->comment('e.g., applied, under_review, admitted, enrolled, rejected, waitlisted');
     
             // Admission fee and payment details
             $table->integer('admission_fee_amount')->nullable(); 

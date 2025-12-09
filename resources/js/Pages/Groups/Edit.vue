@@ -48,14 +48,35 @@ watchEffect(() => {
 // Submit handler sends form data correctly using the update route
 const submit = () => {
     form.post(route('groups.update', props.group.id), {
+        forceFormData: true, // ensures compatibility if you add file inputs later
         onSuccess: () => {
-            // No reset needed, keep form data intact after update
+            Swal.fire({
+                icon: 'success',
+                title: 'Success!',
+                text: 'গ্রুপ সফলভাবে আপডেট করা হয়েছে!',
+                toast: true,
+                position: 'top-end',
+                showConfirmButton: false,
+                timer: 3000,
+            });
+            // Optional: reset form if needed
+            // form.reset();
         },
         onError: (errors) => {
+            Swal.fire({
+                icon: 'error',
+                title: 'Failed!',
+                text: 'Could not update group. Please check the fields.',
+                toast: true,
+                position: 'top-end',
+                showConfirmButton: false,
+                timer: 3000,
+            });
             console.error("Group update failed:", errors);
         },
     });
 };
+
 </script>
 
 

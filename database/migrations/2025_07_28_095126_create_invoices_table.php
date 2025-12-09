@@ -25,7 +25,7 @@ return new class extends Migration
             $table->integer('balance_due'); // Calculated: total_amount_due - amount_paid
 
             // Status of the invoice
-            $table->enum('status', ['pending_payment_approval','pending', 'partially_paid', 'paid', 'overdue', 'cancelled'])->default('pending');
+            $table->enum('status', ['pending', 'partially_paid', 'paid'])->default('pending');
             
             $table->timestamp('issued_at')->useCurrent(); // When the invoice was created/issued
             $table->timestamp(column: 'paid_at')->nullable(); // When the invoice was fully paid

@@ -15,21 +15,26 @@ return new class extends Migration
         Schema::create('student_fee_assignments', function (Blueprint $table) {
             $table->id();
 
-            // Foreign keys to link to students and fee_types (ensure 'students' table exists)
+            // Foreign keys
             $table->foreignId('student_id')->constrained('students')->onDelete('cascade');
             $table->foreignId('fee_type_id')->constrained('fee_types')->onDelete('cascade');
-
-   
-            // Validity period for this fee assignment
-            $table->date('applies_from')->comment('The date from which this fee assignment is valid for the student.');
-            $table->date('applies_to')->nullable()->comment('The date until which this fee assignment is valid. Nullable for indefinite or one-time fees.');
+            $table->foreignId('class_id')->constrained('class_names')->onDelete('cascade');
+            $table->foreignId('section_id')->constrained('sections')->onDelete('cascade');
+            $table->foreignId('session_id')->constrained('class_sessions')->onDelete('cascade');
 
             // Status of this particular assignment
-            $table->boolean('status')->default(0)->comment('0: Active, 1: Inactive (for this specific assignment)');
+            $table->boolean('status')->default(0)->comment('0: Active, 1: Inactive');
 
             $table->timestamps();
+
+            // Unique constraint to prevent duplicates
+            $table->unique(
+                ['student_id', 'fee_type_id', 'class_id', 'section_id', 'session_id'],
+                'unique_fee_assignment'
+            );
         });
     }
+
 
     /**
      * Reverse the migrations.

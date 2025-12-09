@@ -2,36 +2,48 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ExamSeatPlan extends Model
 {
-    use HasFactory;
-
-    // By default, Laravel assumes 'exam_seat_plans' table.
-    // If your table name differs significantly, you might set: protected $table = 'your_table_name';
-
     protected $fillable = [
-        'exam_schedule_id',
+        'exam_id',
+        'class_id',
+        'section_id',
+        'session_id',
+        'room_id',
+        'group_id', // Added group_id
         'student_id',
         'seat_number',
     ];
 
-    /**
-     * Get the exam schedule that owns the seat plan.
-     */
-    public function examSchedule(): BelongsTo
-    {
-        return $this->belongsTo(ExamSchedule::class);
-    }
-
-    /**
-     * Get the student associated with the seat plan.
-    */
-    public function student(): BelongsTo
+    public function student()
     {
         return $this->belongsTo(Student::class);
+    }
+
+    public function room()
+    {
+        return $this->belongsTo(Room::class);
+    }
+
+    public function class()
+    {
+        return $this->belongsTo(ClassName::class, 'class_id');
+    }
+
+    public function section()
+    {
+        return $this->belongsTo(Section::class);
+    }
+
+    public function session()
+    {
+        return $this->belongsTo(ClassSession::class, 'session_id');
+    }
+
+    public function group()
+    {
+        return $this->belongsTo(Group::class);
     }
 }

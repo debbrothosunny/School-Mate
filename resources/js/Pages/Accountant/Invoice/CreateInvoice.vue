@@ -28,7 +28,7 @@ const isFetchingData = ref(false);
 const fetchError = ref(null);
 
 const invoiceForm = useForm({
-    selected_students: [], // Changed from student_id to an array for multiple students
+    selected_students: [], // Array for multiple students
     due_date: '',
     selected_fee_types: [],
     billing_period: '',
@@ -49,6 +49,29 @@ const allAcademicContextSelected = computed(() => {
            academicContextForm.value.group_id;
 });
 
+
+// Writable Computed Property for Select All functionality
+const selectAll = computed({
+    get() {
+        if (availableStudents.value.length === 0) return false;
+        // Check if every available student ID is included in the selected array
+        return invoiceForm.selected_students.length === availableStudents.value.length &&
+               availableStudents.value.every(student => invoiceForm.selected_students.includes(student.id));
+    },
+    set(value) {
+        if (value) {
+            // Select all: Mutate the array using splice with the spread operator.
+            const allStudentIds = availableStudents.value.map(student => student.id);
+            // Splice removes all current elements (0, length) and inserts all new IDs
+            invoiceForm.selected_students.splice(0, invoiceForm.selected_students.length, ...allStudentIds);
+        } else {
+            // Deselect all: Remove all elements using splice to maintain reactivity.
+            invoiceForm.selected_students.splice(0, invoiceForm.selected_students.length);
+        }
+    }
+});
+
+
 // Watch for changes in academic context to fetch students and fees
 watch(
     () => [
@@ -62,9 +85,10 @@ watch(
         if (!allAcademicContextSelected.value) {
             availableStudents.value = [];
             availableFeeTypesWithAmounts.value = [];
-            invoiceForm.selected_students = []; // Clear students array
+            // Use splice to clear the array instead of reassigning it
+            invoiceForm.selected_students.splice(0, invoiceForm.selected_students.length); 
             invoiceForm.due_date = '';
-            invoiceForm.selected_fee_types = [];
+            invoiceForm.selected_fee_types.splice(0, invoiceForm.selected_fee_types.length);
             invoiceForm.billing_period = '';
             fetchError.value = null;
             return;
@@ -74,12 +98,14 @@ watch(
         fetchError.value = null;
         availableStudents.value = [];
         availableFeeTypesWithAmounts.value = [];
-        invoiceForm.selected_students = [];
+        // Use splice to clear the array instead of reassigning it
+        invoiceForm.selected_students.splice(0, invoiceForm.selected_students.length);
         invoiceForm.due_date = '';
-        invoiceForm.selected_fee_types = [];
+        invoiceForm.selected_fee_types.splice(0, invoiceForm.selected_fee_types.length);
         invoiceForm.billing_period = '';
 
         try {
+            // NOTE: Replace 'admin.invoices.get-academic-data' with your actual route name if different
             const response = await axios.get(route('admin.invoices.get-academic-data'), {
                 params: {
                     class_id,
@@ -134,7 +160,7 @@ watchEffect(() => {
 });
 // --- End Toast Notification Logic ---
 
-// Toggle student selection
+// Toggle student selection (for individual student clicks)
 const toggleStudentSelection = (studentId) => {
     const index = invoiceForm.selected_students.indexOf(studentId);
     if (index === -1) {
@@ -145,6 +171,7 @@ const toggleStudentSelection = (studentId) => {
 };
 
 const submitInvoice = () => {
+    // NOTE: Replace 'admin.invoices.store' with your actual route name if different
     invoiceForm.post(route('admin.invoices.store'), {
         onSuccess: () => {
             // Reset the form after successful submission
@@ -231,7 +258,22 @@ const submitInvoice = () => {
                         <div class="mb-6">
                             <InputLabel value="Select Students" />
                             <InputError :message="invoiceForm.errors.selected_students" class="mt-1" />
+                            
+                            <!-- FIX: Removed @click.stop from input. The state is toggled by the parent div click or by the v-model change. -->
+                            <div v-if="availableStudents.length > 0" class="flex items-center mt-3 mb-4 p-3 bg-indigo-50 border border-indigo-200 rounded-md cursor-pointer hover:bg-indigo-100 transition-colors duration-200" @click="selectAll = !selectAll">
+                                <input
+                                    type="checkbox"
+                                    v-model="selectAll"
+                                    class="form-checkbox h-5 w-5 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500"
+                                    
+                                />
+                                <label class="ml-3 font-semibold text-indigo-700 select-none">
+                                    Select All Students ({{ availableStudents.length }} Found)
+                                </label>
+                            </div>
+
                             <div v-if="availableStudents.length === 0" class="text-red-500 mt-2">No students found matching the selected criteria.</div>
+                            
                             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
                                 <div
                                     v-for="student in availableStudents"

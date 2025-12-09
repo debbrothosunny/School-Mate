@@ -5,18 +5,27 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-// This is the line you need to add!
 use App\Models\ClassTimeSlot;
+// Import the new Group model
+use App\Models\Group; 
+// Ensure other models are imported if needed (ClassName, Subject, Teacher, Section, ClassSession, Room)
+use App\Models\ClassName;
+use App\Models\Subject;
+use App\Models\Teacher;
+use App\Models\Section;
+use App\Models\ClassSession;
+use App\Models\Room;
+
 class ClassTime extends Model
-{
+{ 
     use HasFactory;
 
     /**
      * The table associated with the model.
      *
      * @var string
-    */
-    protected $table = 'class_times'; // Ensure this matches your actual table name
+     */
+    protected $table = 'class_times';
 
     /**
      * The attributes that are mass assignable.
@@ -29,6 +38,8 @@ class ClassTime extends Model
         'teacher_id',
         'section_id',
         'session_id',
+        // --- ADDED: group_id ---
+        'group_id', 
         'day_of_week',
         'room_id',
         'class_time_slot_id',
@@ -45,6 +56,15 @@ class ClassTime extends Model
         'updated_at' => 'datetime',
     ];
 
+    // --- NEW: Group Relationship ---
+    /**
+     * Get the group associated with the timetable entry (e.g., Science, Arts, None).
+    */
+    public function group(): BelongsTo
+    {
+        return $this->belongsTo(Group::class);
+    }
+
     /**
      * Get the class name associated with the timetable entry.
      */
@@ -55,8 +75,7 @@ class ClassTime extends Model
 
     /**
      * Get the subject associated with the timetable entry.
-    */
-    
+     */
     public function subject(): BelongsTo
     {
         return $this->belongsTo(Subject::class);
@@ -64,8 +83,7 @@ class ClassTime extends Model
 
     /**
      * Get the teacher associated with the timetable entry.
-    */
-
+     */
     public function teacher(): BelongsTo
     {
         return $this->belongsTo(Teacher::class);
@@ -73,8 +91,7 @@ class ClassTime extends Model
 
     /**
      * Get the section associated with the timetable entry.
-    */
-
+     */
     public function section(): BelongsTo
     {
         return $this->belongsTo(Section::class);
@@ -82,8 +99,7 @@ class ClassTime extends Model
 
     /**
      * Get the session associated with the timetable entry.
-    */
-
+     */
     public function session(): BelongsTo
     {
         // Assuming your session model is named ClassSession and maps to 'class_sessions' table
@@ -100,4 +116,3 @@ class ClassTime extends Model
         return $this->belongsTo(ClassTimeSlot::class, 'class_time_slot_id');
     }
 }
-   

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
-    <title inertia>School-Mate</title>
+    <title inertia>বিদ্যালয়</title>
 
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.bunny.net">
@@ -23,16 +23,7 @@
     <!-- SweetAlert2 JS (can stay here or be moved to body end) -->
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     
-    <!-- IMPORTANT: Dark Mode FOUC Prevention Script -->
-    <script>
-        // This script runs BEFORE Vue loads to set the initial theme
-        const theme = localStorage.getItem('color-theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-        if (theme === 'dark') {
-            document.documentElement.classList.add('dark');
-        } else {
-            document.documentElement.classList.remove('dark');
-        }
-    </script>
+    
 
     <!-- Scripts -->
     @routes
@@ -44,5 +35,10 @@
 
     <!-- Bootstrap JS Bundle (includes Popper.js) CDN - placed at the end of body for optimal loading -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" xintegrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+    
+    <!-- এইখানে রাখুন – সব Vue পেজে কাজ করবে -->
+    <script>
+        window.BLUE_V_SHAPE_HEADER = "{!! $setting->shape_base64 ?? '' !!}";
+    </script>
 </body>
 </html>

@@ -13,10 +13,13 @@ use App\Models\ExamSchedule;
 use App\Models\ClassSession; 
 use App\Models\ExamSeatPlan; 
 use App\Models\ExamTimeSlot; 
+use App\Models\Group; 
 use App\Models\Student; 
+use App\Models\Setting; 
 use Illuminate\Support\Facades\Redirect;
 use Inertia\Inertia;
-use Illuminate\Validation\ValidationException;
+use Illuminate\Validation\Exception;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\Log; // For logging
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Auth; // For teacher/student authentication
@@ -61,6 +64,7 @@ class ExamController extends Controller
 
     public function store(Request $request)
     {
+        // Removed validation for 'total_marks' and 'passing_marks'
         $validatedData = $request->validate([
             'exam_name' => [
                 'required',
@@ -73,8 +77,6 @@ class ExamController extends Controller
             ],
             'session_id' => 'required|exists:class_sessions,id',
             'status' => 'required|integer|in:0,1',
-            'total_marks' => 'required|integer',
-            'passing_marks' => 'required|integer',
         ]);
 
         try {
@@ -94,7 +96,7 @@ class ExamController extends Controller
 
     /**
      * Show the form for editing the specified exam.
-    */
+     */
     public function edit(Exam $exam)
     {
         // Eager load the session relationship
@@ -113,6 +115,7 @@ class ExamController extends Controller
      */
     public function update(Request $request, Exam $exam)
     {
+        // Removed validation for 'total_marks' and 'passing_marks'
         $validatedData = $request->validate([
             'exam_name' => [
                 'required',
@@ -125,8 +128,6 @@ class ExamController extends Controller
             ],
             'session_id' => 'required|exists:class_sessions,id',
             'status' => 'required|integer|in:0,1',
-            'total_marks' => 'required|integer',
-            'passing_marks' => 'required|integer',
         ]);
 
         try {
@@ -169,20 +170,35 @@ class ExamController extends Controller
 
     public function ExamSchdeuleIndex(Request $request)
     {
-        // Fetch all necessary data for filter dropdowns
+        // 1. Fetch all necessary data for filter dropdowns (INCLUDING GROUPS)
         $exams = Exam::where('status', 0)->get(['id', 'exam_name']);
-        $classes = ClassName::where('status', 0)->get(['id', 'class_name']);
+        
+        // Fetch unique class names with the first corresponding id
+        $classes = ClassName::where('status', 0)
+            ->select('id', 'class_name')
+            ->whereIn('id', function ($query) {
+                $query->select(DB::raw('MIN(id)'))
+                    ->from('class_names')
+                    ->where('status', 0)
+                    ->groupBy('class_name');
+            })
+            ->get();
+
         $sections = Section::where('status', 0)->get(['id', 'name']);
         $sessions = ClassSession::where('status', 0)->get(['id', 'name']);
+        
+        // Fetch Groups for filtering
+        $groups = Group::where('status', 0)->get(['id', 'name']);
+        
         $teachers = Teacher::where('status', 0)->get(['id', 'name']);
         $subjects = Subject::where('status', 0)->get(['id', 'name']);
         $rooms = Room::where('status', 0)->get(['id', 'name']);
         $timeSlots = ExamTimeSlot::all(['id', 'name', 'start_time', 'end_time']);
 
-        // Build the query to fetch exam schedules with all related models
-        $query = ExamSchedule::with(['exam', 'className', 'section', 'session', 'teacher', 'subject', 'room', 'examSlot']);
+        // 2. Build the query to fetch exam schedules with all related models (INCLUDING GROUP)
+        $query = ExamSchedule::with(['exam', 'className', 'section', 'session', 'group', 'teacher', 'subject', 'room', 'examSlot']);
 
-        // Apply filters based on request input
+        // 3. Apply filters based on request input (INCLUDING GROUP FILTER)
         if ($request->filled('exam_id')) {
             $query->where('exam_id', $request->exam_id);
         }
@@ -195,6 +211,12 @@ class ExamController extends Controller
         if ($request->filled('session_id')) {
             $query->where('session_id', $request->session_id);
         }
+        // Group Filter Logic
+        if ($request->filled('group_id')) {
+            $query->where('group_id', $request->group_id);
+        }
+        
+        // Existing Filters
         if ($request->filled('teacher_id')) {
             $query->where('teacher_id', $request->teacher_id);
         }
@@ -214,21 +236,26 @@ class ExamController extends Controller
             $query->where('exam_slot_id', $request->exam_slot_id);
         }
 
-        // Order results and paginate
-        $examSchedules = $query->orderBy('exam_date')
-                               ->paginate(10); 
-                               
+        // 4. Order results and paginate
+        $examSchedules = $query->orderBy('exam_date')->paginate(10); 
+                                    
+        // 5. Return data to the Inertia view (INCLUDING GROUPS & GROUP FILTER)
         return Inertia::render('ExamSchedules/Index', [
             'examSchedules' => $examSchedules,
             'exams' => $exams,
             'classes' => $classes,
             'sections' => $sections,
             'sessions' => $sessions,
+            'groups' => $groups,
             'teachers' => $teachers,
             'subjects' => $subjects,
             'rooms' => $rooms,
             'timeSlots' => $timeSlots,
-            'selectedFilters' => $request->only(['exam_id', 'class_id', 'section_id', 'session_id', 'teacher_id', 'subject_id', 'room_id', 'exam_date', 'status', 'exam_slot_id']),
+            'selectedFilters' => $request->only([
+                'exam_id', 'class_id', 'section_id', 'session_id', 
+                'group_id',
+                'teacher_id', 'subject_id', 'room_id', 'exam_date', 'status', 'exam_slot_id'
+            ]),
             'flash' => session('flash'),
         ]);
     }
@@ -237,14 +264,30 @@ class ExamController extends Controller
     /**
      * Show the form for creating a new exam schedule.
     */
+
     public function ExamSchdeuleCreate()
     {
         $exams = Exam::where('status', 0)->get(['id', 'exam_name']);
-        $classes = ClassName::where('status', 0)->get(['id', 'class_name']);
+        
+        // Fetch unique class names with the first corresponding id
+        $classes = ClassName::where('status', 0)
+            ->select('id', 'class_name')
+            ->whereIn('id', function ($query) {
+                $query->select(DB::raw('MIN(id)'))
+                    ->from('class_names')
+                    ->where('status', 0)
+                    ->groupBy('class_name');
+            })
+            ->get();
+
         $sections = Section::where('status', 0)->get(['id', 'name']);
         $sessions = ClassSession::where('status', 0)->get(['id', 'name']);
+        
+        // Fetch Groups
+        $groups = Group::where('status', 0)->get(['id', 'name']); 
+        
         $teachers = Teacher::where('status', 0)->get(['id', 'name', 'subject_taught']);
-        $subjects = Subject::where('status', 0)->get(['id', 'name', 'code']);
+        $subjects = Subject::where('status', 0)->get(['id', 'name']);
         $rooms = Room::where('status', 0)->get(['id', 'name']);
         $timeSlots = ExamTimeSlot::all(['id', 'name', 'start_time', 'end_time']);
 
@@ -253,10 +296,11 @@ class ExamController extends Controller
             'classes' => $classes,
             'sections' => $sections,
             'sessions' => $sessions,
+            'groups' => $groups,
             'teachers' => $teachers,
             'subjects' => $subjects,
             'rooms' => $rooms,
-            'exam_slots' => $timeSlots, // CHANGED THIS LINE
+            'exam_slots' => $timeSlots,
         ]);
     }
 
@@ -268,33 +312,40 @@ class ExamController extends Controller
             'class_id' => 'required|exists:class_names,id',
             'section_id' => 'required|exists:sections,id',
             'session_id' => 'required|exists:class_sessions,id',
+            'group_id' => 'nullable|exists:groups,id', // ⬅️ NEW: Group validation
             'teacher_id' => 'required|exists:teachers,id',
             'subject_id' => 'required|exists:subjects,id',
             'room_id' => 'required|exists:rooms,id',
-            'exam_slot_id' => 'required|exists:exam_time_slots,id', // Use the new ID
+            'exam_slot_id' => 'required|exists:exam_time_slots,id',
             'exam_date' => 'required|date|after_or_equal:today',
             'day_of_week' => 'required|string|in:MONDAY,TUESDAY,WEDNESDAY,THURSDAY,FRIDAY,SATURDAY,SUNDAY',
-            'status' => 'required|integer|in:0,1,2',
+            'status' => 'required|integer|in:0,1', // ⬅️ ADJUSTED: Status validation (0 or 1)
         ]);
 
         // Check for Room, Teacher, or Exam conflict based on the time slot ID
-        $conflict = ExamSchedule::where(function ($query) use ($validatedData) {
-            $query->where('room_id', $validatedData['room_id'])
-                  ->orWhere('teacher_id', $validatedData['teacher_id'])
-                  ->orWhere(function($q) use ($validatedData) {
-                      $q->where('class_id', $validatedData['class_id'])
+        $conflict = ExamSchedule::whereDate('exam_date', $validatedData['exam_date'])
+            ->where('exam_slot_id', $validatedData['exam_slot_id'])
+            ->where(function ($query) use ($validatedData) {
+                
+                // 1. Room conflict check
+                $query->where('room_id', $validatedData['room_id']); 
+                
+                // 2. Teacher conflict check
+                $query->orWhere('teacher_id', $validatedData['teacher_id']); 
+                
+                // 3. Class/Subject conflict check (A class/section/group can't have two exams at once)
+                $query->orWhere(function($q) use ($validatedData) {
+                    $q->where('class_id', $validatedData['class_id'])
                         ->where('section_id', $validatedData['section_id'])
                         ->where('session_id', $validatedData['session_id'])
-                        ->where('subject_id', $validatedData['subject_id']);
-                  });
-        })
-        ->whereDate('exam_date', $validatedData['exam_date'])
-        ->where('exam_slot_id', $validatedData['exam_slot_id'])
-        ->exists();
+                        ->where('group_id', $validatedData['group_id'] ?? null); // ⬅️ NEW: Include group check
+                });
+            })
+            ->exists();
 
         if ($conflict) {
             return redirect()->back()->with('flash', [
-                'message' => 'A conflict was detected. Either the room, teacher, or the exam slot is already booked for this time on this date.',
+                'message' => 'A conflict was detected. Either the room, teacher, or the class/group/section is already booked for this time on this date.',
                 'type' => 'error'
             ])->withInput();
         }
@@ -315,86 +366,98 @@ class ExamController extends Controller
     }
 
 
-    public function ExamSchdeuleEdit(ExamSchedule $examSchedule)
-    {
-        // Eager load all relationships
-        $examSchedule->load(['exam', 'className', 'section', 'session', 'teacher', 'subject', 'room', 'examTimeSlot']);
+    // public function ExamSchdeuleEdit(ExamSchedule $examSchedule)
+    // {
+    //     // ⬅️ ADJUSTED: Eager load all relationships, including 'group'
+    //     $examSchedule->load(['exam', 'className', 'section', 'session', 'group', 'teacher', 'subject', 'room', 'examSlot']);
 
-        $exams = Exam::where('status', 0)->get(['id', 'exam_name']);
-        $classes = ClassName::where('status', 0)->get(['id', 'class_name']);
-        $sections = Section::where('status', 0)->get(['id', 'name']);
-        $sessions = ClassSession::where('status', 0)->get(['id', 'name']);
-        $teachers = Teacher::where('status', 0)->get(['id', 'name', 'subject_taught']);
-        $subjects = Subject::where('status', 0)->get(['id', 'name', 'code']);
-        $rooms = Room::where('status', 0)->get(['id', 'name']);
-        $timeSlots = ExamTimeSlot::all(['id', 'name', 'start_time', 'end_time']);
+    //     $exams = Exam::where('status', 0)->get(['id', 'exam_name']);
+    //     $classes = ClassName::where('status', 0)->get(['id', 'class_name']);
+    //     $sections = Section::where('status', 0)->get(['id', 'name']);
+    //     $sessions = ClassSession::where('status', 0)->get(['id', 'name']);
+        
+    //     // ⬅️ NEW: Fetch Groups
+    //     $groups = Group::where('status', 0)->get(['id', 'name']); 
+        
+    //     $teachers = Teacher::where('status', 0)->get(['id', 'name', 'subject_taught']);
+    //     $subjects = Subject::where('status', 0)->get(['id', 'name']);
+    //     $rooms = Room::where('status', 0)->get(['id', 'name']);
+    //     $timeSlots = ExamTimeSlot::all(['id', 'name', 'start_time', 'end_time']);
 
-        return Inertia::render('ExamSchedules/Edit', [
-            'examSchedule' => $examSchedule,
-            'exams' => $exams,
-            'classes' => $classes,
-            'sections' => $sections,
-            'sessions' => $sessions,
-            'teachers' => $teachers,
-            'subjects' => $subjects,
-            'rooms' => $rooms,
-            'timeSlots' => $timeSlots,
-        ]);
-    }
+    //     return Inertia::render('ExamSchedules/Edit', [
+    //         'examSchedule' => $examSchedule,
+    //         'exams' => $exams,
+    //         'classes' => $classes,
+    //         'sections' => $sections,
+    //         'sessions' => $sessions,
+    //         'groups' => $groups, // ⬅️ NEW: Pass Groups to view
+    //         'teachers' => $teachers,
+    //         'subjects' => $subjects,
+    //         'rooms' => $rooms,
+    //         'timeSlots' => $timeSlots,
+    //     ]);
+    // }
 
-    public function ExamSchdeuleUpdate(Request $request, ExamSchedule $examSchedule)
-    {
-        $validatedData = $request->validate([
-            'exam_id' => 'required|exists:exams,id',
-            'class_id' => 'required|exists:class_names,id',
-            'section_id' => 'required|exists:sections,id',
-            'session_id' => 'required|exists:class_sessions,id',
-            'teacher_id' => 'required|exists:teachers,id',
-            'subject_id' => 'required|exists:subjects,id',
-            'room_id' => 'required|exists:rooms,id',
-            'exam_slot_id' => 'required|exists:exam_time_slots,id', // Use the new ID
-            'exam_date' => 'required|date|after_or_equal:today',
-            'day_of_week' => 'required|string|in:MONDAY,TUESDAY,WEDNESDAY,THURSDAY,FRIDAY,SATURDAY,SUNDAY',
-            'status' => 'required|integer|in:0,1,2',
-        ]);
+    // public function ExamSchdeuleUpdate(Request $request, ExamSchedule $examSchedule)
+    // {
+    //     $validatedData = $request->validate([
+    //         'exam_id' => 'required|exists:exams,id',
+    //         'class_id' => 'required|exists:class_names,id',
+    //         'section_id' => 'required|exists:sections,id',
+    //         'session_id' => 'required|exists:class_sessions,id',
+    //         'group_id' => 'nullable|exists:groups,id', // ⬅️ NEW: Group validation
+    //         'teacher_id' => 'required|exists:teachers,id',
+    //         'subject_id' => 'required|exists:subjects,id',
+    //         'room_id' => 'required|exists:rooms,id',
+    //         'exam_slot_id' => 'required|exists:exam_time_slots,id',
+    //         'exam_date' => 'required|date|after_or_equal:today',
+    //         'day_of_week' => 'required|string|in:MONDAY,TUESDAY,WEDNESDAY,THURSDAY,FRIDAY,SATURDAY,SUNDAY',
+    //         'status' => 'required|integer|in:0,1', // ⬅️ ADJUSTED: Status validation (0 or 1)
+    //     ]);
 
-        // Check for Room, Teacher, or Exam conflict based on the time slot ID
-        $conflict = ExamSchedule::where('id', '!=', $examSchedule->id) // Exclude current record
-            ->where(function ($query) use ($validatedData) {
-                $query->where('room_id', $validatedData['room_id'])
-                      ->orWhere('teacher_id', $validatedData['teacher_id'])
-                      ->orWhere(function($q) use ($validatedData) {
-                          $q->where('class_id', $validatedData['class_id'])
-                            ->where('section_id', $validatedData['section_id'])
-                            ->where('session_id', $validatedData['session_id'])
-                            ->where('subject_id', $validatedData['subject_id']);
-                      });
-            })
-            ->whereDate('exam_date', $validatedData['exam_date'])
-            ->where('exam_slot_id', $validatedData['exam_slot_id'])
-            ->exists();
+    //     // Check for Room, Teacher, or Exam conflict based on the time slot ID
+    //     $conflict = ExamSchedule::where('id', '!=', $examSchedule->id) // Exclude current record
+    //         ->whereDate('exam_date', $validatedData['exam_date'])
+    //         ->where('exam_slot_id', $validatedData['exam_slot_id'])
+    //         ->where(function ($query) use ($validatedData) {
+                
+    //             // 1. Room conflict check
+    //             $query->where('room_id', $validatedData['room_id']);
+                
+    //             // 2. Teacher conflict check
+    //             $query->orWhere('teacher_id', $validatedData['teacher_id']);
+                
+    //             // 3. Class/Subject conflict check
+    //             $query->orWhere(function($q) use ($validatedData) {
+    //                 $q->where('class_id', $validatedData['class_id'])
+    //                     ->where('section_id', $validatedData['section_id'])
+    //                     ->where('session_id', $validatedData['session_id'])
+    //                     ->where('group_id', $validatedData['group_id'] ?? null); // ⬅️ NEW: Include group check
+    //             });
+    //         })
+    //         ->exists();
 
-        if ($conflict) {
-            return redirect()->back()->with('flash', [
-                'message' => 'A conflict was detected. Either the room, teacher, or the exam slot is already booked for this time on this date.',
-                'type' => 'error'
-            ])->withInput();
-        }
+    //     if ($conflict) {
+    //         return redirect()->back()->with('flash', [
+    //             'message' => 'A conflict was detected. Either the room, teacher, or the class/group/section is already booked for this time on this date.',
+    //             'type' => 'error'
+    //         ])->withInput();
+    //     }
 
-        try {
-            $examSchedule->update($validatedData);
+    //     try {
+    //         $examSchedule->update($validatedData);
 
-            return redirect()->route('exam-schedules.index')->with('flash', [
-                'message' => 'Exam schedule updated successfully!',
-                'type' => 'success'
-            ]);
-        } catch (\Exception $e) {
-            return redirect()->back()->with('flash', [
-                'message' => 'Failed to update exam schedule: ' . $e->getMessage(),
-                'type' => 'error'
-            ])->withInput();
-        }
-    }
+    //         return redirect()->route('exam-schedules.index')->with('flash', [
+    //             'message' => 'Exam schedule updated successfully!',
+    //             'type' => 'success'
+    //         ]);
+    //     } catch (\Exception $e) {
+    //         return redirect()->back()->with('flash', [
+    //             'message' => 'Failed to update exam schedule: ' . $e->getMessage(),
+    //             'type' => 'error'
+    //         ])->withInput();
+    //     }
+    // }
 
 
     public function ExamSchdeuleDestroy(ExamSchedule $examSchedule)
@@ -440,104 +503,135 @@ class ExamController extends Controller
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    
-    public function show(ExamSchedule $examSchedule)
+    // Exam Seat Plan Functions
+    public function show(Request $request)
     {
-        // Load relationships needed for the view
-        $examSchedule->load([
-            'room',
-            'exam',          // Ensure this loads the related Exam model
-            'subject',       // Ensure this loads the related Subject model
-            'className',     // Ensure this loads the related Class model (if that's the relationship name)
-            'section',       // Ensure this loads the related Section model
-            'examSeatPlans.student'
+        // Validate the incoming request
+        $request->validate([
+            'exam_id' => 'required|exists:exams,id',
+            'class_id' => 'required|exists:class_names,id',
+            'section_id' => 'required|exists:sections,id',
+            'session_id' => 'required|exists:class_sessions,id',
+            'room_id' => 'nullable|exists:rooms,id',
+            'group_id' => 'required|exists:groups,id',
         ]);
 
-        // Get students eligible for this specific exam
-        // (Adjust this query based on how your students are linked to classes/sections/sessions)
-        $eligibleStudents = Student::where('class_id', $examSchedule->class_id)
-                                   ->where('section_id', $examSchedule->section_id)
-                                   ->where('session_id', $examSchedule->session_id)
-                                   ->orderBy('roll_number') // Order for natural display/assignment
-                                   ->get();
+        // Fetch data based on filters
+        $examId = $request->input('exam_id');
+        $classId = $request->input('class_id');
+        $sectionId = $request->input('section_id');
+        $sessionId = $request->input('session_id');
+        $roomId = $request->input('room_id');
+        $groupId = $request->input('group_id');
 
-        // Prepare existing assignments for the frontend
-        $currentAssignments = $examSchedule->examSeatPlans->keyBy('student_id');
+        // Fetch related models
+        $exam = Exam::findOrFail($examId);
+        $class = ClassName::findOrFail($classId);
+        $section = Section::findOrFail($sectionId);
+        $session = ClassSession::findOrFail($sessionId);
+        $room = $roomId ? Room::findOrFail($roomId) : null;
+        $group = Group::findOrFail($groupId);
 
-        // Map eligible students with their current seat assignments for the form
-        $formAssignments = $eligibleStudents->map(function ($student) use ($currentAssignments) {
-            $assignedSeat = $currentAssignments->get($student->id);
+        // Fetch eligible students
+        $eligibleStudents = Student::where('class_id', $classId)
+            ->where('section_id', $sectionId)
+            ->where('session_id', $sessionId)
+            ->where('group_id', $groupId)
+            ->orderBy('roll_number')
+            ->with('group')
+            ->get();
+
+        // Fetch seat plans based on filters
+        $seatPlans = ExamSeatPlan::where('exam_id', $examId)
+            ->where('class_id', $classId)
+            ->where('section_id', $sectionId)
+            ->where('session_id', $sessionId)
+            ->where('group_id', $groupId)
+            ->when($roomId, function ($query, $roomId) {
+                return $query->where('room_id', $roomId);
+            })
+            ->get()
+            ->keyBy('student_id');
+
+        // Prepare form assignments
+        $formAssignments = $eligibleStudents->map(function ($student) use ($seatPlans) {
+            $assignedSeat = $seatPlans->get($student->id);
             return [
                 'student_id' => $student->id,
                 'name' => $student->name,
                 'roll_number' => $student->roll_number,
                 'admission_number' => $student->admission_number,
+                'group_name' => $student->group ? $student->group->name : 'N/A',
                 'seat_number' => $assignedSeat ? $assignedSeat->seat_number : null,
             ];
         })->toArray();
 
-        return Inertia::render('ExamSchedules/SeatPlan', [ // You'll create this Vue component
-            'examSchedule' => $examSchedule->toArray(),
-            'room' => $examSchedule->room->toArray(),
-            'eligibleStudentsData' => $formAssignments, // Data prepared for the form
-            'errors' => session('errors') ? session('errors')->getBag('default')->toArray() : [], // Pass validation errors
-            'status' => session('status'), // Pass success/error messages
+        // Return data to the Inertia view
+        return Inertia::render('ExamSchedules/ClassSectionSeatPlan', [
+            'exam' => $exam, // Changed from examSchedule to exam
+            'cls' => $class,
+            'section' => $section,
+            'session' => $session,
+            'room' => $room,
+            'group' => $group,
+            'eligibleStudentsData' => $formAssignments,
+            'errors' => session('errors') ? session('errors')->getBag('default')->toArray() : [],
+            'status' => session('status'),
         ]);
     }
 
-    /**
-     * Handle auto-assignment of seats.
-    */
-    public function autoAssign(ExamSchedule $examSchedule)
+    public function autoAssign(Request $request)
     {
-        $examSchedule->load('room');
-        if (!$examSchedule->room) {
-            return back()->withErrors(['message' => 'Room not assigned to this exam schedule.'])->withInput();
-        }
+        $request->validate([
+            'exam_id' => 'required|exists:exams,id',
+            'class_id' => 'required|exists:class_names,id',
+            'section_id' => 'required|exists:sections,id',
+            'session_id' => 'required|exists:class_sessions,id',
+            'room_id' => 'required|exists:rooms,id',
+            'group_id' => 'required|exists:groups,id',
+        ]);
 
-        $room = $examSchedule->room;
-        $eligibleStudents = Student::where('class_id', $examSchedule->class_id)
-                                   ->where('section_id', $examSchedule->section_id)
-                                   ->where('session_id', $examSchedule->session_id)
-                                   ->orderBy('roll_number') // Assign by roll number order
-                                   ->get();
+        $examScheduleId = $request->input('exam_id');
+        $classId = $request->input('class_id');
+        $sectionId = $request->input('section_id');
+        $sessionId = $request->input('session_id');
+        $roomId = $request->input('room_id');
+        $groupId = $request->input('group_id');
+
+        $room = Room::findOrFail($roomId);
+        $eligibleStudents = Student::where('class_id', $classId)
+            ->where('section_id', $sectionId)
+            ->where('session_id', $sessionId)
+            ->where('group_id', $groupId)
+            ->orderBy('roll_number')
+            ->get();
 
         if ($eligibleStudents->count() > $room->capacity) {
-            return back()->withErrors(['message' => 'Number of eligible students (' . $eligibleStudents->count() . ') exceeds room capacity (' . $room->capacity . '). Please split the class or use a larger room.'])->withInput();
+            return back()->withErrors(['message' => "Number of students ({$eligibleStudents->count()}) exceeds room capacity ({$room->capacity})."]);
         }
 
-        DB::transaction(function () use ($examSchedule, $eligibleStudents, $room) {
-            // Delete all existing assignments for this exam schedule
-            $examSchedule->examSeatPlans()->delete();
+        DB::transaction(function () use ($examScheduleId, $classId, $sectionId, $sessionId, $roomId, $groupId, $eligibleStudents, $room) {
+            ExamSeatPlan::where('exam_id', $examScheduleId)
+                ->where('class_id', $classId)
+                ->where('section_id', $sectionId)
+                ->where('session_id', $sessionId)
+                ->where('group_id', $groupId)
+                ->delete();
 
             $seatNumber = 1;
             foreach ($eligibleStudents as $student) {
                 if ($seatNumber <= $room->capacity) {
                     ExamSeatPlan::create([
-                        'exam_schedule_id' => $examSchedule->id,
+                        'exam_id' => $examScheduleId,
+                        'class_id' => $classId,
+                        'section_id' => $sectionId,
+                        'session_id' => $sessionId,
+                        'room_id' => $roomId,
+                        'group_id' => $groupId,
                         'student_id' => $student->id,
                         'seat_number' => $seatNumber,
                     ]);
                     $seatNumber++;
-                } else {
-                    // This case should ideally be caught by the capacity check above,
-                    // but good to have a safeguard.
-                    break;
                 }
             }
         });
@@ -549,65 +643,79 @@ class ExamController extends Controller
     /**
      * Store/Update manual seat assignments.
     */
-    public function seatStore(Request $request, ExamSchedule $examSchedule)
+    public function seatStore(Request $request)
     {
-        $validated = $request->validate([
+        $request->validate([
+            'exam_id' => 'required|exists:exams,id',
+            'class_id' => 'required|exists:class_names,id',
+            'section_id' => 'required|exists:sections,id',
+            'session_id' => 'required|exists:class_sessions,id',
+            'room_id' => 'required|exists:rooms,id',
+            'group_id' => 'required|exists:groups,id',
             'assignments.*.student_id' => 'required|exists:students,id',
-            'assignments.*.seat_number' => 'nullable|integer|min:1', // Allow null for unassigned
+            'assignments.*.seat_number' => 'nullable|integer|min:1',
         ]);
 
-        $roomCapacity = $examSchedule->room->capacity;
+        $examScheduleId = $request->input('exam_id');
+        $classId = $request->input('class_id');
+        $sectionId = $request->input('section_id');
+        $sessionId = $request->input('session_id');
+        $roomId = $request->input('room_id');
+        $groupId = $request->input('group_id');
+        $room = Room::findOrFail($roomId);
 
-        DB::transaction(function () use ($examSchedule, $validated, $roomCapacity) {
-            // Prepare a list of seat numbers that are actually being submitted
-            $submittedSeatNumbers = collect($validated['assignments'])
-                                    ->pluck('seat_number')
-                                    ->filter() // Remove nulls (unassigned)
-                                    ->unique()
-                                    ->values();
+        DB::transaction(function () use ($examScheduleId, $classId, $sectionId, $sessionId, $roomId, $groupId, $request, $room) {
+            $submittedSeatNumbers = collect($request->assignments)
+                ->pluck('seat_number')
+                ->filter()
+                ->unique()
+                ->values();
 
-            // Validate against room capacity and duplicates within submission
             foreach ($submittedSeatNumbers as $seatNum) {
-                if ($seatNum > $roomCapacity) {
+                if ($seatNum > $room->capacity) {
                     throw \Illuminate\Validation\ValidationException::withMessages([
-                        'assignments' => ["Seat number {$seatNum} exceeds the room capacity of {$roomCapacity}."],
+                        'assignments' => ["Seat number {$seatNum} exceeds room capacity ({$room->capacity})."],
                     ]);
                 }
             }
 
-            // Get existing assignments for this schedule
-            $existingAssignments = $examSchedule->examSeatPlans->keyBy('student_id');
-
-            foreach ($validated['assignments'] as $assignmentData) {
+            foreach ($request->assignments as $assignmentData) {
                 $studentId = $assignmentData['student_id'];
                 $newSeatNumber = $assignmentData['seat_number'];
 
                 if ($newSeatNumber !== null) {
-                    // Check for duplicate seat number *across students being assigned* in the current request
-                    $conflictingStudent = collect($validated['assignments'])
-                                          ->where('seat_number', $newSeatNumber)
-                                          ->where('student_id', '!=', $studentId)
-                                          ->first();
+                    $conflictingStudent = collect($request->assignments)
+                        ->where('seat_number', $newSeatNumber)
+                        ->where('student_id', '!=', $studentId)
+                        ->first();
                     if ($conflictingStudent) {
-                         throw \Illuminate\Validation\ValidationException::withMessages([
-                            'assignments.' . collect($validated['assignments'])->search(fn($item) => $item['student_id'] == $studentId) . '.seat_number' => "Seat {$newSeatNumber} is assigned to multiple students.",
+                        throw \Illuminate\Validation\ValidationException::withMessages([
+                            'assignments.' . collect($request->assignments)->search(fn($item) => $item['student_id'] == $studentId) . '.seat_number' => "Seat {$newSeatNumber} is assigned to multiple students.",
                         ]);
                     }
 
-                    // Update or create the assignment
                     ExamSeatPlan::updateOrCreate(
                         [
-                            'exam_schedule_id' => $examSchedule->id,
+                            'exam_id' => $examScheduleId,
+                            'class_id' => $classId,
+                            'section_id' => $sectionId,
+                            'session_id' => $sessionId,
+                            'group_id' => $groupId,
                             'student_id' => $studentId,
                         ],
                         [
+                            'room_id' => $roomId,
                             'seat_number' => $newSeatNumber,
                         ]
                     );
                 } else {
-                    // If seat_number is null, it means the student is unassigned for this exam
-                    // Delete any existing assignment for this student for this exam schedule
-                    $examSchedule->examSeatPlans()->where('student_id', $studentId)->delete();
+                    ExamSeatPlan::where('exam_id', $examScheduleId)
+                        ->where('class_id', $classId)
+                        ->where('section_id', $sectionId)
+                        ->where('session_id', $sessionId)
+                        ->where('group_id', $groupId)
+                        ->where('student_id', $studentId)
+                        ->delete();
                 }
             }
         });
@@ -718,7 +826,6 @@ class ExamController extends Controller
     }
 
 
-
     /**
      * Show the form for creating a new exam time slot.
      */
@@ -750,7 +857,7 @@ class ExamController extends Controller
      * Display the form for editing the specified exam time slot.
      *
      * @param  \App\Models\ExamTimeSlot  $examTimeSlot
-     */
+    */
     public function examTimeSlotEdit(ExamTimeSlot $examTimeSlot)
     {
         return Inertia::render('ExamTimeSlots/Edit', [
@@ -763,7 +870,7 @@ class ExamController extends Controller
      *
      * After validation and updating the record, this method redirects the
      * user to the index page to display the updated list.
-     */
+    */
     public function examTimeSlotUpdate(Request $request, ExamTimeSlot $examTimeSlot)
     {
         $validatedData = $request->validate([
@@ -800,6 +907,120 @@ class ExamController extends Controller
             'message' => 'Exam time slot deleted successfully.',
             'type' => 'success',
         ]);
+    }
+
+
+
+    // Generate PDF for Exam Seat Plan
+
+    public function generateSeatPlanPDF(Request $request)
+    {
+        \Log::info('Starting generateSeatPlanPDF', $request->all());
+
+        try {
+            $request->validate([
+                'exam_id' => 'required|exists:exams,id', // Validates against exams table
+                'class_id' => 'required|exists:class_names,id',
+                'section_id' => 'required|exists:sections,id',
+                'session_id' => 'required|exists:class_sessions,id',
+                'room_id' => 'required|exists:rooms,id',
+                'group_id' => 'required|exists:groups,id',
+            ]);
+
+            $examId = $request->input('exam_id'); // Refers to exams.id
+            $classId = $request->input('class_id');
+            $sectionId = $request->input('section_id');
+            $sessionId = $request->input('session_id');
+            $roomId = $request->input('room_id');
+            $groupId = $request->input('group_id');
+
+            \Log::info('Fetching exam schedule');
+            // Query ExamSchedule by exam_id, not id
+            $examSchedule = ExamSchedule::with(['exam', 'subject'])
+                ->where('exam_id', $examId)
+                ->where('class_id', $classId)
+                ->where('section_id', $sectionId)
+                ->where('session_id', $sessionId)
+                ->where('group_id', $groupId)
+                ->firstOrFail();
+
+            \Log::info('Fetching class, section, session, room, group');
+            $class = ClassName::findOrFail($classId);
+            $section = Section::findOrFail($sectionId);
+            $session = ClassSession::findOrFail($sessionId);
+            $room = Room::findOrFail($roomId);
+            $group = Group::findOrFail($groupId);
+
+            \Log::info('Fetching eligible students');
+            $eligibleStudents = Student::where('class_id', $classId)
+                ->where('section_id', $sectionId)
+                ->where('session_id', $sessionId)
+                ->where('group_id', $groupId)
+                ->orderBy('roll_number')
+                ->with('group')
+                ->get();
+
+            \Log::info('Eligible students count: ' . $eligibleStudents->count());
+
+            $seatPlans = ExamSeatPlan::where('exam_id', $examId)
+                ->where('class_id', $classId)
+                ->where('section_id', $sectionId)
+                ->where('session_id', $sessionId)
+                ->where('group_id', $groupId)
+                ->get()
+                ->keyBy('student_id');
+
+            \Log::info('Seat plans count: ' . $seatPlans->count());
+
+            $seatAssignments = $eligibleStudents->map(function ($student) use ($seatPlans) {
+                $assignedSeat = $seatPlans->get($student->id);
+                return [
+                    'student_id' => $student->id,
+                    'name' => $student->name,
+                    'roll_number' => $student->roll_number,
+                    'admission_number' => $student->admission_number,
+                    'group_name' => $student->group ? $student->group->name : 'N/A',
+                    'seat_number' => $assignedSeat ? $assignedSeat->seat_number : 'Not Assigned',
+                ];
+            })->sortBy('seat_number')->toArray();
+
+            \Log::info('Seat assignments count: ' . count($seatAssignments));
+
+            if (empty($seatAssignments) || !collect($seatAssignments)->some(fn($assignment) => $assignment['seat_number'] !== 'Not Assigned')) {
+                \Log::warning('No seats assigned');
+                return response()->json(['error' => 'No seats assigned for this exam, class, section, and group.'], 422);
+            }
+
+            $setting = Setting::first();
+            \Log::info('Setting fetched', ['setting' => $setting ? $setting->toArray() : null]);
+
+            $data = [
+                'setting' => $setting,
+                'examSchedule' => $examSchedule,
+                'class' => $class,
+                'section' => $section,
+                'session' => $session,
+                'room' => $room,
+                'group' => $group,
+                'seatAssignments' => $seatAssignments,
+            ];
+
+            \Log::info('Loading PDF view');
+            $pdf = PDF::loadView('pdfs.class_section_seat_plan', $data);
+            $pdf->setPaper('A4', 'portrait');
+
+            \Log::info('Generating PDF download');
+            return $pdf->download("seat_plan_exam_{$examId}_class_{$classId}_section_{$sectionId}_group_{$groupId}.pdf");
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            \Log::error('Model not found: ' . $e->getMessage());
+            return response()->json(['error' => 'Record not found: ' . $e->getModel() . ' with ID ' . $e->getIds()[0]], 404);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            \Log::error('Validation failed: ' . $e->getMessage());
+            return response()->json(['error' => 'The selected exam id is invalid.'], 422);
+        } catch (\Exception $e) {
+            \Log::error('PDF generation failed: ' . $e->getMessage());
+            return response()->json(['error' => 'Failed to generate PDF: ' . $e->getMessage()], 500);
+        }
     }
 
 }

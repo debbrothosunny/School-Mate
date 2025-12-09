@@ -9,6 +9,8 @@ use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Database\Eloquent\Relations\MorphOne;
 class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
@@ -22,8 +24,8 @@ class User extends Authenticatable
     protected $fillable = [
         'name',
         'email',
-        'password',
         'contact_info',
+        'password',
     ];
 
     /**
@@ -68,5 +70,35 @@ class User extends Authenticatable
      public function student(): HasOne
     {
         return $this->hasOne(Student::class);
+    }
+
+
+
+    /**
+     * Define the relationship to all salary structures (optional, but good practice).
+     */
+    public function salaryStructures(): MorphMany
+    {
+        return $this->morphMany(SalaryStructure::class, 'salariable');
+    }
+
+    /**
+     * Get the *current* effective salary structure (Crucial for the Controller).
+     */
+    public function currentSalaryStructure(): MorphOne
+    {
+        // Must match the name used in your Teacher model and Controller
+        // Uses 'salariable' as defined in the salary_structures migration
+        return $this->morphOne(SalaryStructure::class, 'salariable')
+                    ->latest('effective_date'); 
+    }
+    
+    /**
+     * The payroll records for this staff member.
+     */
+    public function payrollRecords(): MorphMany
+    {
+        // Uses 'staff' as defined in the payroll_records migration and model
+        return $this->morphMany(PayrollRecord::class, 'staff', 'staff_type', 'staff_id');
     }
 }

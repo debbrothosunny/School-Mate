@@ -27,6 +27,7 @@ class HandleInertiaRequests extends Middleware
      *
      * @return array<string, mixed>
      */
+
     public function share(Request $request): array
     {
         // Always call the parent share method first to merge existing props
@@ -40,12 +41,19 @@ class HandleInertiaRequests extends Middleware
                     'roles' => $request->user()->getRoleNames(),
                 ] : null,
             ],
+            // FIX APPLIED HERE: Sharing 'success' and 'error' flash messages
             'flash' => [
+                // Your existing 'message' key
                 'message' => fn () => $request->session()->get('message'),
+                
+                // NEW: Add 'success' to expose it to $page.props.flash.success
+                'success' => fn () => $request->session()->get('success'),
+                
+                // Recommended: Also add 'error' for displaying global errors
+                'error' => fn () => $request->session()->get('error'),
             ],
-            // --- NEW: Add the unread notifications count here ---
+            // --- Notifications logic remains the same ---
             'unreadNotificationsCount' => fn () => $request->user() ? $request->user()->unreadNotifications()->count() : 0,
-            // --- Optional: Share all unread notifications if you want to display them immediately ---
             'unreadNotifications' => fn () => $request->user() ? $request->user()->unreadNotifications : collect([]),
         ]);
     }

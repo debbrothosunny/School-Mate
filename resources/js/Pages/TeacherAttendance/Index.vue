@@ -1,7 +1,12 @@
 <script setup>
-import { ref, watch, computed, watchEffect } from 'vue';
-import { useForm, router, usePage } from '@inertiajs/vue3';
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
+import { ref, watch, computed } from 'vue'
+import { useForm, router } from '@inertiajs/vue3'
+import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue'
+import PrimaryButton from '@/Components/PrimaryButton.vue'
+import InputLabel from '@/Components/InputLabel.vue'
+import TextInput from '@/Components/TextInput.vue'
+import InputError from '@/Components/InputError.vue'
+import { Head } from '@inertiajs/vue3'
 
 const props = defineProps({
     classes: Array,
@@ -9,232 +14,325 @@ const props = defineProps({
     sections: Array,
     groups: Array,
     students: Array,
-    attendanceExists: Boolean,
-    selectedClassId: Number,
-    selectedSessionId: Number,
-    selectedSectionId: Number,
-    selectedGroupId: Number,
+    teacher: Object,
+    selectedSessionId: [Number, String],
+    selectedSectionId: [Number, String],
+    selectedGroupId: [Number, String],
     selectedAttendanceDate: String,
-    initialMessage: Object,
-});
+})
 
+const search = ref('')
+
+// Filter Form
 const filterForm = useForm({
-    class_id: props.selectedClassId || '',
     session_id: props.selectedSessionId || '',
     section_id: props.selectedSectionId || '',
     group_id: props.selectedGroupId || '',
     attendance_date: props.selectedAttendanceDate || new Date().toISOString().slice(0, 10),
-});
+})
 
+// Attendance Form
 const attendanceForm = useForm({
-    class_id: filterForm.class_id,
     session_id: filterForm.session_id,
     section_id: filterForm.section_id,
     group_id: filterForm.group_id,
     attendance_date: filterForm.attendance_date,
-    attendance_data: props.students.map(s => ({
-        student_id: s.id,
-        status: s.attendance_status || 'absent',
-    })),
-});
+    attendance_data: [], // Will be filled from props.students
+})
 
-watch(() => filterForm.class_id, val => attendanceForm.class_id = val);
-watch(() => filterForm.session_id, val => attendanceForm.session_id = val);
-watch(() => filterForm.section_id, val => attendanceForm.section_id = val);
-watch(() => filterForm.group_id, val => attendanceForm.group_id = val);
-watch(() => filterForm.attendance_date, val => attendanceForm.attendance_date = val);
+// Keep attendance form in sync with filters
+watch([() => filterForm.session_id, () => filterForm.section_id, () => filterForm.group_id, () => filterForm.attendance_date], () => {
+    attendanceForm.session_id = filterForm.session_id
+    attendanceForm.section_id = filterForm.section_id
+    attendanceForm.group_id = filterForm.group_id
+    attendanceForm.attendance_date = filterForm.attendance_date
+})
 
-watch(() => props.students, students => {
-    attendanceForm.attendance_data = students.map(s => ({
-        student_id: s.id,
-        status: s.attendance_status || 'absent',
-    }));
-}, { deep: true });
+// Rebuild attendance_data whenever students change (after filter)
+watch(() => props.students, (newStudents) => {
+    attendanceForm.attendance_data = newStudents.map(student => ({
+        student_id: student.id,
+        status: student.attendance_status || 'present', // respects already saved attendance
+    }))
+}, { immediate: true })
 
+// Safe getters/setters using student_id (works perfectly with search/filter)
+const getStatus = (studentId) => {
+    const item = attendanceForm.attendance_data.find(i => i.student_id === studentId)
+    return item ? item.status : 'present'
+}
+
+const setStatus = (studentId, status) => {
+    const item = attendanceForm.attendance_data.find(i => i.student_id === studentId)
+    if (item) item.status = status
+}
+
+// Search students (by name or roll)
+const filteredStudents = computed(() => {
+    if (!search.value.trim()) return props.students
+
+    const term = search.value.toLowerCase()
+    return props.students.filter(student =>
+        student.name.toLowerCase().includes(term) ||
+        student.roll_number.toString().includes(term)
+    )
+})
+
+// Can submit only if all filters filled and students exist
+const canSubmit = computed(() => {
+    return filterForm.session_id &&
+           filterForm.section_id &&
+           filterForm.group_id &&
+           filterForm.attendance_date &&
+           props.students.length > 0 &&
+           attendanceForm.attendance_data.length > 0
+})
+
+// Apply Filters → Reload page with query params (Called automatically by the watch below)
 const applyFilters = () => {
-    router.get(route('teacherattendance.index'), filterForm.data(), {
+    attendanceForm.clearErrors('attendance_date')
+
+    router.get(route('teacherattendance.index'), {
+        session_id: filterForm.session_id || undefined,
+        section_id: filterForm.section_id || undefined,
+        group_id: filterForm.group_id || undefined,
+        attendance_date: filterForm.attendance_date || undefined,
+    }, {
         preserveState: true,
         preserveScroll: true,
-    });
-};
+        replace: true, // Use replace to avoid filling browser history
+    })
+}
 
+// 🎯 NEW: INSTANT FILTERING WATCHER
+watch([
+    () => filterForm.session_id,
+    () => filterForm.section_id,
+    () => filterForm.group_id,
+    () => filterForm.attendance_date
+], () => {
+    // Only trigger the server request if ALL four required filters are selected
+    if (filterForm.session_id && filterForm.section_id && filterForm.group_id && filterForm.attendance_date) {
+        applyFilters();
+    }
+}, { immediate: false, deep: true })
+
+
+// Submit Attendance
 const submitAttendance = () => {
     attendanceForm.post(route('teacherattendance.store'), {
-        onSuccess: () => applyFilters(),
-    });
-};
-
-const canSubmit = computed(() =>
-    filterForm.class_id &&
-    filterForm.session_id &&
-    filterForm.section_id &&
-    filterForm.group_id &&
-    filterForm.attendance_date &&
-    props.students.length > 0
-);
-
-
+        onSuccess: () => {
+            // Flash message handled by Laravel/Inertia
+        },
+        onError: () => {
+            // Errors will show automatically
+        }
+    })
+}
 </script>
 
-
 <template>
-    <Head title="Manage Attendance" />
+    <Head title="Take Student Attendance" />
 
     <AuthenticatedLayout>
         <template #header>
-            <h2 class="font-semibold text-xl text-gray-800 leading-tight">Manage Student Attendance</h2>
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+                <h2 class="font-semibold text-xl text-gray-800 leading-tight">
+                    Take Student Attendance
+                </h2>
+                <div class="mt-2 sm:mt-0 text-sm text-gray-600">
+                    <strong>{{ teacher.name }}</strong> — Class Teacher of
+                    <span class="font-bold text-indigo-600">
+                        {{ teacher.assigned_class }}
+                        {{ teacher.assigned_section ? ' - ' + teacher.assigned_section : '' }}
+                        {{ teacher.assigned_group ? ` (${teacher.assigned_group})` : '' }}
+                    </span>
+                </div>
+            </div>
         </template>
 
-        <!-- Flash message -->
-        <div v-if="$page.props.flash.message" 
-            :class="[
-                'p-4 mb-6 rounded border-l-4 font-semibold',
-                $page.props.flash.message.type === 'success' ? 'bg-green-100 border-green-500 text-green-700' : '',
-                $page.props.flash.message.type === 'error' ? 'bg-red-100 border-red-500 text-red-700' : '',
-                $page.props.flash.message.type === 'info' ? 'bg-blue-100 border-blue-500 text-blue-700' : ''
-            ]" role="alert">
-        {{ $page.props.flash.message.text }}
-        </div>
+        <div class="py-12 bg-gray-50 min-h-screen">
+            <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-8">
 
-        <div class="py-12 bg-gray-100 min-h-screen">
-            <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-                <div class="bg-white overflow-hidden shadow-lg sm:rounded-xl">
-                    <div class="p-6 text-gray-900 space-y-8">
-                        <!-- Flash and Initial Messages -->
-                        <div v-if="$page.props.flash?.success" class="bg-green-100 border-l-4 border-green-500 text-green-700 p-4 rounded-lg" role="alert">
-                            <p class="font-semibold">{{ $page.props.flash.success }}</p>
-                        </div>
-                        
-                        <div v-if="props.initialMessage" :class="['p-4 border-l-4 rounded-lg', getMessageClass(props.initialMessage.type)]" role="alert">
-                            <p class="font-semibold">{{ props.initialMessage.text }}</p>
-                        </div>
-                        
-                        <div v-if="attendanceForm.hasErrors" class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-lg" role="alert">
-                            <ul class="list-disc list-inside">
-                                <li v-for="error in attendanceForm.errors" :key="error">{{ error }}</li>
-                            </ul>
-                        </div>
-                        
-                        <!-- Filter Section -->
-                        <div class="bg-gray-50 p-6 rounded-xl shadow-inner">
-                            <h3 class="text-xl font-bold text-gray-800 mb-6">Filter Students for Attendance</h3>
-                            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
-                                <!-- Class Dropdown -->
-                                <div>
-                                    <label for="class_id" class="block text-sm font-medium text-gray-700 mb-1">Class</label>
-                                    <select id="class_id" v-model="filterForm.class_id" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring focus:ring-indigo-500 focus:ring-opacity-50 transition duration-150 ease-in-out">
-                                        <option value="">Select Class</option>
-                                        <option v-for="cls in classes" :key="cls.id" :value="cls.id">{{ cls.class_name }}</option>
-                                    </select>
-                                </div>
-                                <!-- Session Dropdown -->
-                                <div>
-                                    <label for="session_id" class="block text-sm font-medium text-gray-700 mb-1">Session</label>
-                                    <select id="session_id" v-model="filterForm.session_id" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring focus:ring-indigo-500 focus:ring-opacity-50 transition duration-150 ease-in-out">
-                                        <option value="">Select Session</option>
-                                        <option v-for="session in sessions" :key="session.id" :value="session.id">{{ session.name }}</option>
-                                    </select>
-                                </div>
-                                <!-- Section Dropdown -->
-                                <div>
-                                    <label for="section_id" class="block text-sm font-medium text-gray-700 mb-1">Section</label>
-                                    <select id="section_id" v-model="filterForm.section_id" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring focus:ring-indigo-500 focus:ring-opacity-50 transition duration-150 ease-in-out">
-                                        <option value="">Select Section</option>
-                                        <option v-for="section in sections" :key="section.id" :value="section.id">{{ section.name }}</option>
-                                    </select>
-                                </div>
-                                <!-- Group Dropdown -->
-                                <div>
-                                    <label for="group_id" class="block text-sm font-medium text-gray-700 mb-1">Group</label>
-                                    <select id="group_id" v-model="filterForm.group_id" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring focus:ring-indigo-500 focus:ring-opacity-50 transition duration-150 ease-in-out">
-                                        <option value="">Select Group</option>
-                                        <option v-for="group in groups" :key="group.id" :value="group.id">{{ group.name }}</option>
-                                    </select>
-                                </div>
-                                <!-- Date Picker -->
-                                <div>
-                                    <label for="attendance_date" class="block text-sm font-medium text-gray-700 mb-1">Date</label>
-                                    <input type="date" id="attendance_date" v-model="filterForm.attendance_date"
-                                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring focus:ring-indigo-500 focus:ring-opacity-50 transition duration-150 ease-in-out" />
-                                </div>
-                            </div>
+                <div v-if="$page.props.flash?.success"
+                    class="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-8 py-5 rounded-2xl shadow-2xl bg-gradient-to-r from-green-500 to-emerald-600 text-white font-bold text-lg animate-pulse">
+                    {{ $page.props.flash.success }}
+                </div>
 
-                            <!-- Apply Filters Button -->
-                            <div class="mt-8 flex justify-end">
-                                <button type="button" @click="applyFilters"
-                                    :disabled="filterForm.processing"
-                                    class="px-6 py-2 bg-blue-600 text-white font-semibold rounded-md shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition duration-150 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed">
-                                    {{ filterForm.processing ? 'Filtering...' : 'Apply Filters' }}
-                                </button>
-                            </div>
+                <div v-if="$page.props.flash?.error"
+                    class="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-8 py-5 rounded-2xl shadow-2xl bg-gradient-to-r from-red-500 to-rose-600 text-white font-bold text-lg animate-bounce">
+                    {{ $page.props.flash.error }}
+                </div>
+
+                <div class="bg-gradient-to-r from-indigo-600 to-purple-700 text-white p-8 rounded-3xl shadow-2xl text-center">
+                    <h3 class="text-2xl font-bold">You are Class Teacher of</h3>
+                    <p class="text-5xl font-extrabold mt-3">
+                        {{ props.classes[0]?.class_name }}
+                        <span v-if="teacher.assigned_section" class="text-3xl"> — {{ teacher.assigned_section }}</span>
+                        <span v-if="teacher.assigned_group" class="text-2xl"> ({{ teacher.assigned_group }})</span>
+                    </p>
+                </div>
+
+                <div class="bg-white rounded-3xl shadow-xl p-8 border border-gray-200">
+                    <h3 class="text-2xl font-bold text-gray-800 mb-8">Select Filters</h3>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <div>
+                            <InputLabel value="Session" />
+                            <select v-model="filterForm.session_id"
+                                class="mt-1 block w-full rounded-xl border-gray-300 focus:ring-4 focus:ring-indigo-300 focus:border-indigo-500">
+                                <option value="">Select Session</option>
+                                <option v-for="s in sessions" :key="s.id" :value="s.id">{{ s.name }}</option>
+                            </select>
+                            <InputError :message="filterForm.errors.session_id" class="mt-2" />
                         </div>
 
-                        <!-- Student Attendance Section -->
-                        <div v-if="props.students && props.students.length > 0">
-                            <h3 class="text-xl font-bold text-gray-800 mt-8 mb-6">Student Attendance Entry</h3>
-                            <form @submit.prevent="submitAttendance">
-                                <div class="overflow-x-auto relative shadow-md sm:rounded-xl">
-                                    <table class="w-full text-sm text-left text-gray-500">
-                                        <thead class="text-xs text-gray-700 uppercase bg-gray-200">
-                                            <tr>
-                                                <th scope="col" class="py-3 px-6">Student Name</th>
-                                                <th scope="col" class="py-3 px-6">Roll</th>
-                                                <th scope="col" class="py-3 px-6 text-center">Attendance Status</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <tr v-for="(student, index) in props.students" :key="student.id" class="bg-white border-b hover:bg-gray-50 transition-colors duration-200">
-                                                <td class="py-4 px-6 font-medium text-gray-900 whitespace-nowrap">
-                                                    {{ student.name }}
-                                                    <input type="hidden" :name="`attendance_data[${index}][student_id]`" :value="student.id">
-                                                </td>
-                                                <td class="py-4 px-6">{{ student.roll_no }}</td>
-                                                <td class="py-4 px-6">
-                                                    <div class="flex items-center justify-center space-x-4">
-                                                        <!-- Present Radio -->
-                                                        <label class="inline-flex items-center cursor-pointer">
-                                                            <input type="radio" :name="`attendance_data[${index}][status]`" value="present" v-model="attendanceForm.attendance_data[index].status" class="form-radio h-4 w-4 text-green-600 focus:ring-green-500">
-                                                            <span class="ml-2 text-sm text-gray-700">Present</span>
-                                                        </label>
-                                                        <!-- Absent Radio -->
-                                                        <label class="inline-flex items-center cursor-pointer">
-                                                            <input type="radio" :name="`attendance_data[${index}][status]`" value="absent" v-model="attendanceForm.attendance_data[index].status" class="form-radio h-4 w-4 text-red-600 focus:ring-red-500">
-                                                            <span class="ml-2 text-sm text-gray-700">Absent</span>
-                                                        </label>
-                                                        <!-- Late Radio -->
-                                                        <label class="inline-flex items-center cursor-pointer">
-                                                            <input type="radio" :name="`attendance_data[${index}][status]`" value="late" v-model="attendanceForm.attendance_data[index].status" class="form-radio h-4 w-4 text-yellow-600 focus:ring-yellow-500">
-                                                            <span class="ml-2 text-sm text-gray-700">Late</span>
-                                                        </label>
-                                                    </div>
-                                                    <div v-if="attendanceForm.errors[`attendance_data.${index}.status`]" class="text-red-500 text-xs text-center mt-1">
-                                                        {{ attendanceForm.errors[`attendance_data.${index}.status`] }}
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                                <div class="mt-8 flex justify-end">
-                                    <button type="submit" :disabled="attendanceForm.processing || !canSubmit"
-                                        class="px-6 py-2 bg-indigo-600 text-white font-semibold rounded-md shadow-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition duration-150 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed">
-                                        {{ attendanceForm.processing ? 'Saving...' : 'Save Attendance' }}
-                                    </button>
-                                </div>
-                            </form>
+                        <div>
+                            <InputLabel value="Section" />
+                            <select v-model="filterForm.section_id"
+                                class="mt-1 block w-full rounded-xl border-gray-300 focus:ring-4 focus:ring-indigo-300">
+                                <option value="">Select Section</option>
+                                <option v-for="s in sections" :key="s.id" :value="s.id">{{ s.name }}</option>
+                            </select>
+                            <InputError :message="filterForm.errors.section_id" class="mt-2" />
                         </div>
-                        
-                        <!-- No Students Found Message -->
-                        <div v-else-if="filterForm.class_id && filterForm.session_id && filterForm.section_id && filterForm.group_id && filterForm.attendance_date && !props.initialMessage"
-                             class="bg-gray-100 border-l-4 border-gray-400 text-gray-700 p-4 rounded-lg" role="alert">
-                            <p class="font-semibold">No students found for the selected criteria.</p>
+
+                        <div>
+                            <InputLabel value="Group" />
+                            <select v-model="filterForm.group_id"
+                                class="mt-1 block w-full rounded-xl border-gray-300 focus:ring-4 focus:ring-indigo-300">
+                                <option value="">Select Group</option>
+                                <option v-for="g in groups" :key="g.id" :value="g.id">{{ g.name }}</option>
+                            </select>
+                            <InputError :message="filterForm.errors.group_id" class="mt-2" />
+                        </div>
+
+                        <div>
+                            <InputLabel value="Date" />
+                            <TextInput type="date" v-model="filterForm.attendance_date"
+                                class="mt-1 block w-full rounded-xl" />
+                            <InputError :message="attendanceForm.errors.attendance_date" class="mt-2" />
                         </div>
                     </div>
+
+                    </div>
+                
+                <div v-if="props.students.length > 0"
+                    class="bg-white rounded-3xl shadow-2xl border border-gray-200 overflow-hidden">
+
+                    <div class="p-6 bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                        <h3 class="text-2xl font-bold text-gray-800">
+                            Student Attendance ({{ props.students.length }})
+                        </h3>
+                        <div class="flex flex-col sm:flex-row gap-3">
+                            <TextInput v-model="search" placeholder="Search by name or roll..."
+                                class="w-full sm:w-64" />
+                            
+                            </div>
+                    </div>
+
+                    <form @submit.prevent="submitAttendance">
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead class="bg-gray-100 text-xs uppercase font-bold text-gray-600">
+                                    <tr>
+                                        <th class="px-6 py-4 text-left">Roll</th>
+                                        <th class="px-6 py-4 text-left">Name</th>
+                                        <th class="px-6 py-4 text-center">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-200">
+                                    <tr v-for="student in filteredStudents" :key="student.id"
+                                        class="hover:bg-gray-50 transition-all duration-200">
+                                        <td class="px-6 py-5 font-medium text-gray-900">
+                                            {{ student.roll_number }}
+                                        </td>
+                                        <td class="px-6 py-5 text-gray-800 font-medium">
+                                            {{ student.name }}
+                                        </td>
+                                        <td class="px-6 py-5">
+                                            <div class="flex justify-center gap-8">
+                                                <label class="flex items-center gap-2 cursor-pointer">
+                                                    <input type="radio"
+                                                            :name="'status_' + student.id"
+                                                            :checked="getStatus(student.id) === 'present'"
+                                                            @change="setStatus(student.id, 'present')"
+                                                            class="w-5 h-5 text-green-600 focus:ring-green-500">
+                                                    <span class="text-green-700 font-semibold">Present</span>
+                                                </label>
+
+                                                <label class="flex items-center gap-2 cursor-pointer">
+                                                    <input type="radio"
+                                                            :name="'status_' + student.id"
+                                                            :checked="getStatus(student.id) === 'absent'"
+                                                            @change="setStatus(student.id, 'absent')"
+                                                            class="w-5 h-5 text-red-600 focus:ring-red-500">
+                                                    <span class="text-red-700 font-semibold">Absent</span>
+                                                </label>
+
+                                                <label class="flex items-center gap-2 cursor-pointer">
+                                                    <input type="radio"
+                                                            :name="'status_' + student.id"
+                                                            :checked="getStatus(student.id) === 'late'"
+                                                            @change="setStatus(student.id, 'late')"
+                                                            class="w-5 h-5 text-yellow-600 focus:ring-yellow-500">
+                                                    <span class="text-yellow-700 font-semibold">Late</span>
+                                                </label>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="p-6 bg-gray-50 border-t border-gray-200">
+                            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                                <div v-if="attendanceForm.hasErrors" class="text-red-600">
+                                    <p class="font-semibold">Please fix the following errors:</p>
+                                    <ul class="list-disc list-inside">
+                                        <li v-for="(error, field) in attendanceForm.errors" :key="field">
+                                            {{ error }}
+                                        </li>
+                                    </ul>
+                                </div>
+
+                                <PrimaryButton type="submit"
+                                    :disabled="!canSubmit || attendanceForm.processing"
+                                    class="px-12 py-4 text-xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700">
+                                    {{ attendanceForm.processing ? 'Saving Attendance...' : 'Save Attendance' }}
+                                </PrimaryButton>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+
+                <div v-else-if="filterForm.session_id && filterForm.section_id && filterForm.group_id && filterForm.attendance_date"
+                    class="bg-yellow-50 border-2 border-yellow-400 rounded-3xl p-12 text-center">
+                    <p class="text-2xl font-bold text-yellow-800">
+                        No students found for the selected criteria.
+                    </p>
+                </div>
+
+                <div v-else class="bg-blue-50 border-2 border-blue-300 rounded-3xl p-12 text-center">
+                    <p class="text-2xl font-semibold text-blue-800">
+                        Please select **Session**, **Section**, **Group**, and **Date** to load students automatically.
+                    </p>
                 </div>
             </div>
         </div>
     </AuthenticatedLayout>
 </template>
 
+<style scoped>
+input[type="radio"] {
+    transform: scale(1.4);
+}
 
+.animate-pulse {
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1);
+}
 
+.animate-bounce {
+    animation: bounce 1s infinite;
+}
+</style>

@@ -49,5 +49,8 @@ class FeeType extends Model
         return $this->hasMany(InvoiceItem::class);
     }
 
+
+    
+
     
 }

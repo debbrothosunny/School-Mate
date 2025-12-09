@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Aug 13, 2025 at 12:26 PM
+-- Generation Time: Dec 07, 2025 at 07:17 AM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -34,7 +34,6 @@ CREATE TABLE `attendances` (
   `session_id` bigint(20) UNSIGNED NOT NULL,
   `section_id` bigint(20) UNSIGNED NOT NULL,
   `group_id` bigint(20) UNSIGNED NOT NULL,
-  `subject_id` bigint(20) UNSIGNED NOT NULL,
   `date` date NOT NULL,
   `status` enum('present','absent','late') NOT NULL DEFAULT 'present',
   `created_at` timestamp NULL DEFAULT NULL,
@@ -45,19 +44,9 @@ CREATE TABLE `attendances` (
 -- Dumping data for table `attendances`
 --
 
-INSERT INTO `attendances` (`id`, `student_id`, `class_id`, `session_id`, `section_id`, `group_id`, `subject_id`, `date`, `status`, `created_at`, `updated_at`) VALUES
-(2, 1, 1, 1, 7, 1, 1, '2025-07-21', 'present', '2025-07-20 04:07:59', '2025-07-20 04:07:59'),
-(3, 2, 1, 1, 7, 1, 1, '2025-07-21', 'late', '2025-07-20 04:07:59', '2025-07-20 04:07:59'),
-(5, 1, 1, 1, 7, 1, 3, '2025-07-20', 'absent', '2025-07-20 04:09:32', '2025-07-20 04:09:32'),
-(6, 2, 1, 1, 7, 1, 3, '2025-07-20', 'present', '2025-07-20 04:09:32', '2025-07-20 04:09:32'),
-(7, 1, 1, 1, 7, 1, 5, '2025-07-22', 'present', '2025-07-22 02:30:42', '2025-07-22 02:30:42'),
-(8, 2, 1, 1, 7, 1, 5, '2025-07-22', 'present', '2025-07-22 02:30:42', '2025-07-22 02:30:42'),
-(9, 1, 1, 1, 7, 1, 5, '2025-07-23', 'present', '2025-07-23 02:11:46', '2025-07-23 02:11:46'),
-(10, 2, 1, 1, 7, 1, 5, '2025-07-23', 'present', '2025-07-23 02:11:46', '2025-07-23 02:11:46'),
-(11, 1, 1, 1, 7, 4, 1, '2025-08-05', 'absent', '2025-08-05 00:57:43', '2025-08-05 00:57:43'),
-(12, 2, 1, 1, 7, 4, 1, '2025-08-05', 'present', '2025-08-05 00:57:43', '2025-08-05 00:57:43'),
-(13, 1, 1, 1, 7, 4, 1, '2025-08-04', 'late', '2025-08-05 01:18:46', '2025-08-05 01:18:46'),
-(14, 2, 1, 1, 7, 4, 1, '2025-08-04', 'late', '2025-08-05 01:18:46', '2025-08-05 01:18:46');
+INSERT INTO `attendances` (`id`, `student_id`, `class_id`, `session_id`, `section_id`, `group_id`, `date`, `status`, `created_at`, `updated_at`) VALUES
+(46, 13, 3, 1, 7, 4, '2025-12-04', 'present', '2025-12-04 01:12:32', '2025-12-04 01:12:32'),
+(47, 14, 3, 1, 7, 4, '2025-12-04', 'present', '2025-12-04 01:12:32', '2025-12-04 01:12:32');
 
 -- --------------------------------------------------------
 
@@ -75,18 +64,10 @@ CREATE TABLE `books` (
   `quantity` int(11) NOT NULL DEFAULT 0,
   `available_quantity` int(11) NOT NULL DEFAULT 0,
   `genre` varchar(255) DEFAULT NULL,
-  `cover_image_path` varchar(255) DEFAULT NULL,
   `status` tinyint(1) NOT NULL DEFAULT 0,
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
---
--- Dumping data for table `books`
---
-
-INSERT INTO `books` (`id`, `title`, `author`, `publisher`, `publication_date`, `isbn`, `quantity`, `available_quantity`, `genre`, `cover_image_path`, `status`, `created_at`, `updated_at`) VALUES
-(1, 'sss', 'ss', 'ss', '2025-07-13', 'ss', 10, 2, 'ss', NULL, 0, '2025-07-13 06:46:04', '2025-07-15 02:37:26');
 
 -- --------------------------------------------------------
 
@@ -97,10 +78,14 @@ INSERT INTO `books` (`id`, `title`, `author`, `publisher`, `publication_date`, `
 CREATE TABLE `borrow_books` (
   `id` bigint(20) UNSIGNED NOT NULL,
   `book_id` bigint(20) UNSIGNED NOT NULL,
-  `student_id` bigint(20) UNSIGNED NOT NULL,
+  `student_name` varchar(255) NOT NULL,
+  `admission_number` varchar(50) NOT NULL,
+  `class_name` varchar(50) NOT NULL,
+  `quantity` smallint(5) UNSIGNED NOT NULL DEFAULT 1,
   `borrow_date` date NOT NULL,
+  `due_date` date NOT NULL,
   `return_date` date DEFAULT NULL,
-  `status` int(11) NOT NULL DEFAULT 0,
+  `status` tinyint(3) UNSIGNED NOT NULL DEFAULT 0,
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -109,9 +94,10 @@ CREATE TABLE `borrow_books` (
 -- Dumping data for table `borrow_books`
 --
 
-INSERT INTO `borrow_books` (`id`, `book_id`, `student_id`, `borrow_date`, `return_date`, `status`, `created_at`, `updated_at`) VALUES
-(1, 1, 3, '2025-07-13', '2025-07-15', 1, '2025-07-13 04:51:36', '2025-07-15 01:57:10'),
-(2, 1, 3, '2025-07-15', '2025-07-22', 0, '2025-07-15 02:37:26', '2025-07-15 02:37:26');
+INSERT INTO `borrow_books` (`id`, `book_id`, `student_name`, `admission_number`, `class_name`, `quantity`, `borrow_date`, `due_date`, `return_date`, `status`, `created_at`, `updated_at`) VALUES
+(1, 5, 'Sunny', '331505', 'Six', 1, '2025-10-15', '2025-10-22', '2025-10-15', 1, '2025-10-15 04:07:28', '2025-10-15 05:08:20'),
+(2, 5, 'Sunny', '442255', 'Six', 1, '2025-10-15', '2025-10-22', '2025-10-15', 1, '2025-10-15 05:11:08', '2025-10-15 05:12:05'),
+(3, 1, 'saaa', '12123', 'Six', 1, '2025-10-30', '2025-11-06', '2025-10-30', 1, '2025-10-29 23:41:04', '2025-10-29 23:41:11');
 
 -- --------------------------------------------------------
 
@@ -181,9 +167,9 @@ CREATE TABLE `class_fee_structures` (
 --
 
 INSERT INTO `class_fee_structures` (`id`, `class_id`, `session_id`, `group_id`, `section_id`, `amount`, `fee_type_id`, `status`, `created_at`, `updated_at`) VALUES
-(1, 1, 1, 4, 7, 4000, 2, 0, '2025-07-29 03:06:20', '2025-07-29 03:38:59'),
-(2, 1, 1, 4, 7, 5000, 1, 0, '2025-07-29 23:13:54', '2025-07-29 23:13:54'),
-(4, 1, 1, 4, 7, 1000, 4, 0, '2025-07-30 23:41:52', '2025-07-30 23:41:52');
+(11, 1, 1, 4, 7, 1000, 10, 0, '2025-10-13 23:47:05', '2025-11-13 03:26:27'),
+(12, 1, 1, 4, 7, 500, 8, 0, '2025-11-13 05:08:48', '2025-11-13 05:08:48'),
+(13, 1, 1, 4, 7, 1000, 6, 0, '2025-11-13 05:09:05', '2025-11-13 05:09:05');
 
 -- --------------------------------------------------------
 
@@ -194,8 +180,7 @@ INSERT INTO `class_fee_structures` (`id`, `class_id`, `session_id`, `group_id`, 
 CREATE TABLE `class_names` (
   `id` bigint(20) UNSIGNED NOT NULL,
   `class_name` varchar(255) NOT NULL,
-  `status` tinyint(4) NOT NULL DEFAULT 0,
-  `total_classes` smallint(5) UNSIGNED NOT NULL DEFAULT 0,
+  `status` tinyint(4) NOT NULL DEFAULT 0 COMMENT '0 = Active, 1 = Inactive',
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -204,8 +189,9 @@ CREATE TABLE `class_names` (
 -- Dumping data for table `class_names`
 --
 
-INSERT INTO `class_names` (`id`, `class_name`, `status`, `total_classes`, `created_at`, `updated_at`) VALUES
-(1, 'Six', 0, 20, '2025-08-03 06:33:39', '2025-08-03 06:33:39');
+INSERT INTO `class_names` (`id`, `class_name`, `status`, `created_at`, `updated_at`) VALUES
+(3, 'Six', 0, '2025-11-23 00:48:22', '2025-11-23 00:48:22'),
+(4, 'Seven', 0, '2025-11-23 00:48:59', '2025-11-23 00:48:59');
 
 -- --------------------------------------------------------
 
@@ -226,10 +212,10 @@ CREATE TABLE `class_sessions` (
 --
 
 INSERT INTO `class_sessions` (`id`, `name`, `status`, `created_at`, `updated_at`) VALUES
-(1, '2024-2025', 0, '2025-06-02 18:17:22', '2025-06-02 18:17:22'),
-(2, '2025-2026', 0, '2025-06-24 06:56:28', '2025-06-25 06:56:28'),
-(3, '2026-2027', 0, '2025-07-26 23:35:18', '2025-07-26 23:35:18'),
-(4, '2027-2028', 0, '2025-08-09 22:13:58', '2025-08-09 22:13:58');
+(1, '2025', 0, '2025-06-02 18:17:22', '2025-10-30 00:34:36'),
+(2, '2026', 0, '2025-06-24 06:56:28', '2025-10-30 00:34:47'),
+(9, '2027', 0, '2025-09-03 23:08:12', '2025-10-30 00:34:55'),
+(16, '2028', 0, '2025-12-03 23:29:37', '2025-12-03 23:29:37');
 
 -- --------------------------------------------------------
 
@@ -255,10 +241,13 @@ CREATE TABLE `class_subjects` (
 --
 
 INSERT INTO `class_subjects` (`id`, `class_name_id`, `subject_id`, `teacher_id`, `session_id`, `section_id`, `group_id`, `status`, `created_at`, `updated_at`) VALUES
-(1, 1, 5, 5, 1, 7, 4, 0, '2025-07-24 04:01:14', '2025-07-24 04:01:14'),
-(2, 1, 3, 6, 1, 7, 4, 0, '2025-07-25 22:50:00', '2025-07-25 22:50:00'),
-(3, 1, 1, 5, 1, 7, 4, 0, '2025-07-25 22:50:16', '2025-07-25 22:50:16'),
-(4, 1, 2, 6, 1, 7, 4, 0, '2025-08-02 00:27:39', '2025-08-02 00:27:39');
+(29, 1, 14, 1, 1, 7, 4, 0, '2025-10-30 03:16:34', '2025-11-12 00:21:55'),
+(31, 1, 4, 2, 1, 8, 4, 0, '2025-11-01 03:03:50', '2025-11-18 03:52:38'),
+(33, 1, 5, 3, 1, 7, 4, 0, '2025-11-01 03:04:49', '2025-11-12 00:21:12'),
+(34, 1, 9, 1, 1, 7, 4, 0, '2025-11-01 03:05:11', '2025-11-12 00:21:03'),
+(37, 1, 3, 2, 1, 7, 4, 0, '2025-11-07 23:14:18', '2025-11-12 00:18:53'),
+(39, 3, 18, 5, 1, 7, 4, 0, '2025-11-08 00:00:50', '2025-11-23 22:52:56'),
+(40, 3, 8, 15, 1, 7, 4, 0, '2025-11-10 01:31:54', '2025-12-04 00:22:25');
 
 -- --------------------------------------------------------
 
@@ -273,21 +262,37 @@ CREATE TABLE `class_times` (
   `teacher_id` bigint(20) UNSIGNED NOT NULL,
   `section_id` bigint(20) UNSIGNED NOT NULL,
   `session_id` bigint(20) UNSIGNED NOT NULL,
+  `group_id` bigint(20) UNSIGNED NOT NULL,
   `day_of_week` varchar(255) NOT NULL,
-  `start_time` time NOT NULL,
-  `end_time` time NOT NULL,
-  `room_id` bigint(20) UNSIGNED NOT NULL,
+  `class_time_slot_id` bigint(20) UNSIGNED NOT NULL,
+  `room_id` bigint(20) UNSIGNED DEFAULT NULL,
   `status` tinyint(4) NOT NULL DEFAULT 0 COMMENT '0=Active, 1=Inactive',
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- --------------------------------------------------------
+
 --
--- Dumping data for table `class_times`
+-- Table structure for table `class_time_slots`
 --
 
-INSERT INTO `class_times` (`id`, `class_name_id`, `subject_id`, `teacher_id`, `section_id`, `session_id`, `day_of_week`, `start_time`, `end_time`, `room_id`, `status`, `created_at`, `updated_at`) VALUES
-(3, 1, 2, 6, 7, 1, 'MONDAY', '10:00:00', '11:00:00', 1, 0, '2025-08-02 00:28:19', '2025-08-02 00:28:19');
+CREATE TABLE `class_time_slots` (
+  `id` bigint(20) UNSIGNED NOT NULL,
+  `name` varchar(255) NOT NULL,
+  `start_time` time NOT NULL,
+  `end_time` time NOT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `class_time_slots`
+--
+
+INSERT INTO `class_time_slots` (`id`, `name`, `start_time`, `end_time`, `created_at`, `updated_at`) VALUES
+(2, 'First Period', '10:00:00', '11:00:00', '2025-08-31 00:52:09', '2025-10-18 00:39:05'),
+(3, 'Second Period', '11:00:00', '12:00:00', '2025-08-31 00:53:41', '2025-09-06 00:33:16');
 
 -- --------------------------------------------------------
 
@@ -299,8 +304,6 @@ CREATE TABLE `exams` (
   `id` bigint(20) UNSIGNED NOT NULL,
   `exam_name` varchar(255) NOT NULL,
   `session_id` bigint(20) UNSIGNED NOT NULL,
-  `total_marks` int(11) NOT NULL,
-  `passing_marks` int(11) NOT NULL,
   `status` tinyint(4) NOT NULL DEFAULT 0 COMMENT '0=Active, 1=Inactive',
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL
@@ -310,9 +313,8 @@ CREATE TABLE `exams` (
 -- Dumping data for table `exams`
 --
 
-INSERT INTO `exams` (`id`, `exam_name`, `session_id`, `total_marks`, `passing_marks`, `status`, `created_at`, `updated_at`) VALUES
-(1, 'Half-Yearly', 1, 40, 20, 0, '2025-07-23 04:55:33', '2025-07-23 04:58:21'),
-(2, 'Yearly', 1, 60, 30, 0, '2025-07-23 04:56:04', '2025-07-26 00:07:27');
+INSERT INTO `exams` (`id`, `exam_name`, `session_id`, `status`, `created_at`, `updated_at`) VALUES
+(1, 'Half-Yearly', 1, 0, '2025-10-30 02:54:33', '2025-10-30 02:54:33');
 
 -- --------------------------------------------------------
 
@@ -322,31 +324,23 @@ INSERT INTO `exams` (`id`, `exam_name`, `session_id`, `total_marks`, `passing_ma
 
 CREATE TABLE `exam_results` (
   `id` bigint(20) UNSIGNED NOT NULL,
-  `exam_id` bigint(20) UNSIGNED NOT NULL,
+  `exam_id` bigint(20) UNSIGNED DEFAULT NULL,
   `student_id` bigint(20) UNSIGNED NOT NULL,
   `session_id` bigint(20) UNSIGNED NOT NULL,
   `class_id` bigint(20) UNSIGNED NOT NULL,
   `section_id` bigint(20) UNSIGNED NOT NULL,
   `group_id` bigint(20) UNSIGNED NOT NULL,
-  `total_marks_obtained` int(11) DEFAULT NULL,
-  `total_possible_marks` int(11) DEFAULT NULL,
+  `total_marks_obtained` smallint(5) UNSIGNED DEFAULT NULL COMMENT 'Sum of marks from all subjects for this student in this exam.',
+  `total_possible_marks` smallint(5) UNSIGNED DEFAULT NULL COMMENT 'Sum of full marks from all subjects for this student in this exam.',
   `percentage` decimal(5,2) DEFAULT NULL,
-  `final_grade_point` decimal(3,2) NOT NULL,
+  `final_grade_point` decimal(3,2) NOT NULL COMMENT 'Calculated GPA/Grade Point',
   `final_letter_grade` varchar(10) NOT NULL,
-  `overall_status` varchar(20) DEFAULT NULL,
-  `subject_wise_data` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`subject_wise_data`)),
+  `overall_status` varchar(20) DEFAULT NULL COMMENT 'e.g., Pass, Fail, Promoted',
+  `subject_wise_data` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL COMMENT 'Detailed breakdown per subject, including component marks (Subjective/Objective/Practical).' CHECK (json_valid(`subject_wise_data`)),
   `published_at` timestamp NULL DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
---
--- Dumping data for table `exam_results`
---
-
-INSERT INTO `exam_results` (`id`, `exam_id`, `student_id`, `session_id`, `class_id`, `section_id`, `group_id`, `total_marks_obtained`, `total_possible_marks`, `percentage`, `final_grade_point`, `final_letter_grade`, `overall_status`, `subject_wise_data`, `published_at`, `created_at`, `updated_at`) VALUES
-(11, 1, 1, 1, 1, 7, 4, 85, 120, 70.83, 4.00, 'A', 'Pass', '\"[{\\\"subject_name\\\":\\\"Bangla\\\",\\\"marks_obtained\\\":30,\\\"total_marks\\\":40,\\\"passing_marks\\\":20,\\\"percentage\\\":75,\\\"letter_grade\\\":\\\"A\\\",\\\"grade_point\\\":4,\\\"pass_status\\\":\\\"Pass\\\"},{\\\"subject_name\\\":\\\"English\\\",\\\"marks_obtained\\\":25,\\\"total_marks\\\":40,\\\"passing_marks\\\":20,\\\"percentage\\\":62.5,\\\"letter_grade\\\":\\\"A-\\\",\\\"grade_point\\\":3.5,\\\"pass_status\\\":\\\"Pass\\\"},{\\\"subject_name\\\":\\\"Math\\\",\\\"marks_obtained\\\":30,\\\"total_marks\\\":40,\\\"passing_marks\\\":20,\\\"percentage\\\":75,\\\"letter_grade\\\":\\\"A\\\",\\\"grade_point\\\":4,\\\"pass_status\\\":\\\"Pass\\\"}]\"', '2025-08-10 04:14:00', '2025-07-28 00:37:20', '2025-08-10 04:14:00'),
-(12, 1, 2, 1, 1, 7, 4, 81, 120, 67.50, 3.50, 'A-', 'Pass', '\"[{\\\"subject_name\\\":\\\"Bangla\\\",\\\"marks_obtained\\\":25,\\\"total_marks\\\":40,\\\"passing_marks\\\":20,\\\"percentage\\\":62.5,\\\"letter_grade\\\":\\\"A-\\\",\\\"grade_point\\\":3.5,\\\"pass_status\\\":\\\"Pass\\\"},{\\\"subject_name\\\":\\\"English\\\",\\\"marks_obtained\\\":25,\\\"total_marks\\\":40,\\\"passing_marks\\\":20,\\\"percentage\\\":62.5,\\\"letter_grade\\\":\\\"A-\\\",\\\"grade_point\\\":3.5,\\\"pass_status\\\":\\\"Pass\\\"},{\\\"subject_name\\\":\\\"Math\\\",\\\"marks_obtained\\\":31,\\\"total_marks\\\":40,\\\"passing_marks\\\":20,\\\"percentage\\\":77.5,\\\"letter_grade\\\":\\\"A\\\",\\\"grade_point\\\":4,\\\"pass_status\\\":\\\"Pass\\\"}]\"', '2025-08-10 04:14:00', '2025-07-28 00:37:20', '2025-08-10 04:14:00');
 
 -- --------------------------------------------------------
 
@@ -360,14 +354,14 @@ CREATE TABLE `exam_schedules` (
   `class_id` bigint(20) UNSIGNED NOT NULL,
   `section_id` bigint(20) UNSIGNED NOT NULL,
   `session_id` bigint(20) UNSIGNED NOT NULL,
+  `group_id` bigint(20) UNSIGNED DEFAULT NULL,
   `teacher_id` bigint(20) UNSIGNED DEFAULT NULL,
   `subject_id` bigint(20) UNSIGNED NOT NULL,
   `room_id` bigint(20) UNSIGNED DEFAULT NULL,
+  `exam_slot_id` bigint(20) UNSIGNED NOT NULL,
   `exam_date` date NOT NULL,
-  `start_time` time NOT NULL,
-  `end_time` time NOT NULL,
   `day_of_week` varchar(255) NOT NULL,
-  `status` tinyint(4) NOT NULL DEFAULT 0 COMMENT '0=Active, 1=Canceled, 2=Rescheduled',
+  `status` tinyint(4) NOT NULL DEFAULT 0,
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -376,10 +370,8 @@ CREATE TABLE `exam_schedules` (
 -- Dumping data for table `exam_schedules`
 --
 
-INSERT INTO `exam_schedules` (`id`, `exam_id`, `class_id`, `section_id`, `session_id`, `teacher_id`, `subject_id`, `room_id`, `exam_date`, `start_time`, `end_time`, `day_of_week`, `status`, `created_at`, `updated_at`) VALUES
-(15, 1, 1, 7, 1, 5, 3, 1, '2025-07-28', '10:00:00', '11:00:00', 'MONDAY', 0, '2025-07-27 22:29:27', '2025-07-27 22:29:27'),
-(16, 1, 1, 7, 1, 6, 2, 1, '2025-08-02', '14:00:00', '16:00:00', 'SATURDAY', 0, '2025-08-02 02:46:06', '2025-08-02 02:46:06'),
-(18, 2, 1, 7, 1, 6, 2, 1, '2025-08-13', '10:00:00', '11:00:00', 'WEDNESDAY', 0, '2025-08-10 05:26:16', '2025-08-10 05:26:16');
+INSERT INTO `exam_schedules` (`id`, `exam_id`, `class_id`, `section_id`, `session_id`, `group_id`, `teacher_id`, `subject_id`, `room_id`, `exam_slot_id`, `exam_date`, `day_of_week`, `status`, `created_at`, `updated_at`) VALUES
+(5, 1, 3, 7, 1, 4, NULL, 8, 1, 1, '2025-12-04', 'THURSDAY', 0, '2025-12-04 00:23:21', '2025-12-04 00:23:21');
 
 -- --------------------------------------------------------
 
@@ -389,22 +381,40 @@ INSERT INTO `exam_schedules` (`id`, `exam_id`, `class_id`, `section_id`, `sessio
 
 CREATE TABLE `exam_seat_plans` (
   `id` bigint(20) UNSIGNED NOT NULL,
-  `exam_schedule_id` bigint(20) UNSIGNED NOT NULL,
+  `exam_id` bigint(20) UNSIGNED DEFAULT NULL,
+  `class_id` bigint(20) UNSIGNED DEFAULT NULL,
+  `section_id` bigint(20) UNSIGNED DEFAULT NULL,
+  `session_id` bigint(20) UNSIGNED DEFAULT NULL,
+  `room_id` bigint(20) UNSIGNED DEFAULT NULL,
+  `group_id` bigint(20) UNSIGNED DEFAULT NULL,
   `student_id` bigint(20) UNSIGNED NOT NULL,
   `seat_number` int(11) NOT NULL COMMENT 'The sequential seat number assigned to the student within the exam room.',
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- --------------------------------------------------------
+
 --
--- Dumping data for table `exam_seat_plans`
+-- Table structure for table `exam_time_slots`
 --
 
-INSERT INTO `exam_seat_plans` (`id`, `exam_schedule_id`, `student_id`, `seat_number`, `created_at`, `updated_at`) VALUES
-(12, 15, 1, 3, '2025-07-30 05:34:04', '2025-07-30 05:34:12'),
-(14, 15, 2, 1, '2025-07-30 05:34:27', '2025-07-30 05:34:27'),
-(17, 18, 1, 1, '2025-08-10 05:27:22', '2025-08-10 05:27:22'),
-(18, 18, 2, 2, '2025-08-10 05:27:22', '2025-08-10 05:27:22');
+CREATE TABLE `exam_time_slots` (
+  `id` bigint(20) UNSIGNED NOT NULL,
+  `name` varchar(255) NOT NULL,
+  `start_time` time NOT NULL,
+  `end_time` time NOT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `exam_time_slots`
+--
+
+INSERT INTO `exam_time_slots` (`id`, `name`, `start_time`, `end_time`, `created_at`, `updated_at`) VALUES
+(1, 'First Shift', '10:00:00', '12:00:00', '2025-09-05 22:40:30', '2025-10-14 05:41:33'),
+(9, 'Second Shift', '12:00:00', '13:00:00', '2025-10-11 03:02:50', '2025-11-12 22:55:43');
 
 -- --------------------------------------------------------
 
@@ -469,10 +479,9 @@ CREATE TABLE `fee_types` (
 --
 
 INSERT INTO `fee_types` (`id`, `name`, `description`, `frequency`, `status`, `created_at`, `updated_at`) VALUES
-(1, 'Admission Fee', 'Annual fee for new student admissions.', 'annual', 0, '2025-07-29 22:50:58', '2025-07-29 22:50:58'),
-(2, 'Tuition Fee', 'Regular monthly tuition fee.', 'monthly', 0, '2025-07-29 22:51:24', '2025-07-29 22:51:24'),
-(3, 'Exam Fee (Half-Yearly)', 'Fee for biannual exam.', 'biannual', 0, '2025-07-29 22:53:14', '2025-07-29 22:53:14'),
-(4, 'Library Fee', 'Fee for library access and services.', 'annual', 0, '2025-07-29 22:55:42', '2025-07-29 22:55:42');
+(6, 'Tuition Fee', 'A tuition fee is the money a student pays to attend a school It covers the cost of instruction and is a primary source of funding for educational institutions.', 'annual', 0, '2025-09-08 23:18:41', '2025-09-19 22:32:08'),
+(8, 'Library Fee', 'A library fee is a charge levied by a library for services or actions that fall outside the standard use of its resources. These fees are typically used to cover administrative costs, replace lost or damaged materials, or incentivize the timely return of items.', 'annual', 0, '2025-09-08 23:19:28', '2025-09-19 22:32:32'),
+(10, 'Exam Fee (Half-Yearly)', 'N/A', 'biannual', 0, '2025-09-19 22:35:50', '2025-09-19 22:37:50');
 
 -- --------------------------------------------------------
 
@@ -522,9 +531,9 @@ CREATE TABLE `groups` (
 
 INSERT INTO `groups` (`id`, `name`, `status`, `created_at`, `updated_at`) VALUES
 (1, 'Science', 0, '2025-06-02 18:17:22', '2025-06-02 18:17:22'),
-(2, 'Arts', 0, '2025-07-24 03:42:06', '2025-07-24 03:42:06'),
 (3, 'Commerce', 0, '2025-07-24 03:42:15', '2025-07-24 03:42:15'),
-(4, 'None', 0, '2025-07-24 03:42:33', '2025-07-24 03:42:33');
+(4, 'None', 0, '2025-07-24 03:42:33', '2025-07-24 03:42:33'),
+(9, 'Arts', 0, '2025-11-08 03:56:36', '2025-11-08 03:56:36');
 
 -- --------------------------------------------------------
 
@@ -541,38 +550,12 @@ CREATE TABLE `invoices` (
   `total_amount_due` int(11) NOT NULL,
   `amount_paid` int(11) NOT NULL DEFAULT 0,
   `balance_due` int(11) NOT NULL,
-  `status` enum('pending_payment_approval','pending','partially_paid','paid','overdue','cancelled') NOT NULL DEFAULT 'pending',
+  `status` enum('pending','partially_paid','paid') NOT NULL DEFAULT 'pending',
   `issued_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `paid_at` timestamp NULL DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
---
--- Dumping data for table `invoices`
---
-
-INSERT INTO `invoices` (`id`, `student_id`, `invoice_number`, `billing_period`, `due_date`, `total_amount_due`, `amount_paid`, `balance_due`, `status`, `issued_at`, `paid_at`, `created_at`, `updated_at`) VALUES
-(22, 2, 'INV-1755078422', 'August 2025', '2025-08-10', 10000, 0, 10000, 'pending', '2025-08-13 03:47:02', NULL, '2025-08-13 03:47:02', '2025-08-13 03:47:02'),
-(23, 2, 'INV-1755078505', 'August 2025', '2025-08-26', 10000, 0, 10000, 'pending', '2025-08-13 03:48:25', NULL, '2025-08-13 03:48:25', '2025-08-13 03:48:25'),
-(24, 2, 'INV-1755078533', 'August 2025', '2025-08-26', 10000, 0, 10000, 'pending', '2025-08-13 03:48:53', NULL, '2025-08-13 03:48:53', '2025-08-13 03:48:53'),
-(25, 2, 'INV-1755078606', 'August 2025', '2025-08-13', 9000, 0, 9000, 'pending', '2025-08-13 03:50:06', NULL, '2025-08-13 03:50:06', '2025-08-13 03:50:06'),
-(26, 2, 'INV-1755078645', 'August 2025', '2025-08-13', 9000, 0, 9000, 'pending', '2025-08-13 03:50:45', NULL, '2025-08-13 03:50:45', '2025-08-13 03:50:45'),
-(27, 2, 'INV-1755079051', 'August 2025', '2025-08-13', 9000, 0, 9000, 'pending', '2025-08-13 03:57:31', NULL, '2025-08-13 03:57:31', '2025-08-13 03:57:31'),
-(28, 2, 'INV-1755079718', 'August 2025', '2025-08-31', 9000, 0, 9000, 'pending', '2025-08-13 04:08:38', NULL, '2025-08-13 04:08:38', '2025-08-13 04:08:38'),
-(29, 2, 'INV-1755079748', 'August 2025', '2025-08-31', 9000, 0, 9000, 'pending', '2025-08-13 04:09:08', NULL, '2025-08-13 04:09:08', '2025-08-13 04:09:08'),
-(30, 2, 'INV-1755079806', 'August 2025', '2025-08-31', 9000, 0, 9000, 'pending', '2025-08-13 04:10:06', NULL, '2025-08-13 04:10:06', '2025-08-13 04:10:06'),
-(31, 2, 'INV-1755079869', 'August 2025', '2025-08-13', 1000, 0, 1000, 'pending', '2025-08-13 04:11:09', NULL, '2025-08-13 04:11:09', '2025-08-13 04:11:09'),
-(32, 2, 'INV-1755080081', 'August 2025', '2025-08-13', 4000, 0, 4000, 'pending', '2025-08-13 04:14:41', NULL, '2025-08-13 04:14:41', '2025-08-13 04:14:41'),
-(33, 2, 'INV-1755080122', 'August 2025', '2025-08-13', 4000, 0, 4000, 'pending', '2025-08-13 04:15:22', NULL, '2025-08-13 04:15:22', '2025-08-13 04:15:22'),
-(34, 2, 'INV-1755080491', 'August 2025', '2025-08-13', 4000, 0, 4000, 'pending', '2025-08-13 04:21:31', NULL, '2025-08-13 04:21:31', '2025-08-13 04:21:31'),
-(35, 2, 'INV-1755080515', 'August 2025', '2025-08-16', 9000, 0, 9000, 'pending', '2025-08-13 04:21:55', NULL, '2025-08-13 04:21:55', '2025-08-13 04:21:55'),
-(36, 2, 'INV-1755080590', 'August 2025', '2025-08-16', 9000, 0, 9000, 'pending', '2025-08-13 04:23:10', NULL, '2025-08-13 04:23:10', '2025-08-13 04:23:10'),
-(37, 2, 'INV-1755080632', 'August 2025', '2025-08-16', 9000, 0, 9000, 'pending', '2025-08-13 04:23:52', NULL, '2025-08-13 04:23:52', '2025-08-13 04:23:52'),
-(38, 2, 'INV-1755080699', 'August 2025', '2025-08-16', 10000, 0, 10000, 'pending', '2025-08-13 04:24:59', NULL, '2025-08-13 04:24:59', '2025-08-13 04:24:59'),
-(39, 2, 'INV-1755080708', 'August 2025', '2025-08-16', 5000, 0, 5000, 'pending', '2025-08-13 04:25:08', NULL, '2025-08-13 04:25:08', '2025-08-13 04:25:08'),
-(40, 2, 'INV-1755080730', 'August 2025', '2025-08-16', 6000, 0, 6000, 'pending', '2025-08-13 04:25:30', NULL, '2025-08-13 04:25:30', '2025-08-13 04:25:30'),
-(41, 2, 'INV-1755080753', 'August 2025', '2025-08-16', 4000, 0, 4000, 'pending', '2025-08-13 04:25:53', NULL, '2025-08-13 04:25:53', '2025-08-13 04:25:53');
 
 -- --------------------------------------------------------
 
@@ -586,6 +569,7 @@ CREATE TABLE `invoice_items` (
   `fee_type_id` bigint(20) UNSIGNED DEFAULT NULL,
   `description` varchar(255) NOT NULL,
   `amount` int(11) NOT NULL,
+  `balance_due` int(11) NOT NULL COMMENT 'Amount remaining due for this specific item.',
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -594,69 +578,22 @@ CREATE TABLE `invoice_items` (
 -- Dumping data for table `invoice_items`
 --
 
-INSERT INTO `invoice_items` (`id`, `invoice_id`, `fee_type_id`, `description`, `amount`, `created_at`, `updated_at`) VALUES
-(9, 7, 1, 'Admission Fee - August 2025', 5000, '2025-08-04 00:23:52', '2025-08-04 00:23:52'),
-(10, 7, 4, 'Library Fee - August 2025', 1000, '2025-08-04 00:23:52', '2025-08-04 00:23:52'),
-(11, 7, 2, 'Tuition Fee - August 2025', 4000, '2025-08-04 00:23:52', '2025-08-04 00:23:52'),
-(18, 3, 2, 'Tuition Fee - August 2025', 4000, '2025-08-04 03:51:54', '2025-08-04 03:51:54'),
-(19, 3, 1, 'Admission Fee - August 2025', 5000, '2025-08-04 03:51:54', '2025-08-04 03:51:54'),
-(20, 3, 4, 'Library Fee - August 2025', 1000, '2025-08-04 03:51:54', '2025-08-04 03:51:54'),
-(21, 4, 4, 'Library Fee - August 2025', 1000, '2025-08-09 04:20:10', '2025-08-09 04:20:10'),
-(24, 7, 4, 'Library Fee - August 2025', 1000, '2025-08-11 01:46:29', '2025-08-11 01:46:29'),
-(29, 12, 2, 'Tuition Fee - August 2025', 4000, '2025-08-13 00:38:58', '2025-08-13 00:38:58'),
-(30, 13, 2, 'Tuition Fee - August 2025', 4000, '2025-08-13 00:45:42', '2025-08-13 00:45:42'),
-(31, 14, 2, 'Tuition Fee - August 2025', 4000, '2025-08-13 00:47:46', '2025-08-13 00:47:46'),
-(32, 15, 2, 'Tuition Fee - August 2025', 4000, '2025-08-13 01:01:17', '2025-08-13 01:01:17'),
-(33, 15, 4, 'Library Fee - August 2025', 1000, '2025-08-13 01:01:17', '2025-08-13 01:01:17'),
-(34, 15, 1, 'Admission Fee - August 2025', 5000, '2025-08-13 01:01:17', '2025-08-13 01:01:17'),
-(35, 16, 2, 'Tuition Fee - August 2025', 4000, '2025-08-13 02:09:26', '2025-08-13 02:09:26'),
-(36, 17, 1, 'Admission Fee - August 2025', 5000, '2025-08-13 03:24:32', '2025-08-13 03:24:32'),
-(37, 18, 2, 'Tuition Fee - August 2025', 4000, '2025-08-13 03:29:16', '2025-08-13 03:29:16'),
-(38, 19, 1, 'Admission Fee - August 2025', 5000, '2025-08-13 03:36:04', '2025-08-13 03:36:04'),
-(39, 20, 1, 'Admission Fee - August 2025', 5000, '2025-08-13 03:42:53', '2025-08-13 03:42:53'),
-(40, 20, 4, 'Library Fee - August 2025', 1000, '2025-08-13 03:42:53', '2025-08-13 03:42:53'),
-(41, 21, 1, 'Admission Fee - August 2025', 5000, '2025-08-13 03:45:34', '2025-08-13 03:45:34'),
-(42, 21, 4, 'Library Fee - August 2025', 1000, '2025-08-13 03:45:34', '2025-08-13 03:45:34'),
-(43, 21, 2, 'Tuition Fee - August 2025', 4000, '2025-08-13 03:45:34', '2025-08-13 03:45:34'),
-(44, 22, 1, 'Admission Fee - August 2025', 5000, '2025-08-13 03:47:02', '2025-08-13 03:47:02'),
-(45, 22, 4, 'Library Fee - August 2025', 1000, '2025-08-13 03:47:02', '2025-08-13 03:47:02'),
-(46, 22, 2, 'Tuition Fee - August 2025', 4000, '2025-08-13 03:47:02', '2025-08-13 03:47:02'),
-(47, 23, 1, 'Admission Fee - August 2025', 5000, '2025-08-13 03:48:25', '2025-08-13 03:48:25'),
-(48, 23, 2, 'Tuition Fee - August 2025', 4000, '2025-08-13 03:48:25', '2025-08-13 03:48:25'),
-(49, 23, 4, 'Library Fee - August 2025', 1000, '2025-08-13 03:48:25', '2025-08-13 03:48:25'),
-(50, 24, 1, 'Admission Fee - August 2025', 5000, '2025-08-13 03:48:53', '2025-08-13 03:48:53'),
-(51, 24, 2, 'Tuition Fee - August 2025', 4000, '2025-08-13 03:48:53', '2025-08-13 03:48:53'),
-(52, 24, 4, 'Library Fee - August 2025', 1000, '2025-08-13 03:48:53', '2025-08-13 03:48:53'),
-(53, 25, 2, 'Tuition Fee - August 2025', 4000, '2025-08-13 03:50:06', '2025-08-13 03:50:06'),
-(54, 25, 1, 'Admission Fee - August 2025', 5000, '2025-08-13 03:50:06', '2025-08-13 03:50:06'),
-(55, 26, 2, 'Tuition Fee - August 2025', 4000, '2025-08-13 03:50:45', '2025-08-13 03:50:45'),
-(56, 26, 1, 'Admission Fee - August 2025', 5000, '2025-08-13 03:50:45', '2025-08-13 03:50:45'),
-(57, 27, 2, 'Tuition Fee - August 2025', 4000, '2025-08-13 03:57:31', '2025-08-13 03:57:31'),
-(58, 27, 1, 'Admission Fee - August 2025', 5000, '2025-08-13 03:57:31', '2025-08-13 03:57:31'),
-(59, 28, 1, 'Admission Fee - August 2025', 5000, '2025-08-13 04:08:38', '2025-08-13 04:08:38'),
-(60, 28, 2, 'Tuition Fee - August 2025', 4000, '2025-08-13 04:08:38', '2025-08-13 04:08:38'),
-(61, 29, 1, 'Admission Fee - August 2025', 5000, '2025-08-13 04:09:08', '2025-08-13 04:09:08'),
-(62, 29, 2, 'Tuition Fee - August 2025', 4000, '2025-08-13 04:09:08', '2025-08-13 04:09:08'),
-(63, 30, 1, 'Admission Fee - August 2025', 5000, '2025-08-13 04:10:06', '2025-08-13 04:10:06'),
-(64, 30, 2, 'Tuition Fee - August 2025', 4000, '2025-08-13 04:10:06', '2025-08-13 04:10:06'),
-(65, 31, 4, 'Library Fee - August 2025', 1000, '2025-08-13 04:11:09', '2025-08-13 04:11:09'),
-(66, 32, 2, 'Tuition Fee - August 2025', 4000, '2025-08-13 04:14:41', '2025-08-13 04:14:41'),
-(67, 33, 2, 'Tuition Fee - August 2025', 4000, '2025-08-13 04:15:22', '2025-08-13 04:15:22'),
-(68, 34, 2, 'Tuition Fee - August 2025', 4000, '2025-08-13 04:21:31', '2025-08-13 04:21:31'),
-(69, 35, 2, 'Tuition Fee - August 2025', 4000, '2025-08-13 04:21:55', '2025-08-13 04:21:55'),
-(70, 35, 1, 'Admission Fee - August 2025', 5000, '2025-08-13 04:21:55', '2025-08-13 04:21:55'),
-(71, 36, 2, 'Tuition Fee - August 2025', 4000, '2025-08-13 04:23:10', '2025-08-13 04:23:10'),
-(72, 36, 1, 'Admission Fee - August 2025', 5000, '2025-08-13 04:23:10', '2025-08-13 04:23:10'),
-(73, 37, 2, 'Tuition Fee - August 2025', 4000, '2025-08-13 04:23:52', '2025-08-13 04:23:52'),
-(74, 37, 1, 'Admission Fee - August 2025', 5000, '2025-08-13 04:23:52', '2025-08-13 04:23:52'),
-(75, 38, 2, 'Tuition Fee - August 2025', 4000, '2025-08-13 04:24:59', '2025-08-13 04:24:59'),
-(76, 38, 1, 'Admission Fee - August 2025', 5000, '2025-08-13 04:24:59', '2025-08-13 04:24:59'),
-(77, 38, 4, 'Library Fee - August 2025', 1000, '2025-08-13 04:24:59', '2025-08-13 04:24:59'),
-(78, 39, 2, 'Tuition Fee - August 2025', 4000, '2025-08-13 04:25:08', '2025-08-13 04:25:08'),
-(79, 39, 4, 'Library Fee - August 2025', 1000, '2025-08-13 04:25:08', '2025-08-13 04:25:08'),
-(80, 40, 4, 'Library Fee - August 2025', 1000, '2025-08-13 04:25:30', '2025-08-13 04:25:30'),
-(81, 40, 1, 'Admission Fee - August 2025', 5000, '2025-08-13 04:25:30', '2025-08-13 04:25:30'),
-(82, 41, 2, 'Tuition Fee - August 2025', 4000, '2025-08-13 04:25:53', '2025-08-13 04:25:53');
+INSERT INTO `invoice_items` (`id`, `invoice_id`, `fee_type_id`, `description`, `amount`, `balance_due`, `created_at`, `updated_at`) VALUES
+(1, 16, 10, 'Exam Fee (Half-Yearly) - Aug-2025', 1000, 1000, '2025-10-18 04:12:36', '2025-10-18 04:12:36'),
+(2, 17, 10, 'Exam Fee (Half-Yearly) - Aug-2025', 1000, 1000, '2025-10-18 04:12:39', '2025-10-18 04:12:39'),
+(3, 18, 10, 'Exam Fee (Half-Yearly) - Aug-2025', 1000, 1000, '2025-11-13 05:29:35', '2025-11-13 05:29:35'),
+(4, 18, 8, 'Library Fee - Aug-2025', 500, 500, '2025-11-13 05:29:35', '2025-11-13 05:29:35'),
+(5, 18, 6, 'Tuition Fee - Aug-2025', 1000, 1000, '2025-11-13 05:29:35', '2025-11-13 05:29:35'),
+(6, 19, 10, 'Exam Fee (Half-Yearly) - November 2025', 1000, 1000, '2025-11-13 05:31:13', '2025-11-13 05:31:13'),
+(7, 19, 8, 'Library Fee - November 2025', 500, 500, '2025-11-13 05:31:13', '2025-11-13 05:31:13'),
+(8, 19, 6, 'Tuition Fee - November 2025', 1000, 1000, '2025-11-13 05:31:13', '2025-11-13 05:31:13'),
+(9, 20, 10, 'Exam Fee (Half-Yearly) - November 2025', 1000, 1000, '2025-11-14 22:41:32', '2025-11-14 22:41:32'),
+(10, 20, 8, 'Library Fee - November 2025', 500, 500, '2025-11-14 22:41:32', '2025-11-14 22:41:32'),
+(11, 20, 6, 'Tuition Fee - November 2025', 1000, 1000, '2025-11-14 22:41:32', '2025-11-14 22:41:32'),
+(12, 21, 8, 'Library Fee - Aug-2025', 500, 500, '2025-11-14 22:45:11', '2025-11-14 22:45:11'),
+(13, 21, 10, 'Exam Fee (Half-Yearly) - Aug-2025', 1000, 1000, '2025-11-14 22:45:11', '2025-11-14 22:45:11'),
+(14, 21, 6, 'Tuition Fee - Aug-2025', 1000, 1000, '2025-11-14 22:45:11', '2025-11-14 22:45:11'),
+(15, 22, 10, 'Exam Fee (Half-Yearly) - Aug-2025', 800, 1000, '2025-11-14 23:44:13', '2025-11-18 00:46:53');
 
 -- --------------------------------------------------------
 
@@ -673,6 +610,36 @@ CREATE TABLE `jobs` (
   `available_at` int(10) UNSIGNED NOT NULL,
   `created_at` int(10) UNSIGNED NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `jobs`
+--
+
+INSERT INTO `jobs` (`id`, `queue`, `payload`, `attempts`, `reserved_at`, `available_at`, `created_at`) VALUES
+(336, 'default', '{\"uuid\":\"497994d8-83f4-4b10-841a-ddc6640935d2\",\"displayName\":\"App\\\\Notifications\\\\InvoiceCreated\",\"job\":\"Illuminate\\\\Queue\\\\CallQueuedHandler@call\",\"maxTries\":null,\"maxExceptions\":null,\"failOnTimeout\":false,\"backoff\":null,\"timeout\":null,\"retryUntil\":null,\"data\":{\"commandName\":\"Illuminate\\\\Notifications\\\\SendQueuedNotifications\",\"command\":\"O:48:\\\"Illuminate\\\\Notifications\\\\SendQueuedNotifications\\\":3:{s:11:\\\"notifiables\\\";O:45:\\\"Illuminate\\\\Contracts\\\\Database\\\\ModelIdentifier\\\":5:{s:5:\\\"class\\\";s:15:\\\"App\\\\Models\\\\User\\\";s:2:\\\"id\\\";a:1:{i:0;i:67;}s:9:\\\"relations\\\";a:0:{}s:10:\\\"connection\\\";s:5:\\\"mysql\\\";s:15:\\\"collectionClass\\\";N;}s:12:\\\"notification\\\";O:32:\\\"App\\\\Notifications\\\\InvoiceCreated\\\":2:{s:7:\\\"invoice\\\";O:45:\\\"Illuminate\\\\Contracts\\\\Database\\\\ModelIdentifier\\\":5:{s:5:\\\"class\\\";s:18:\\\"App\\\\Models\\\\Invoice\\\";s:2:\\\"id\\\";i:11;s:9:\\\"relations\\\";a:0:{}s:10:\\\"connection\\\";s:5:\\\"mysql\\\";s:15:\\\"collectionClass\\\";N;}s:2:\\\"id\\\";s:36:\\\"5c0957a3-c283-4f30-9da7-9b6bd8273c10\\\";}s:8:\\\"channels\\\";a:1:{i:0;s:9:\\\"broadcast\\\";}}\"},\"createdAt\":1759557832,\"delay\":null}', 0, NULL, 1759557832, 1759557832),
+(337, 'default', '{\"uuid\":\"01f9305a-679e-4e9d-b4bc-f03b0cef1cef\",\"displayName\":\"App\\\\Notifications\\\\InvoiceCreated\",\"job\":\"Illuminate\\\\Queue\\\\CallQueuedHandler@call\",\"maxTries\":null,\"maxExceptions\":null,\"failOnTimeout\":false,\"backoff\":null,\"timeout\":null,\"retryUntil\":null,\"data\":{\"commandName\":\"Illuminate\\\\Notifications\\\\SendQueuedNotifications\",\"command\":\"O:48:\\\"Illuminate\\\\Notifications\\\\SendQueuedNotifications\\\":3:{s:11:\\\"notifiables\\\";O:45:\\\"Illuminate\\\\Contracts\\\\Database\\\\ModelIdentifier\\\":5:{s:5:\\\"class\\\";s:15:\\\"App\\\\Models\\\\User\\\";s:2:\\\"id\\\";a:1:{i:0;i:67;}s:9:\\\"relations\\\";a:0:{}s:10:\\\"connection\\\";s:5:\\\"mysql\\\";s:15:\\\"collectionClass\\\";N;}s:12:\\\"notification\\\";O:32:\\\"App\\\\Notifications\\\\InvoiceCreated\\\":2:{s:7:\\\"invoice\\\";O:45:\\\"Illuminate\\\\Contracts\\\\Database\\\\ModelIdentifier\\\":5:{s:5:\\\"class\\\";s:18:\\\"App\\\\Models\\\\Invoice\\\";s:2:\\\"id\\\";i:11;s:9:\\\"relations\\\";a:0:{}s:10:\\\"connection\\\";s:5:\\\"mysql\\\";s:15:\\\"collectionClass\\\";N;}s:2:\\\"id\\\";s:36:\\\"5c0957a3-c283-4f30-9da7-9b6bd8273c10\\\";}s:8:\\\"channels\\\";a:1:{i:0;s:8:\\\"database\\\";}}\"},\"createdAt\":1759557832,\"delay\":null}', 0, NULL, 1759557832, 1759557832),
+(338, 'default', '{\"uuid\":\"07dcb14b-863e-4864-a8fa-4e0483293938\",\"displayName\":\"App\\\\Notifications\\\\InvoiceCreated\",\"job\":\"Illuminate\\\\Queue\\\\CallQueuedHandler@call\",\"maxTries\":null,\"maxExceptions\":null,\"failOnTimeout\":false,\"backoff\":null,\"timeout\":null,\"retryUntil\":null,\"data\":{\"commandName\":\"Illuminate\\\\Notifications\\\\SendQueuedNotifications\",\"command\":\"O:48:\\\"Illuminate\\\\Notifications\\\\SendQueuedNotifications\\\":3:{s:11:\\\"notifiables\\\";O:45:\\\"Illuminate\\\\Contracts\\\\Database\\\\ModelIdentifier\\\":5:{s:5:\\\"class\\\";s:15:\\\"App\\\\Models\\\\User\\\";s:2:\\\"id\\\";a:1:{i:0;i:78;}s:9:\\\"relations\\\";a:0:{}s:10:\\\"connection\\\";s:5:\\\"mysql\\\";s:15:\\\"collectionClass\\\";N;}s:12:\\\"notification\\\";O:32:\\\"App\\\\Notifications\\\\InvoiceCreated\\\":2:{s:7:\\\"invoice\\\";O:45:\\\"Illuminate\\\\Contracts\\\\Database\\\\ModelIdentifier\\\":5:{s:5:\\\"class\\\";s:18:\\\"App\\\\Models\\\\Invoice\\\";s:2:\\\"id\\\";i:12;s:9:\\\"relations\\\";a:0:{}s:10:\\\"connection\\\";s:5:\\\"mysql\\\";s:15:\\\"collectionClass\\\";N;}s:2:\\\"id\\\";s:36:\\\"31a632d3-4988-46f5-a329-cb7cfacee9c3\\\";}s:8:\\\"channels\\\";a:1:{i:0;s:9:\\\"broadcast\\\";}}\"},\"createdAt\":1759664590,\"delay\":null}', 0, NULL, 1759664590, 1759664590),
+(339, 'default', '{\"uuid\":\"c2763e7d-fe32-4f6f-91ad-061661c36c98\",\"displayName\":\"App\\\\Notifications\\\\InvoiceCreated\",\"job\":\"Illuminate\\\\Queue\\\\CallQueuedHandler@call\",\"maxTries\":null,\"maxExceptions\":null,\"failOnTimeout\":false,\"backoff\":null,\"timeout\":null,\"retryUntil\":null,\"data\":{\"commandName\":\"Illuminate\\\\Notifications\\\\SendQueuedNotifications\",\"command\":\"O:48:\\\"Illuminate\\\\Notifications\\\\SendQueuedNotifications\\\":3:{s:11:\\\"notifiables\\\";O:45:\\\"Illuminate\\\\Contracts\\\\Database\\\\ModelIdentifier\\\":5:{s:5:\\\"class\\\";s:15:\\\"App\\\\Models\\\\User\\\";s:2:\\\"id\\\";a:1:{i:0;i:78;}s:9:\\\"relations\\\";a:0:{}s:10:\\\"connection\\\";s:5:\\\"mysql\\\";s:15:\\\"collectionClass\\\";N;}s:12:\\\"notification\\\";O:32:\\\"App\\\\Notifications\\\\InvoiceCreated\\\":2:{s:7:\\\"invoice\\\";O:45:\\\"Illuminate\\\\Contracts\\\\Database\\\\ModelIdentifier\\\":5:{s:5:\\\"class\\\";s:18:\\\"App\\\\Models\\\\Invoice\\\";s:2:\\\"id\\\";i:12;s:9:\\\"relations\\\";a:0:{}s:10:\\\"connection\\\";s:5:\\\"mysql\\\";s:15:\\\"collectionClass\\\";N;}s:2:\\\"id\\\";s:36:\\\"31a632d3-4988-46f5-a329-cb7cfacee9c3\\\";}s:8:\\\"channels\\\";a:1:{i:0;s:8:\\\"database\\\";}}\"},\"createdAt\":1759664590,\"delay\":null}', 0, NULL, 1759664590, 1759664590),
+(340, 'default', '{\"uuid\":\"fa19c170-616a-40ae-b8f3-27588b6e372f\",\"displayName\":\"App\\\\Notifications\\\\InvoiceCreated\",\"job\":\"Illuminate\\\\Queue\\\\CallQueuedHandler@call\",\"maxTries\":null,\"maxExceptions\":null,\"failOnTimeout\":false,\"backoff\":null,\"timeout\":null,\"retryUntil\":null,\"data\":{\"commandName\":\"Illuminate\\\\Notifications\\\\SendQueuedNotifications\",\"command\":\"O:48:\\\"Illuminate\\\\Notifications\\\\SendQueuedNotifications\\\":3:{s:11:\\\"notifiables\\\";O:45:\\\"Illuminate\\\\Contracts\\\\Database\\\\ModelIdentifier\\\":5:{s:5:\\\"class\\\";s:15:\\\"App\\\\Models\\\\User\\\";s:2:\\\"id\\\";a:1:{i:0;i:79;}s:9:\\\"relations\\\";a:0:{}s:10:\\\"connection\\\";s:5:\\\"mysql\\\";s:15:\\\"collectionClass\\\";N;}s:12:\\\"notification\\\";O:32:\\\"App\\\\Notifications\\\\InvoiceCreated\\\":2:{s:7:\\\"invoice\\\";O:45:\\\"Illuminate\\\\Contracts\\\\Database\\\\ModelIdentifier\\\":5:{s:5:\\\"class\\\";s:18:\\\"App\\\\Models\\\\Invoice\\\";s:2:\\\"id\\\";i:13;s:9:\\\"relations\\\";a:0:{}s:10:\\\"connection\\\";s:5:\\\"mysql\\\";s:15:\\\"collectionClass\\\";N;}s:2:\\\"id\\\";s:36:\\\"02b60dae-74b2-446e-baed-38ec8dd17c2a\\\";}s:8:\\\"channels\\\";a:1:{i:0;s:9:\\\"broadcast\\\";}}\"},\"createdAt\":1759664590,\"delay\":null}', 0, NULL, 1759664590, 1759664590),
+(341, 'default', '{\"uuid\":\"5fe23265-1b48-41ea-ba64-1ab5b14f1b55\",\"displayName\":\"App\\\\Notifications\\\\InvoiceCreated\",\"job\":\"Illuminate\\\\Queue\\\\CallQueuedHandler@call\",\"maxTries\":null,\"maxExceptions\":null,\"failOnTimeout\":false,\"backoff\":null,\"timeout\":null,\"retryUntil\":null,\"data\":{\"commandName\":\"Illuminate\\\\Notifications\\\\SendQueuedNotifications\",\"command\":\"O:48:\\\"Illuminate\\\\Notifications\\\\SendQueuedNotifications\\\":3:{s:11:\\\"notifiables\\\";O:45:\\\"Illuminate\\\\Contracts\\\\Database\\\\ModelIdentifier\\\":5:{s:5:\\\"class\\\";s:15:\\\"App\\\\Models\\\\User\\\";s:2:\\\"id\\\";a:1:{i:0;i:79;}s:9:\\\"relations\\\";a:0:{}s:10:\\\"connection\\\";s:5:\\\"mysql\\\";s:15:\\\"collectionClass\\\";N;}s:12:\\\"notification\\\";O:32:\\\"App\\\\Notifications\\\\InvoiceCreated\\\":2:{s:7:\\\"invoice\\\";O:45:\\\"Illuminate\\\\Contracts\\\\Database\\\\ModelIdentifier\\\":5:{s:5:\\\"class\\\";s:18:\\\"App\\\\Models\\\\Invoice\\\";s:2:\\\"id\\\";i:13;s:9:\\\"relations\\\";a:0:{}s:10:\\\"connection\\\";s:5:\\\"mysql\\\";s:15:\\\"collectionClass\\\";N;}s:2:\\\"id\\\";s:36:\\\"02b60dae-74b2-446e-baed-38ec8dd17c2a\\\";}s:8:\\\"channels\\\";a:1:{i:0;s:8:\\\"database\\\";}}\"},\"createdAt\":1759664590,\"delay\":null}', 0, NULL, 1759664590, 1759664590),
+(342, 'default', '{\"uuid\":\"79c71251-40f4-4692-8d92-7feabb3b10db\",\"displayName\":\"App\\\\Notifications\\\\InvoiceCreated\",\"job\":\"Illuminate\\\\Queue\\\\CallQueuedHandler@call\",\"maxTries\":null,\"maxExceptions\":null,\"failOnTimeout\":false,\"backoff\":null,\"timeout\":null,\"retryUntil\":null,\"data\":{\"commandName\":\"Illuminate\\\\Notifications\\\\SendQueuedNotifications\",\"command\":\"O:48:\\\"Illuminate\\\\Notifications\\\\SendQueuedNotifications\\\":3:{s:11:\\\"notifiables\\\";O:45:\\\"Illuminate\\\\Contracts\\\\Database\\\\ModelIdentifier\\\":5:{s:5:\\\"class\\\";s:15:\\\"App\\\\Models\\\\User\\\";s:2:\\\"id\\\";a:1:{i:0;i:103;}s:9:\\\"relations\\\";a:0:{}s:10:\\\"connection\\\";s:5:\\\"mysql\\\";s:15:\\\"collectionClass\\\";N;}s:12:\\\"notification\\\";O:32:\\\"App\\\\Notifications\\\\InvoiceCreated\\\":2:{s:7:\\\"invoice\\\";O:45:\\\"Illuminate\\\\Contracts\\\\Database\\\\ModelIdentifier\\\":5:{s:5:\\\"class\\\";s:18:\\\"App\\\\Models\\\\Invoice\\\";s:2:\\\"id\\\";i:14;s:9:\\\"relations\\\";a:0:{}s:10:\\\"connection\\\";s:5:\\\"mysql\\\";s:15:\\\"collectionClass\\\";N;}s:2:\\\"id\\\";s:36:\\\"0eedf8f1-4d45-45f4-bc40-67d7d30e03d7\\\";}s:8:\\\"channels\\\";a:1:{i:0;s:9:\\\"broadcast\\\";}}\"},\"createdAt\":1760421387,\"delay\":null}', 0, NULL, 1760421388, 1760421388),
+(343, 'default', '{\"uuid\":\"4fb58c45-8510-4989-8c0a-3e270ce97b44\",\"displayName\":\"App\\\\Notifications\\\\InvoiceCreated\",\"job\":\"Illuminate\\\\Queue\\\\CallQueuedHandler@call\",\"maxTries\":null,\"maxExceptions\":null,\"failOnTimeout\":false,\"backoff\":null,\"timeout\":null,\"retryUntil\":null,\"data\":{\"commandName\":\"Illuminate\\\\Notifications\\\\SendQueuedNotifications\",\"command\":\"O:48:\\\"Illuminate\\\\Notifications\\\\SendQueuedNotifications\\\":3:{s:11:\\\"notifiables\\\";O:45:\\\"Illuminate\\\\Contracts\\\\Database\\\\ModelIdentifier\\\":5:{s:5:\\\"class\\\";s:15:\\\"App\\\\Models\\\\User\\\";s:2:\\\"id\\\";a:1:{i:0;i:103;}s:9:\\\"relations\\\";a:0:{}s:10:\\\"connection\\\";s:5:\\\"mysql\\\";s:15:\\\"collectionClass\\\";N;}s:12:\\\"notification\\\";O:32:\\\"App\\\\Notifications\\\\InvoiceCreated\\\":2:{s:7:\\\"invoice\\\";O:45:\\\"Illuminate\\\\Contracts\\\\Database\\\\ModelIdentifier\\\":5:{s:5:\\\"class\\\";s:18:\\\"App\\\\Models\\\\Invoice\\\";s:2:\\\"id\\\";i:14;s:9:\\\"relations\\\";a:0:{}s:10:\\\"connection\\\";s:5:\\\"mysql\\\";s:15:\\\"collectionClass\\\";N;}s:2:\\\"id\\\";s:36:\\\"0eedf8f1-4d45-45f4-bc40-67d7d30e03d7\\\";}s:8:\\\"channels\\\";a:1:{i:0;s:8:\\\"database\\\";}}\"},\"createdAt\":1760421388,\"delay\":null}', 0, NULL, 1760421388, 1760421388),
+(344, 'default', '{\"uuid\":\"ff5c2b67-c283-48ca-b3c5-3f5eba32a84c\",\"displayName\":\"App\\\\Notifications\\\\InvoiceCreated\",\"job\":\"Illuminate\\\\Queue\\\\CallQueuedHandler@call\",\"maxTries\":null,\"maxExceptions\":null,\"failOnTimeout\":false,\"backoff\":null,\"timeout\":null,\"retryUntil\":null,\"data\":{\"commandName\":\"Illuminate\\\\Notifications\\\\SendQueuedNotifications\",\"command\":\"O:48:\\\"Illuminate\\\\Notifications\\\\SendQueuedNotifications\\\":3:{s:11:\\\"notifiables\\\";O:45:\\\"Illuminate\\\\Contracts\\\\Database\\\\ModelIdentifier\\\":5:{s:5:\\\"class\\\";s:15:\\\"App\\\\Models\\\\User\\\";s:2:\\\"id\\\";a:1:{i:0;i:104;}s:9:\\\"relations\\\";a:0:{}s:10:\\\"connection\\\";s:5:\\\"mysql\\\";s:15:\\\"collectionClass\\\";N;}s:12:\\\"notification\\\";O:32:\\\"App\\\\Notifications\\\\InvoiceCreated\\\":2:{s:7:\\\"invoice\\\";O:45:\\\"Illuminate\\\\Contracts\\\\Database\\\\ModelIdentifier\\\":5:{s:5:\\\"class\\\";s:18:\\\"App\\\\Models\\\\Invoice\\\";s:2:\\\"id\\\";i:15;s:9:\\\"relations\\\";a:0:{}s:10:\\\"connection\\\";s:5:\\\"mysql\\\";s:15:\\\"collectionClass\\\";N;}s:2:\\\"id\\\";s:36:\\\"d13b68f9-29da-453c-8ad4-bc3c90d4d6b7\\\";}s:8:\\\"channels\\\";a:1:{i:0;s:9:\\\"broadcast\\\";}}\"},\"createdAt\":1760421388,\"delay\":null}', 0, NULL, 1760421388, 1760421388),
+(345, 'default', '{\"uuid\":\"c28c620d-d47e-4048-8260-39c2300aac00\",\"displayName\":\"App\\\\Notifications\\\\InvoiceCreated\",\"job\":\"Illuminate\\\\Queue\\\\CallQueuedHandler@call\",\"maxTries\":null,\"maxExceptions\":null,\"failOnTimeout\":false,\"backoff\":null,\"timeout\":null,\"retryUntil\":null,\"data\":{\"commandName\":\"Illuminate\\\\Notifications\\\\SendQueuedNotifications\",\"command\":\"O:48:\\\"Illuminate\\\\Notifications\\\\SendQueuedNotifications\\\":3:{s:11:\\\"notifiables\\\";O:45:\\\"Illuminate\\\\Contracts\\\\Database\\\\ModelIdentifier\\\":5:{s:5:\\\"class\\\";s:15:\\\"App\\\\Models\\\\User\\\";s:2:\\\"id\\\";a:1:{i:0;i:104;}s:9:\\\"relations\\\";a:0:{}s:10:\\\"connection\\\";s:5:\\\"mysql\\\";s:15:\\\"collectionClass\\\";N;}s:12:\\\"notification\\\";O:32:\\\"App\\\\Notifications\\\\InvoiceCreated\\\":2:{s:7:\\\"invoice\\\";O:45:\\\"Illuminate\\\\Contracts\\\\Database\\\\ModelIdentifier\\\":5:{s:5:\\\"class\\\";s:18:\\\"App\\\\Models\\\\Invoice\\\";s:2:\\\"id\\\";i:15;s:9:\\\"relations\\\";a:0:{}s:10:\\\"connection\\\";s:5:\\\"mysql\\\";s:15:\\\"collectionClass\\\";N;}s:2:\\\"id\\\";s:36:\\\"d13b68f9-29da-453c-8ad4-bc3c90d4d6b7\\\";}s:8:\\\"channels\\\";a:1:{i:0;s:8:\\\"database\\\";}}\"},\"createdAt\":1760421388,\"delay\":null}', 0, NULL, 1760421388, 1760421388),
+(346, 'default', '{\"uuid\":\"ff6fe075-b17b-423b-8a4b-bbbafde5c842\",\"displayName\":\"App\\\\Notifications\\\\InvoiceCreated\",\"job\":\"Illuminate\\\\Queue\\\\CallQueuedHandler@call\",\"maxTries\":null,\"maxExceptions\":null,\"failOnTimeout\":false,\"backoff\":null,\"timeout\":null,\"retryUntil\":null,\"data\":{\"commandName\":\"Illuminate\\\\Notifications\\\\SendQueuedNotifications\",\"command\":\"O:48:\\\"Illuminate\\\\Notifications\\\\SendQueuedNotifications\\\":3:{s:11:\\\"notifiables\\\";O:45:\\\"Illuminate\\\\Contracts\\\\Database\\\\ModelIdentifier\\\":5:{s:5:\\\"class\\\";s:15:\\\"App\\\\Models\\\\User\\\";s:2:\\\"id\\\";a:1:{i:0;i:103;}s:9:\\\"relations\\\";a:0:{}s:10:\\\"connection\\\";s:5:\\\"mysql\\\";s:15:\\\"collectionClass\\\";N;}s:12:\\\"notification\\\";O:32:\\\"App\\\\Notifications\\\\InvoiceCreated\\\":2:{s:7:\\\"invoice\\\";O:45:\\\"Illuminate\\\\Contracts\\\\Database\\\\ModelIdentifier\\\":5:{s:5:\\\"class\\\";s:18:\\\"App\\\\Models\\\\Invoice\\\";s:2:\\\"id\\\";i:16;s:9:\\\"relations\\\";a:0:{}s:10:\\\"connection\\\";s:5:\\\"mysql\\\";s:15:\\\"collectionClass\\\";N;}s:2:\\\"id\\\";s:36:\\\"fe54be06-6635-4958-8431-acee833d7384\\\";}s:8:\\\"channels\\\";a:1:{i:0;s:9:\\\"broadcast\\\";}}\"},\"createdAt\":1760782359,\"delay\":null}', 0, NULL, 1760782359, 1760782359),
+(347, 'default', '{\"uuid\":\"fbd82021-dfdd-4ec5-b220-92dda5832fca\",\"displayName\":\"App\\\\Notifications\\\\InvoiceCreated\",\"job\":\"Illuminate\\\\Queue\\\\CallQueuedHandler@call\",\"maxTries\":null,\"maxExceptions\":null,\"failOnTimeout\":false,\"backoff\":null,\"timeout\":null,\"retryUntil\":null,\"data\":{\"commandName\":\"Illuminate\\\\Notifications\\\\SendQueuedNotifications\",\"command\":\"O:48:\\\"Illuminate\\\\Notifications\\\\SendQueuedNotifications\\\":3:{s:11:\\\"notifiables\\\";O:45:\\\"Illuminate\\\\Contracts\\\\Database\\\\ModelIdentifier\\\":5:{s:5:\\\"class\\\";s:15:\\\"App\\\\Models\\\\User\\\";s:2:\\\"id\\\";a:1:{i:0;i:103;}s:9:\\\"relations\\\";a:0:{}s:10:\\\"connection\\\";s:5:\\\"mysql\\\";s:15:\\\"collectionClass\\\";N;}s:12:\\\"notification\\\";O:32:\\\"App\\\\Notifications\\\\InvoiceCreated\\\":2:{s:7:\\\"invoice\\\";O:45:\\\"Illuminate\\\\Contracts\\\\Database\\\\ModelIdentifier\\\":5:{s:5:\\\"class\\\";s:18:\\\"App\\\\Models\\\\Invoice\\\";s:2:\\\"id\\\";i:16;s:9:\\\"relations\\\";a:0:{}s:10:\\\"connection\\\";s:5:\\\"mysql\\\";s:15:\\\"collectionClass\\\";N;}s:2:\\\"id\\\";s:36:\\\"fe54be06-6635-4958-8431-acee833d7384\\\";}s:8:\\\"channels\\\";a:1:{i:0;s:8:\\\"database\\\";}}\"},\"createdAt\":1760782359,\"delay\":null}', 0, NULL, 1760782359, 1760782359),
+(348, 'default', '{\"uuid\":\"ea62737d-915a-4f8d-98e3-1816dcb281a6\",\"displayName\":\"App\\\\Notifications\\\\InvoiceCreated\",\"job\":\"Illuminate\\\\Queue\\\\CallQueuedHandler@call\",\"maxTries\":null,\"maxExceptions\":null,\"failOnTimeout\":false,\"backoff\":null,\"timeout\":null,\"retryUntil\":null,\"data\":{\"commandName\":\"Illuminate\\\\Notifications\\\\SendQueuedNotifications\",\"command\":\"O:48:\\\"Illuminate\\\\Notifications\\\\SendQueuedNotifications\\\":3:{s:11:\\\"notifiables\\\";O:45:\\\"Illuminate\\\\Contracts\\\\Database\\\\ModelIdentifier\\\":5:{s:5:\\\"class\\\";s:15:\\\"App\\\\Models\\\\User\\\";s:2:\\\"id\\\";a:1:{i:0;i:104;}s:9:\\\"relations\\\";a:0:{}s:10:\\\"connection\\\";s:5:\\\"mysql\\\";s:15:\\\"collectionClass\\\";N;}s:12:\\\"notification\\\";O:32:\\\"App\\\\Notifications\\\\InvoiceCreated\\\":2:{s:7:\\\"invoice\\\";O:45:\\\"Illuminate\\\\Contracts\\\\Database\\\\ModelIdentifier\\\":5:{s:5:\\\"class\\\";s:18:\\\"App\\\\Models\\\\Invoice\\\";s:2:\\\"id\\\";i:17;s:9:\\\"relations\\\";a:0:{}s:10:\\\"connection\\\";s:5:\\\"mysql\\\";s:15:\\\"collectionClass\\\";N;}s:2:\\\"id\\\";s:36:\\\"c3a08a31-110b-4573-8464-864793f21db5\\\";}s:8:\\\"channels\\\";a:1:{i:0;s:9:\\\"broadcast\\\";}}\"},\"createdAt\":1760782360,\"delay\":null}', 0, NULL, 1760782360, 1760782360),
+(349, 'default', '{\"uuid\":\"cd696d86-c5e9-41b9-9c7e-ce7cbdb15901\",\"displayName\":\"App\\\\Notifications\\\\InvoiceCreated\",\"job\":\"Illuminate\\\\Queue\\\\CallQueuedHandler@call\",\"maxTries\":null,\"maxExceptions\":null,\"failOnTimeout\":false,\"backoff\":null,\"timeout\":null,\"retryUntil\":null,\"data\":{\"commandName\":\"Illuminate\\\\Notifications\\\\SendQueuedNotifications\",\"command\":\"O:48:\\\"Illuminate\\\\Notifications\\\\SendQueuedNotifications\\\":3:{s:11:\\\"notifiables\\\";O:45:\\\"Illuminate\\\\Contracts\\\\Database\\\\ModelIdentifier\\\":5:{s:5:\\\"class\\\";s:15:\\\"App\\\\Models\\\\User\\\";s:2:\\\"id\\\";a:1:{i:0;i:104;}s:9:\\\"relations\\\";a:0:{}s:10:\\\"connection\\\";s:5:\\\"mysql\\\";s:15:\\\"collectionClass\\\";N;}s:12:\\\"notification\\\";O:32:\\\"App\\\\Notifications\\\\InvoiceCreated\\\":2:{s:7:\\\"invoice\\\";O:45:\\\"Illuminate\\\\Contracts\\\\Database\\\\ModelIdentifier\\\":5:{s:5:\\\"class\\\";s:18:\\\"App\\\\Models\\\\Invoice\\\";s:2:\\\"id\\\";i:17;s:9:\\\"relations\\\";a:0:{}s:10:\\\"connection\\\";s:5:\\\"mysql\\\";s:15:\\\"collectionClass\\\";N;}s:2:\\\"id\\\";s:36:\\\"c3a08a31-110b-4573-8464-864793f21db5\\\";}s:8:\\\"channels\\\";a:1:{i:0;s:8:\\\"database\\\";}}\"},\"createdAt\":1760782360,\"delay\":null}', 0, NULL, 1760782360, 1760782360),
+(350, 'default', '{\"uuid\":\"c23c783d-fa62-4706-bb61-b14a7228ce56\",\"displayName\":\"App\\\\Notifications\\\\InvoiceCreated\",\"job\":\"Illuminate\\\\Queue\\\\CallQueuedHandler@call\",\"maxTries\":null,\"maxExceptions\":null,\"failOnTimeout\":false,\"backoff\":null,\"timeout\":null,\"retryUntil\":null,\"data\":{\"commandName\":\"Illuminate\\\\Notifications\\\\SendQueuedNotifications\",\"command\":\"O:48:\\\"Illuminate\\\\Notifications\\\\SendQueuedNotifications\\\":3:{s:11:\\\"notifiables\\\";O:45:\\\"Illuminate\\\\Contracts\\\\Database\\\\ModelIdentifier\\\":5:{s:5:\\\"class\\\";s:15:\\\"App\\\\Models\\\\User\\\";s:2:\\\"id\\\";a:1:{i:0;i:109;}s:9:\\\"relations\\\";a:0:{}s:10:\\\"connection\\\";s:5:\\\"mysql\\\";s:15:\\\"collectionClass\\\";N;}s:12:\\\"notification\\\";O:32:\\\"App\\\\Notifications\\\\InvoiceCreated\\\":2:{s:7:\\\"invoice\\\";O:45:\\\"Illuminate\\\\Contracts\\\\Database\\\\ModelIdentifier\\\":5:{s:5:\\\"class\\\";s:18:\\\"App\\\\Models\\\\Invoice\\\";s:2:\\\"id\\\";i:18;s:9:\\\"relations\\\";a:0:{}s:10:\\\"connection\\\";s:5:\\\"mysql\\\";s:15:\\\"collectionClass\\\";N;}s:2:\\\"id\\\";s:36:\\\"a81c7d8b-874b-43f1-a910-f822eb539043\\\";}s:8:\\\"channels\\\";a:1:{i:0;s:9:\\\"broadcast\\\";}}\"},\"createdAt\":1763033378,\"delay\":null}', 0, NULL, 1763033378, 1763033378),
+(351, 'default', '{\"uuid\":\"654616cc-acd4-4570-a136-001a1948af57\",\"displayName\":\"App\\\\Notifications\\\\InvoiceCreated\",\"job\":\"Illuminate\\\\Queue\\\\CallQueuedHandler@call\",\"maxTries\":null,\"maxExceptions\":null,\"failOnTimeout\":false,\"backoff\":null,\"timeout\":null,\"retryUntil\":null,\"data\":{\"commandName\":\"Illuminate\\\\Notifications\\\\SendQueuedNotifications\",\"command\":\"O:48:\\\"Illuminate\\\\Notifications\\\\SendQueuedNotifications\\\":3:{s:11:\\\"notifiables\\\";O:45:\\\"Illuminate\\\\Contracts\\\\Database\\\\ModelIdentifier\\\":5:{s:5:\\\"class\\\";s:15:\\\"App\\\\Models\\\\User\\\";s:2:\\\"id\\\";a:1:{i:0;i:109;}s:9:\\\"relations\\\";a:0:{}s:10:\\\"connection\\\";s:5:\\\"mysql\\\";s:15:\\\"collectionClass\\\";N;}s:12:\\\"notification\\\";O:32:\\\"App\\\\Notifications\\\\InvoiceCreated\\\":2:{s:7:\\\"invoice\\\";O:45:\\\"Illuminate\\\\Contracts\\\\Database\\\\ModelIdentifier\\\":5:{s:5:\\\"class\\\";s:18:\\\"App\\\\Models\\\\Invoice\\\";s:2:\\\"id\\\";i:18;s:9:\\\"relations\\\";a:0:{}s:10:\\\"connection\\\";s:5:\\\"mysql\\\";s:15:\\\"collectionClass\\\";N;}s:2:\\\"id\\\";s:36:\\\"a81c7d8b-874b-43f1-a910-f822eb539043\\\";}s:8:\\\"channels\\\";a:1:{i:0;s:8:\\\"database\\\";}}\"},\"createdAt\":1763033378,\"delay\":null}', 0, NULL, 1763033378, 1763033378),
+(352, 'default', '{\"uuid\":\"3fa82455-bf05-43a9-ae06-bbcbd916a37a\",\"displayName\":\"App\\\\Notifications\\\\InvoiceCreated\",\"job\":\"Illuminate\\\\Queue\\\\CallQueuedHandler@call\",\"maxTries\":null,\"maxExceptions\":null,\"failOnTimeout\":false,\"backoff\":null,\"timeout\":null,\"retryUntil\":null,\"data\":{\"commandName\":\"Illuminate\\\\Notifications\\\\SendQueuedNotifications\",\"command\":\"O:48:\\\"Illuminate\\\\Notifications\\\\SendQueuedNotifications\\\":3:{s:11:\\\"notifiables\\\";O:45:\\\"Illuminate\\\\Contracts\\\\Database\\\\ModelIdentifier\\\":5:{s:5:\\\"class\\\";s:15:\\\"App\\\\Models\\\\User\\\";s:2:\\\"id\\\";a:1:{i:0;i:109;}s:9:\\\"relations\\\";a:0:{}s:10:\\\"connection\\\";s:5:\\\"mysql\\\";s:15:\\\"collectionClass\\\";N;}s:12:\\\"notification\\\";O:32:\\\"App\\\\Notifications\\\\InvoiceCreated\\\":2:{s:7:\\\"invoice\\\";O:45:\\\"Illuminate\\\\Contracts\\\\Database\\\\ModelIdentifier\\\":5:{s:5:\\\"class\\\";s:18:\\\"App\\\\Models\\\\Invoice\\\";s:2:\\\"id\\\";i:19;s:9:\\\"relations\\\";a:0:{}s:10:\\\"connection\\\";s:5:\\\"mysql\\\";s:15:\\\"collectionClass\\\";N;}s:2:\\\"id\\\";s:36:\\\"99a051f4-0d4d-4533-9f7c-af95cb6ff901\\\";}s:8:\\\"channels\\\";a:1:{i:0;s:9:\\\"broadcast\\\";}}\"},\"createdAt\":1763033473,\"delay\":null}', 0, NULL, 1763033473, 1763033473),
+(353, 'default', '{\"uuid\":\"7aa35225-9d83-400b-a38f-442c3ac2143a\",\"displayName\":\"App\\\\Notifications\\\\InvoiceCreated\",\"job\":\"Illuminate\\\\Queue\\\\CallQueuedHandler@call\",\"maxTries\":null,\"maxExceptions\":null,\"failOnTimeout\":false,\"backoff\":null,\"timeout\":null,\"retryUntil\":null,\"data\":{\"commandName\":\"Illuminate\\\\Notifications\\\\SendQueuedNotifications\",\"command\":\"O:48:\\\"Illuminate\\\\Notifications\\\\SendQueuedNotifications\\\":3:{s:11:\\\"notifiables\\\";O:45:\\\"Illuminate\\\\Contracts\\\\Database\\\\ModelIdentifier\\\":5:{s:5:\\\"class\\\";s:15:\\\"App\\\\Models\\\\User\\\";s:2:\\\"id\\\";a:1:{i:0;i:109;}s:9:\\\"relations\\\";a:0:{}s:10:\\\"connection\\\";s:5:\\\"mysql\\\";s:15:\\\"collectionClass\\\";N;}s:12:\\\"notification\\\";O:32:\\\"App\\\\Notifications\\\\InvoiceCreated\\\":2:{s:7:\\\"invoice\\\";O:45:\\\"Illuminate\\\\Contracts\\\\Database\\\\ModelIdentifier\\\":5:{s:5:\\\"class\\\";s:18:\\\"App\\\\Models\\\\Invoice\\\";s:2:\\\"id\\\";i:19;s:9:\\\"relations\\\";a:0:{}s:10:\\\"connection\\\";s:5:\\\"mysql\\\";s:15:\\\"collectionClass\\\";N;}s:2:\\\"id\\\";s:36:\\\"99a051f4-0d4d-4533-9f7c-af95cb6ff901\\\";}s:8:\\\"channels\\\";a:1:{i:0;s:8:\\\"database\\\";}}\"},\"createdAt\":1763033473,\"delay\":null}', 0, NULL, 1763033473, 1763033473),
+(354, 'default', '{\"uuid\":\"7157de09-b625-451e-bd25-6ad43c85a022\",\"displayName\":\"App\\\\Notifications\\\\InvoiceCreated\",\"job\":\"Illuminate\\\\Queue\\\\CallQueuedHandler@call\",\"maxTries\":null,\"maxExceptions\":null,\"failOnTimeout\":false,\"backoff\":null,\"timeout\":null,\"retryUntil\":null,\"data\":{\"commandName\":\"Illuminate\\\\Notifications\\\\SendQueuedNotifications\",\"command\":\"O:48:\\\"Illuminate\\\\Notifications\\\\SendQueuedNotifications\\\":3:{s:11:\\\"notifiables\\\";O:45:\\\"Illuminate\\\\Contracts\\\\Database\\\\ModelIdentifier\\\":5:{s:5:\\\"class\\\";s:15:\\\"App\\\\Models\\\\User\\\";s:2:\\\"id\\\";a:1:{i:0;i:109;}s:9:\\\"relations\\\";a:0:{}s:10:\\\"connection\\\";s:5:\\\"mysql\\\";s:15:\\\"collectionClass\\\";N;}s:12:\\\"notification\\\";O:32:\\\"App\\\\Notifications\\\\InvoiceCreated\\\":2:{s:7:\\\"invoice\\\";O:45:\\\"Illuminate\\\\Contracts\\\\Database\\\\ModelIdentifier\\\":5:{s:5:\\\"class\\\";s:18:\\\"App\\\\Models\\\\Invoice\\\";s:2:\\\"id\\\";i:20;s:9:\\\"relations\\\";a:0:{}s:10:\\\"connection\\\";s:5:\\\"mysql\\\";s:15:\\\"collectionClass\\\";N;}s:2:\\\"id\\\";s:36:\\\"b45b1b20-9afe-4581-bc21-eefb1622e083\\\";}s:8:\\\"channels\\\";a:1:{i:0;s:9:\\\"broadcast\\\";}}\"},\"createdAt\":1763181697,\"delay\":null}', 0, NULL, 1763181698, 1763181698),
+(355, 'default', '{\"uuid\":\"ca9f4189-06be-4e04-a98f-6b97335fc17b\",\"displayName\":\"App\\\\Notifications\\\\InvoiceCreated\",\"job\":\"Illuminate\\\\Queue\\\\CallQueuedHandler@call\",\"maxTries\":null,\"maxExceptions\":null,\"failOnTimeout\":false,\"backoff\":null,\"timeout\":null,\"retryUntil\":null,\"data\":{\"commandName\":\"Illuminate\\\\Notifications\\\\SendQueuedNotifications\",\"command\":\"O:48:\\\"Illuminate\\\\Notifications\\\\SendQueuedNotifications\\\":3:{s:11:\\\"notifiables\\\";O:45:\\\"Illuminate\\\\Contracts\\\\Database\\\\ModelIdentifier\\\":5:{s:5:\\\"class\\\";s:15:\\\"App\\\\Models\\\\User\\\";s:2:\\\"id\\\";a:1:{i:0;i:109;}s:9:\\\"relations\\\";a:0:{}s:10:\\\"connection\\\";s:5:\\\"mysql\\\";s:15:\\\"collectionClass\\\";N;}s:12:\\\"notification\\\";O:32:\\\"App\\\\Notifications\\\\InvoiceCreated\\\":2:{s:7:\\\"invoice\\\";O:45:\\\"Illuminate\\\\Contracts\\\\Database\\\\ModelIdentifier\\\":5:{s:5:\\\"class\\\";s:18:\\\"App\\\\Models\\\\Invoice\\\";s:2:\\\"id\\\";i:20;s:9:\\\"relations\\\";a:0:{}s:10:\\\"connection\\\";s:5:\\\"mysql\\\";s:15:\\\"collectionClass\\\";N;}s:2:\\\"id\\\";s:36:\\\"b45b1b20-9afe-4581-bc21-eefb1622e083\\\";}s:8:\\\"channels\\\";a:1:{i:0;s:8:\\\"database\\\";}}\"},\"createdAt\":1763181698,\"delay\":null}', 0, NULL, 1763181698, 1763181698),
+(356, 'default', '{\"uuid\":\"fab05da9-01d6-4d50-939e-5a00f1b7525f\",\"displayName\":\"App\\\\Notifications\\\\InvoiceCreated\",\"job\":\"Illuminate\\\\Queue\\\\CallQueuedHandler@call\",\"maxTries\":null,\"maxExceptions\":null,\"failOnTimeout\":false,\"backoff\":null,\"timeout\":null,\"retryUntil\":null,\"data\":{\"commandName\":\"Illuminate\\\\Notifications\\\\SendQueuedNotifications\",\"command\":\"O:48:\\\"Illuminate\\\\Notifications\\\\SendQueuedNotifications\\\":3:{s:11:\\\"notifiables\\\";O:45:\\\"Illuminate\\\\Contracts\\\\Database\\\\ModelIdentifier\\\":5:{s:5:\\\"class\\\";s:15:\\\"App\\\\Models\\\\User\\\";s:2:\\\"id\\\";a:1:{i:0;i:109;}s:9:\\\"relations\\\";a:0:{}s:10:\\\"connection\\\";s:5:\\\"mysql\\\";s:15:\\\"collectionClass\\\";N;}s:12:\\\"notification\\\";O:32:\\\"App\\\\Notifications\\\\InvoiceCreated\\\":2:{s:7:\\\"invoice\\\";O:45:\\\"Illuminate\\\\Contracts\\\\Database\\\\ModelIdentifier\\\":5:{s:5:\\\"class\\\";s:18:\\\"App\\\\Models\\\\Invoice\\\";s:2:\\\"id\\\";i:21;s:9:\\\"relations\\\";a:0:{}s:10:\\\"connection\\\";s:5:\\\"mysql\\\";s:15:\\\"collectionClass\\\";N;}s:2:\\\"id\\\";s:36:\\\"8706bc8f-ffea-4f28-8bde-2c054b651590\\\";}s:8:\\\"channels\\\";a:1:{i:0;s:9:\\\"broadcast\\\";}}\"},\"createdAt\":1763181911,\"delay\":null}', 0, NULL, 1763181911, 1763181911),
+(357, 'default', '{\"uuid\":\"9e5dc605-a484-4655-ad75-102ae512ba18\",\"displayName\":\"App\\\\Notifications\\\\InvoiceCreated\",\"job\":\"Illuminate\\\\Queue\\\\CallQueuedHandler@call\",\"maxTries\":null,\"maxExceptions\":null,\"failOnTimeout\":false,\"backoff\":null,\"timeout\":null,\"retryUntil\":null,\"data\":{\"commandName\":\"Illuminate\\\\Notifications\\\\SendQueuedNotifications\",\"command\":\"O:48:\\\"Illuminate\\\\Notifications\\\\SendQueuedNotifications\\\":3:{s:11:\\\"notifiables\\\";O:45:\\\"Illuminate\\\\Contracts\\\\Database\\\\ModelIdentifier\\\":5:{s:5:\\\"class\\\";s:15:\\\"App\\\\Models\\\\User\\\";s:2:\\\"id\\\";a:1:{i:0;i:109;}s:9:\\\"relations\\\";a:0:{}s:10:\\\"connection\\\";s:5:\\\"mysql\\\";s:15:\\\"collectionClass\\\";N;}s:12:\\\"notification\\\";O:32:\\\"App\\\\Notifications\\\\InvoiceCreated\\\":2:{s:7:\\\"invoice\\\";O:45:\\\"Illuminate\\\\Contracts\\\\Database\\\\ModelIdentifier\\\":5:{s:5:\\\"class\\\";s:18:\\\"App\\\\Models\\\\Invoice\\\";s:2:\\\"id\\\";i:21;s:9:\\\"relations\\\";a:0:{}s:10:\\\"connection\\\";s:5:\\\"mysql\\\";s:15:\\\"collectionClass\\\";N;}s:2:\\\"id\\\";s:36:\\\"8706bc8f-ffea-4f28-8bde-2c054b651590\\\";}s:8:\\\"channels\\\";a:1:{i:0;s:8:\\\"database\\\";}}\"},\"createdAt\":1763181911,\"delay\":null}', 0, NULL, 1763181911, 1763181911),
+(358, 'default', '{\"uuid\":\"083f9d0a-dcf7-4e1f-9bcd-a74f1d83779e\",\"displayName\":\"App\\\\Notifications\\\\InvoiceCreated\",\"job\":\"Illuminate\\\\Queue\\\\CallQueuedHandler@call\",\"maxTries\":null,\"maxExceptions\":null,\"failOnTimeout\":false,\"backoff\":null,\"timeout\":null,\"retryUntil\":null,\"data\":{\"commandName\":\"Illuminate\\\\Notifications\\\\SendQueuedNotifications\",\"command\":\"O:48:\\\"Illuminate\\\\Notifications\\\\SendQueuedNotifications\\\":3:{s:11:\\\"notifiables\\\";O:45:\\\"Illuminate\\\\Contracts\\\\Database\\\\ModelIdentifier\\\":5:{s:5:\\\"class\\\";s:15:\\\"App\\\\Models\\\\User\\\";s:2:\\\"id\\\";a:1:{i:0;i:109;}s:9:\\\"relations\\\";a:0:{}s:10:\\\"connection\\\";s:5:\\\"mysql\\\";s:15:\\\"collectionClass\\\";N;}s:12:\\\"notification\\\";O:32:\\\"App\\\\Notifications\\\\InvoiceCreated\\\":2:{s:7:\\\"invoice\\\";O:45:\\\"Illuminate\\\\Contracts\\\\Database\\\\ModelIdentifier\\\":5:{s:5:\\\"class\\\";s:18:\\\"App\\\\Models\\\\Invoice\\\";s:2:\\\"id\\\";i:22;s:9:\\\"relations\\\";a:0:{}s:10:\\\"connection\\\";s:5:\\\"mysql\\\";s:15:\\\"collectionClass\\\";N;}s:2:\\\"id\\\";s:36:\\\"f2488d4c-e6a0-4aa5-9142-ae946b5b910d\\\";}s:8:\\\"channels\\\";a:1:{i:0;s:9:\\\"broadcast\\\";}}\"},\"createdAt\":1763185453,\"delay\":null}', 0, NULL, 1763185453, 1763185453),
+(359, 'default', '{\"uuid\":\"cf9656e9-7c4e-461c-8c54-04d6fabf65f3\",\"displayName\":\"App\\\\Notifications\\\\InvoiceCreated\",\"job\":\"Illuminate\\\\Queue\\\\CallQueuedHandler@call\",\"maxTries\":null,\"maxExceptions\":null,\"failOnTimeout\":false,\"backoff\":null,\"timeout\":null,\"retryUntil\":null,\"data\":{\"commandName\":\"Illuminate\\\\Notifications\\\\SendQueuedNotifications\",\"command\":\"O:48:\\\"Illuminate\\\\Notifications\\\\SendQueuedNotifications\\\":3:{s:11:\\\"notifiables\\\";O:45:\\\"Illuminate\\\\Contracts\\\\Database\\\\ModelIdentifier\\\":5:{s:5:\\\"class\\\";s:15:\\\"App\\\\Models\\\\User\\\";s:2:\\\"id\\\";a:1:{i:0;i:109;}s:9:\\\"relations\\\";a:0:{}s:10:\\\"connection\\\";s:5:\\\"mysql\\\";s:15:\\\"collectionClass\\\";N;}s:12:\\\"notification\\\";O:32:\\\"App\\\\Notifications\\\\InvoiceCreated\\\":2:{s:7:\\\"invoice\\\";O:45:\\\"Illuminate\\\\Contracts\\\\Database\\\\ModelIdentifier\\\":5:{s:5:\\\"class\\\";s:18:\\\"App\\\\Models\\\\Invoice\\\";s:2:\\\"id\\\";i:22;s:9:\\\"relations\\\";a:0:{}s:10:\\\"connection\\\";s:5:\\\"mysql\\\";s:15:\\\"collectionClass\\\";N;}s:2:\\\"id\\\";s:36:\\\"f2488d4c-e6a0-4aa5-9142-ae946b5b910d\\\";}s:8:\\\"channels\\\";a:1:{i:0;s:8:\\\"database\\\";}}\"},\"createdAt\":1763185453,\"delay\":null}', 0, NULL, 1763185453, 1763185453);
 
 -- --------------------------------------------------------
 
@@ -702,16 +669,21 @@ CREATE TABLE `job_batches` (
 CREATE TABLE `marks` (
   `id` bigint(20) UNSIGNED NOT NULL,
   `student_id` bigint(20) UNSIGNED NOT NULL,
+  `exam_id` bigint(20) UNSIGNED DEFAULT NULL,
+  `subject_id` bigint(20) UNSIGNED NOT NULL,
   `class_id` bigint(20) UNSIGNED NOT NULL,
   `session_id` bigint(20) UNSIGNED NOT NULL,
   `section_id` bigint(20) UNSIGNED NOT NULL,
   `group_id` bigint(20) UNSIGNED NOT NULL,
-  `exam_id` bigint(20) UNSIGNED NOT NULL,
-  `subject_id` bigint(20) UNSIGNED NOT NULL,
-  `class_test_marks` int(11) DEFAULT NULL,
-  `assignment_marks` int(11) DEFAULT NULL,
-  `exam_marks` int(11) DEFAULT NULL,
-  `attendance_marks` decimal(8,2) NOT NULL DEFAULT 0.00,
+  `subjective_marks` smallint(5) UNSIGNED DEFAULT NULL COMMENT 'Marks obtained in subjective part.',
+  `objective_marks` smallint(5) UNSIGNED DEFAULT NULL COMMENT 'Marks obtained in objective part.',
+  `practical_marks` smallint(5) UNSIGNED DEFAULT NULL COMMENT 'Marks obtained in practical part (if applicable).',
+  `total_marks_obtained` smallint(5) UNSIGNED DEFAULT NULL COMMENT 'Sum of subjective, objective, practical',
+  `subject_percentage` decimal(5,2) DEFAULT NULL COMMENT 'Percentage marks achieved in the subject.',
+  `subject_letter_grade` varchar(5) DEFAULT NULL COMMENT 'The corresponding letter grade (e.g., A+, B).',
+  `subject_grade_point` decimal(3,2) DEFAULT NULL COMMENT 'The grade point (GPA) for the subject.',
+  `subject_pass_status` varchar(10) DEFAULT NULL COMMENT 'Pass/Fail status for the subject (e.g., Pass, Fail).',
+  `is_absent` tinyint(1) NOT NULL DEFAULT 0 COMMENT 'Flag if student was absent for this subject/exam.',
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -720,13 +692,9 @@ CREATE TABLE `marks` (
 -- Dumping data for table `marks`
 --
 
-INSERT INTO `marks` (`id`, `student_id`, `class_id`, `session_id`, `section_id`, `group_id`, `exam_id`, `subject_id`, `class_test_marks`, `assignment_marks`, `exam_marks`, `attendance_marks`, `created_at`, `updated_at`) VALUES
-(7, 1, 1, 1, 7, 4, 1, 1, 5, 5, 20, 0.00, '2025-07-27 01:26:12', '2025-07-27 01:26:12'),
-(8, 2, 1, 1, 7, 4, 1, 1, 5, 5, 15, 0.00, '2025-07-27 01:26:12', '2025-07-27 01:26:12'),
-(9, 1, 1, 1, 7, 4, 1, 2, 5, 5, 15, 0.00, '2025-07-27 02:51:41', '2025-07-27 02:51:41'),
-(10, 2, 1, 1, 7, 4, 1, 2, 5, 5, 15, 0.00, '2025-07-27 02:51:41', '2025-07-27 02:51:41'),
-(11, 1, 1, 1, 7, 4, 1, 3, 5, 5, 20, 0.00, '2025-07-27 02:53:51', '2025-07-27 02:53:51'),
-(12, 2, 1, 1, 7, 4, 1, 3, 5, 5, 21, 0.00, '2025-07-27 02:53:51', '2025-07-27 02:53:51');
+INSERT INTO `marks` (`id`, `student_id`, `exam_id`, `subject_id`, `class_id`, `session_id`, `section_id`, `group_id`, `subjective_marks`, `objective_marks`, `practical_marks`, `total_marks_obtained`, `subject_percentage`, `subject_letter_grade`, `subject_grade_point`, `subject_pass_status`, `is_absent`, `created_at`, `updated_at`) VALUES
+(11, 13, 1, 8, 3, 1, 7, 4, 10, 5, 0, 15, 15.00, 'F', 0.00, 'Fail', 0, '2025-12-04 00:42:39', '2025-12-04 00:42:39'),
+(12, 14, 1, 8, 3, 1, 7, 4, 10, 5, 0, 15, 15.00, 'F', 0.00, 'Fail', 0, '2025-12-04 00:42:39', '2025-12-04 00:42:39');
 
 -- --------------------------------------------------------
 
@@ -753,33 +721,37 @@ INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES
 (7, '2025_06_01_071359_create_sections_table', 3),
 (11, '2025_06_02_180233_create_class_sessions_table', 6),
 (13, '2025_06_02_180416_create_groups_table', 7),
-(20, '2025_06_01_071027_create_teachers_table', 11),
-(33, '2025_06_23_050935_create_exam_schedules_table', 21),
-(36, '2025_06_22_084234_create_class_times_table', 23),
 (39, '2025_06_23_043001_create_rooms_table', 26),
-(42, '2025_07_12_050917_create_books_table', 28),
-(46, '2025_07_12_052145_create_borrow_books_table', 29),
 (48, '2025_07_14_091844_create_bus_schedules_table', 30),
-(50, '2025_07_15_112508_create_exam_seat_plans_table', 32),
-(51, '2025_06_01_071659_create_students_table', 33),
-(57, '2025_06_01_071801_create_attendances_table', 36),
-(59, '2025_07_22_074552_create_class_times_table', 37),
 (61, '2025_07_23_093525_create_grade_configures_table', 39),
-(62, '2025_06_22_105417_create_exams_table', 40),
 (65, '2025_06_22_063607_create_class_subjects_table', 42),
-(67, '2025_07_20_063847_create_marks_table', 44),
-(71, '2025_07_24_042418_create_exam_results_table', 45),
-(72, '2025_06_22_054115_create_subjects_table', 46),
-(77, '2025_07_28_095144_create_invoice_items_table', 47),
 (81, '2025_07_28_094959_create_class_fee_structures_table', 50),
-(82, '2025_07_28_095102_create_student_fee_assignments_table', 51),
 (83, '2025_07_28_090702_create_fee_types_table', 52),
-(84, '2025_06_01_071529_create_class_names_table', 53),
-(85, '2025_07_15_054129_create_notices_table', 53),
-(87, '2025_07_28_095126_create_invoices_table', 54),
-(89, '2025_07_28_095209_create_payments_table', 55),
 (90, '2025_08_10_053504_create_settings_table', 56),
-(91, '2025_08_11_084631_create_notifications_table', 57);
+(91, '2025_08_11_084631_create_notifications_table', 57),
+(97, '2025_08_31_055728_create_class_time_slots_table', 63),
+(101, '2025_07_15_054129_create_notices_table', 65),
+(102, '2025_09_04_104730_create_exam_time_slots_table', 66),
+(109, '2025_07_28_095209_create_payments_table', 70),
+(110, '2025_07_28_095126_create_invoices_table', 71),
+(120, '2025_07_28_095144_create_invoice_items_table', 75),
+(122, '2025_07_12_052145_create_borrow_books_table', 77),
+(125, '2025_10_16_055223_create_salary_structures_table', 79),
+(127, '2025_07_12_050917_create_books_table', 81),
+(129, '2025_10_18_060031_create_payroll_records_table', 82),
+(132, '2025_06_22_054115_create_subjects_table', 83),
+(133, '2025_06_22_105417_create_exams_table', 84),
+(134, '2025_07_24_042418_create_exam_results_table', 85),
+(137, '2025_07_20_063847_create_marks_table', 86),
+(141, '2025_06_23_050935_create_exam_schedules_table', 89),
+(143, '2025_07_15_112508_create_exam_seat_plans_table', 90),
+(144, '2025_06_01_071801_create_attendances_table', 91),
+(146, '2025_11_04_091329_create_teacher_attendances_table', 92),
+(147, '2025_07_22_074552_create_class_times_table', 93),
+(149, '2025_07_28_095102_create_student_fee_assignments_table', 95),
+(154, '2025_06_01_071529_create_class_names_table', 98),
+(155, '2025_06_01_071027_create_teachers_table', 99),
+(157, '2025_06_01_071659_create_students_table', 100);
 
 -- --------------------------------------------------------
 
@@ -816,10 +788,33 @@ INSERT INTO `model_has_roles` (`role_id`, `model_type`, `model_id`) VALUES
 (2, 'App\\Models\\User', 13),
 (2, 'App\\Models\\User', 14),
 (2, 'App\\Models\\User', 16),
+(2, 'App\\Models\\User', 19),
+(2, 'App\\Models\\User', 20),
+(2, 'App\\Models\\User', 66),
+(2, 'App\\Models\\User', 77),
+(2, 'App\\Models\\User', 98),
+(2, 'App\\Models\\User', 99),
+(2, 'App\\Models\\User', 100),
+(2, 'App\\Models\\User', 102),
+(2, 'App\\Models\\User', 105),
+(2, 'App\\Models\\User', 106),
+(2, 'App\\Models\\User', 125),
+(2, 'App\\Models\\User', 126),
+(2, 'App\\Models\\User', 127),
+(2, 'App\\Models\\User', 128),
+(2, 'App\\Models\\User', 149),
 (3, 'App\\Models\\User', 7),
 (3, 'App\\Models\\User', 15),
 (4, 'App\\Models\\User', 17),
-(4, 'App\\Models\\User', 18);
+(4, 'App\\Models\\User', 18),
+(4, 'App\\Models\\User', 54),
+(4, 'App\\Models\\User', 55),
+(4, 'App\\Models\\User', 67),
+(4, 'App\\Models\\User', 78),
+(4, 'App\\Models\\User', 103),
+(4, 'App\\Models\\User', 104),
+(5, 'App\\Models\\User', 39),
+(5, 'App\\Models\\User', 40);
 
 -- --------------------------------------------------------
 
@@ -829,15 +824,23 @@ INSERT INTO `model_has_roles` (`role_id`, `model_type`, `model_id`) VALUES
 
 CREATE TABLE `notices` (
   `id` bigint(20) UNSIGNED NOT NULL,
-  `title` varchar(255) NOT NULL,
+  `notice_title` varchar(255) NOT NULL,
   `content` text NOT NULL,
-  `notice_date` date DEFAULT NULL,
+  `start_date` date NOT NULL,
+  `end_date` date NOT NULL,
   `status` int(11) NOT NULL DEFAULT 0,
-  `target_user` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`target_user`)),
+  `target_user` varchar(255) DEFAULT NULL,
   `created_by` bigint(20) UNSIGNED NOT NULL,
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `notices`
+--
+
+INSERT INTO `notices` (`id`, `notice_title`, `content`, `start_date`, `end_date`, `status`, `target_user`, `created_by`, `created_at`, `updated_at`) VALUES
+(4, 'Durga Puja', 'N/A', '2025-09-04', '2025-09-07', 0, '[\"all\"]', 4, '2025-09-04 00:58:23', '2025-09-04 00:58:23');
 
 -- --------------------------------------------------------
 
@@ -861,12 +864,68 @@ CREATE TABLE `notifications` (
 --
 
 INSERT INTO `notifications` (`id`, `type`, `notifiable_type`, `notifiable_id`, `data`, `read_at`, `created_at`, `updated_at`) VALUES
-('594f3ff4-0adc-42ea-9082-44f1292020c2', 'App\\Notifications\\InvoiceCreated', 'App\\Models\\User', 17, '{\"invoice_id\":40,\"message\":\"A new invoice has been created.\",\"created_at\":\"2025-08-13T10:25:31.017883Z\"}', NULL, '2025-08-13 04:25:31', '2025-08-13 04:25:31'),
-('6860673a-69f4-4e31-afb2-b78c65c5344b', 'App\\Notifications\\InvoiceCreated', 'App\\Models\\User', 17, '{\"invoice_id\":36,\"message\":\"A new invoice has been created.\",\"created_at\":\"2025-08-13T10:23:11.162033Z\"}', NULL, '2025-08-13 04:23:11', '2025-08-13 04:23:11'),
-('6e137411-76cf-4198-9e66-62b73340ff86', 'App\\Notifications\\InvoiceCreated', 'App\\Models\\User', 17, '{\"invoice_id\":39,\"message\":\"A new invoice has been created.\",\"created_at\":\"2025-08-13T10:25:09.605839Z\"}', NULL, '2025-08-13 04:25:09', '2025-08-13 04:25:09'),
-('8478d590-c347-44e0-957c-88ce0ab178de', 'App\\Notifications\\InvoiceCreated', 'App\\Models\\User', 17, '{\"invoice_id\":37,\"message\":\"A new invoice has been created.\",\"created_at\":\"2025-08-13T10:23:53.638096Z\"}', NULL, '2025-08-13 04:23:53', '2025-08-13 04:23:53'),
-('89595851-482f-4190-a675-696979916505', 'App\\Notifications\\InvoiceCreated', 'App\\Models\\User', 17, '{\"invoice_id\":38,\"message\":\"A new invoice has been created.\",\"created_at\":\"2025-08-13T10:25:00.276134Z\"}', NULL, '2025-08-13 04:25:00', '2025-08-13 04:25:00'),
-('abc4db93-3edd-42f5-af31-779e9d0ee238', 'App\\Notifications\\InvoiceCreated', 'App\\Models\\User', 17, '{\"invoice_id\":41,\"message\":\"A new invoice has been created.\",\"created_at\":\"2025-08-13T10:25:55.468877Z\"}', NULL, '2025-08-13 04:25:55', '2025-08-13 04:25:55');
+('02d9d6cf-05ec-47b3-bd1b-408ccef87798', 'App\\Notifications\\InvoiceCreated', 'App\\Models\\User', 18, '{\"invoice_id\":75,\"invoice_name\":\"INV-1755429679\",\"message\":\"Your new invoice (INV-1755429679) for August 2025 has been created.\",\"created_at\":\"2025-08-17T11:21:22.513873Z\"}', '2025-08-18 22:55:40', '2025-08-17 05:21:22', '2025-08-18 22:55:40'),
+('030236e4-c9fe-44a1-aa00-110fe3c5c60e', 'App\\Notifications\\StudentPaymentReceived', 'App\\Models\\User', 15, '{\"message\":\"Pabel has made a payment of 4000.\",\"student_name\":\"Pabel\",\"amount\":4000}', '2025-08-19 05:00:18', '2025-08-19 03:15:26', '2025-08-19 05:00:18'),
+('09658d06-8647-43ce-82ac-86a690ed9c8c', 'App\\Notifications\\InvoiceCreated', 'App\\Models\\User', 17, '{\"invoice_id\":93,\"invoice_name\":\"INV-1755845581\",\"message\":\"Your new invoice (INV-1755845581) for August 2025 has been created.\",\"created_at\":\"2025-08-22T06:53:06.851497Z\"}', NULL, '2025-08-22 00:53:06', '2025-08-22 00:53:06'),
+('0a18814f-7440-44df-b29c-0bc6a2238061', 'App\\Notifications\\InvoiceCreated', 'App\\Models\\User', 18, '{\"invoice_id\":76,\"invoice_name\":\"INV-1755430571\",\"message\":\"Your new invoice (INV-1755430571) for August 2025 has been created.\",\"created_at\":\"2025-08-17T11:36:14.625925Z\"}', '2025-08-18 22:55:40', '2025-08-17 05:36:14', '2025-08-18 22:55:40'),
+('0f8bf681-57a5-4e08-b5b7-2f5b4aeaed69', 'App\\Notifications\\StudentPaymentReceived', 'App\\Models\\User', 15, '{\"message\":\"Pabel has made a payment of 10000.\",\"student_name\":\"Pabel\",\"amount\":10000}', '2025-08-19 03:10:36', '2025-08-18 05:40:13', '2025-08-19 03:10:36'),
+('1279a6b6-7d4f-4210-96ad-16acfd270353', 'App\\Notifications\\StudentPaymentReceived', 'App\\Models\\User', 15, '{\"message\":\"Pabel has made a payment of 10000.\",\"student_name\":\"Pabel\",\"amount\":10000}', '2025-08-19 05:00:18', '2025-08-19 03:11:01', '2025-08-19 05:00:18'),
+('131e8a24-9e30-4afc-b651-8e2d4ddb8b0f', 'App\\Notifications\\InvoiceCreated', 'App\\Models\\User', 54, '{\"invoice_id\":2,\"invoice_name\":\"INV-1758621087-1\",\"message\":\"Your new invoice (INV-1758621087-1) for SEP-2025 has been created.\",\"created_at\":\"2025-09-23T09:51:29.491346Z\"}', NULL, '2025-09-23 03:51:29', '2025-09-23 03:51:29'),
+('13e65e7d-cc4b-42a8-a07e-5e9372ff4f8e', 'App\\Notifications\\InvoiceCreated', 'App\\Models\\User', 55, '{\"invoice_id\":7,\"invoice_name\":\"INV-1758622987-2\",\"message\":\"Your new invoice (INV-1758622987-2) for SEP-2025 has been created.\",\"created_at\":\"2025-09-23T10:23:09.737564Z\"}', NULL, '2025-09-23 04:23:09', '2025-09-23 04:23:09'),
+('15ac39c1-ffb5-4ce3-b320-a8ab63007e16', 'App\\Notifications\\InvoiceCreated', 'App\\Models\\User', 17, '{\"invoice_id\":91,\"invoice_name\":\"INV-1755769591\",\"message\":\"Your new invoice (INV-1755769591) for August 2025 has been created.\",\"created_at\":\"2025-08-21T09:46:34.549059Z\"}', '2025-08-21 04:05:38', '2025-08-21 03:46:34', '2025-08-21 04:05:38'),
+('173fc6d6-fba1-4bff-b449-710b7082fbba', 'App\\Notifications\\StudentPaymentReceived', 'App\\Models\\User', 15, '{\"message\":\"sunny has made a payment of 1000.\",\"student_name\":\"sunny\",\"amount\":1000}', NULL, '2025-09-09 00:58:29', '2025-09-09 00:58:29'),
+('1ffc8176-eff6-43d1-bd93-9216f4987164', 'App\\Notifications\\InvoiceCreated', 'App\\Models\\User', 18, '{\"invoice_id\":77,\"invoice_name\":\"INV-1755511188\",\"message\":\"Your new invoice (INV-1755511188) for August 2025 has been created.\",\"created_at\":\"2025-08-18T09:59:55.870779Z\"}', '2025-08-18 22:55:40', '2025-08-18 03:59:55', '2025-08-18 22:55:40'),
+('23d19284-2dae-4e38-b9e5-18eef7c8b523', 'App\\Notifications\\StudentPaymentReceived', 'App\\Models\\User', 15, '{\"message\":\"Pabel has made a payment of 10000.\",\"student_name\":\"Pabel\",\"amount\":10000}', '2025-08-18 05:35:55', '2025-08-18 05:17:57', '2025-08-18 05:35:55'),
+('269d2ff5-f20c-4f86-8b89-7179ed7f061d', 'App\\Notifications\\StudentPaymentReceived', 'App\\Models\\User', 15, '{\"message\":\"Pabel has made a payment of 6000.\",\"student_name\":\"Pabel\",\"amount\":6000}', '2025-08-19 05:00:18', '2025-08-19 03:28:03', '2025-08-19 05:00:18'),
+('2bcfb7f3-4e5e-4ecc-82cd-d5a9a47d48ee', 'App\\Notifications\\InvoiceCreated', 'App\\Models\\User', 18, '{\"invoice_id\":78,\"invoice_name\":\"INV-1755511236\",\"message\":\"Your new invoice (INV-1755511236) for August 2025 has been created.\",\"created_at\":\"2025-08-18T10:00:36.519285Z\"}', '2025-08-18 22:55:40', '2025-08-18 04:00:36', '2025-08-18 22:55:40'),
+('37e138cc-4592-49f0-b4c9-02039b5abc06', 'App\\Notifications\\InvoiceCreated', 'App\\Models\\User', 18, '{\"invoice_id\":71,\"invoice_name\":\"INV-1755415513\",\"message\":\"Your new invoice (INV-1755415513) for August 2025 has been created.\",\"created_at\":\"2025-08-17T07:25:16.115701Z\"}', '2025-08-18 22:55:40', '2025-08-17 01:25:16', '2025-08-18 22:55:40'),
+('3dbcdfdb-a3a7-4967-9984-093bfc5fb14f', 'App\\Notifications\\StudentPaymentReceived', 'App\\Models\\User', 15, '{\"message\":\"sunny has made a payment of 10000.\",\"student_name\":\"sunny\",\"amount\":10000}', '2025-08-19 05:00:17', '2025-08-19 04:58:04', '2025-08-19 05:00:17'),
+('4487e22a-d47c-4a57-846b-fa5b25095edb', 'App\\Notifications\\InvoiceCreated', 'App\\Models\\User', 18, '{\"invoice_id\":94,\"invoice_name\":\"INV-1757396939-1\",\"message\":\"Your new invoice (INV-1757396939-1) for SEP-2025 has been created.\",\"created_at\":\"2025-09-09T05:49:08.202563Z\"}', NULL, '2025-09-08 23:49:08', '2025-09-08 23:49:08'),
+('46cc1db7-5797-404f-8206-809d782fea26', 'App\\Notifications\\InvoiceCreated', 'App\\Models\\User', 54, '{\"invoice_id\":5,\"invoice_name\":\"INV-1758621596-1\",\"message\":\"Your new invoice (INV-1758621596-1) for SEP-2025 has been created.\",\"created_at\":\"2025-09-23T09:59:56.487542Z\"}', NULL, '2025-09-23 03:59:56', '2025-09-23 03:59:56'),
+('49516ded-7ca4-46b6-99ee-d88e6a3fb818', 'App\\Notifications\\StudentPaymentReceived', 'App\\Models\\User', 15, '{\"message\":\"sunny has made a payment of 4500.\",\"student_name\":\"sunny\",\"amount\":4500}', NULL, '2025-09-09 00:14:58', '2025-09-09 00:14:58'),
+('4ba6bdef-da9b-44fc-a12f-5d81608784c9', 'App\\Notifications\\StudentPaymentReceived', 'App\\Models\\User', 15, '{\"message\":\"Pabel has made a payment of 4000.\",\"student_name\":\"Pabel\",\"amount\":4000}', '2025-08-19 03:10:36', '2025-08-19 03:06:43', '2025-08-19 03:10:36'),
+('4ce751bd-d3a8-4cb9-85b9-07207d967eb2', 'App\\Notifications\\InvoiceCreated', 'App\\Models\\User', 18, '{\"invoice_id\":79,\"invoice_name\":\"INV-1755511262\",\"message\":\"Your new invoice (INV-1755511262) for August 2025 has been created.\",\"created_at\":\"2025-08-18T10:01:04.036206Z\"}', '2025-08-18 22:55:40', '2025-08-18 04:01:04', '2025-08-18 22:55:40'),
+('5235d8cb-20a6-44bb-967c-5d330e1661bf', 'App\\Notifications\\InvoiceCreated', 'App\\Models\\User', 18, '{\"invoice_id\":80,\"invoice_name\":\"INV-1755513161\",\"message\":\"Your new invoice (INV-1755513161) for August 2025 has been created.\",\"created_at\":\"2025-08-18T10:32:43.750488Z\"}', '2025-08-18 22:55:40', '2025-08-18 04:32:43', '2025-08-18 22:55:40'),
+('554069ab-4b59-475c-8308-6101d881e302', 'App\\Notifications\\InvoiceCreated', 'App\\Models\\User', 17, '{\"invoice_id\":88,\"invoice_name\":\"INV-1755600985\",\"message\":\"Your new invoice (INV-1755600985) for August 2025 has been created.\",\"created_at\":\"2025-08-19T10:56:28.633144Z\"}', '2025-08-21 04:05:38', '2025-08-19 04:56:28', '2025-08-21 04:05:38'),
+('57e1195b-a048-4b75-855d-1ead34f4cf73', 'App\\Notifications\\InvoiceCreated', 'App\\Models\\User', 18, '{\"invoice_id\":73,\"invoice_name\":\"INV-1755419712\",\"message\":\"Your new invoice (INV-1755419712) for August 2025 has been created.\",\"created_at\":\"2025-08-17T08:35:14.889499Z\"}', '2025-08-18 22:55:40', '2025-08-17 02:35:14', '2025-08-18 22:55:40'),
+('5854f84a-3be7-4190-9c65-72e3a231f40f', 'App\\Notifications\\InvoiceCreated', 'App\\Models\\User', 18, '{\"invoice_id\":83,\"invoice_name\":\"INV-1755579021\",\"message\":\"Your new invoice (INV-1755579021) for August 2025 has been created.\",\"created_at\":\"2025-08-19T04:50:24.613012Z\"}', '2025-08-18 22:55:40', '2025-08-18 22:50:24', '2025-08-18 22:55:40'),
+('67628440-2680-405b-9b2f-15739c274b1f', 'App\\Notifications\\InvoiceCreated', 'App\\Models\\User', 18, '{\"invoice_id\":68,\"invoice_name\":\"INV-1755324275\",\"message\":\"Your new invoice (INV-1755324275) for August 2025 has been created.\",\"created_at\":\"2025-08-16T06:04:37.186425Z\"}', '2025-08-18 22:55:40', '2025-08-16 00:04:37', '2025-08-18 22:55:40'),
+('693dcd75-8793-4f50-ba8b-b0a8a6ad9e9d', 'App\\Notifications\\StudentPaymentReceived', 'App\\Models\\User', 15, '{\"message\":\"Pabel has made a payment of 10000.\",\"student_name\":\"Pabel\",\"amount\":10000}', '2025-08-18 05:35:55', '2025-08-18 05:34:53', '2025-08-18 05:35:55'),
+('6bd84fe6-daea-48c1-af52-7a92bd0c48c1', 'App\\Notifications\\InvoiceCreated', 'App\\Models\\User', 54, '{\"invoice_id\":6,\"invoice_name\":\"INV-1758622458-1\",\"message\":\"Your new invoice (INV-1758622458-1) for SEP-2025 has been created.\",\"created_at\":\"2025-09-23T10:14:19.021921Z\"}', NULL, '2025-09-23 04:14:19', '2025-09-23 04:14:19'),
+('6e00e4ae-a566-4d3d-b42d-9bae7ca975bd', 'App\\Notifications\\InvoiceCreated', 'App\\Models\\User', 54, '{\"invoice_id\":98,\"invoice_name\":\"INV-1758344214-1\",\"message\":\"Your new invoice (INV-1758344214-1) for SEP-2025 has been created.\",\"created_at\":\"2025-09-20T04:57:02.218109Z\"}', NULL, '2025-09-19 22:57:02', '2025-09-19 22:57:02'),
+('7b679ef3-d2b1-42a6-9095-a0c08507d697', 'App\\Notifications\\InvoiceCreated', 'App\\Models\\User', 54, '{\"invoice_id\":4,\"invoice_name\":\"INV-1758621379-1\",\"message\":\"Your new invoice (INV-1758621379-1) for SEP-2025 has been created.\",\"created_at\":\"2025-09-23T09:56:22.277596Z\"}', NULL, '2025-09-23 03:56:22', '2025-09-23 03:56:22'),
+('85d5239e-18bd-4e47-92d4-bc99d0f40038', 'App\\Notifications\\InvoiceCreated', 'App\\Models\\User', 18, '{\"invoice_id\":96,\"invoice_name\":\"INV-1757397755-1\",\"message\":\"Your new invoice (INV-1757397755-1) for SEP-2025 has been created.\",\"created_at\":\"2025-09-09T06:02:35.791086Z\"}', NULL, '2025-09-09 00:02:35', '2025-09-09 00:02:35'),
+('8bad4966-d000-4f2e-bbbf-baab79735f2a', 'App\\Notifications\\InvoiceCreated', 'App\\Models\\User', 17, '{\"invoice_id\":89,\"invoice_name\":\"INV-1755601213\",\"message\":\"Your new invoice (INV-1755601213) for August 2025 has been created.\",\"created_at\":\"2025-08-19T11:00:15.346338Z\"}', '2025-08-21 04:05:38', '2025-08-19 05:00:15', '2025-08-21 04:05:38'),
+('8d85ee2f-d5ba-40a4-99e9-f51f36db7ce5', 'App\\Notifications\\InvoiceCreated', 'App\\Models\\User', 18, '{\"invoice_id\":72,\"invoice_name\":\"INV-1755416933\",\"message\":\"Your new invoice (INV-1755416933) for August 2025 has been created.\",\"created_at\":\"2025-08-17T07:48:56.102354Z\"}', '2025-08-18 22:55:40', '2025-08-17 01:48:56', '2025-08-18 22:55:40'),
+('8f82f8a2-d169-4a8d-b135-805f0b189f7b', 'App\\Notifications\\StudentPaymentReceived', 'App\\Models\\User', 15, '{\"message\":\"Pabel has made a payment of 4000.\",\"student_name\":\"Pabel\",\"amount\":4000}', '2025-08-19 03:10:36', '2025-08-19 02:06:39', '2025-08-19 03:10:36'),
+('9396435b-26d0-42e3-83a0-8f5877acade2', 'App\\Notifications\\InvoiceCreated', 'App\\Models\\User', 54, '{\"invoice_id\":8,\"invoice_name\":\"INV-1758696997-1\",\"message\":\"Your new invoice (INV-1758696997-1) for SEP-2025 has been created.\",\"created_at\":\"2025-09-24T06:56:40.657677Z\"}', NULL, '2025-09-24 00:56:40', '2025-09-24 00:56:40'),
+('98f57fd6-7e47-445b-b105-7669ac22bdf0', 'App\\Notifications\\StudentPaymentReceived', 'App\\Models\\User', 15, '{\"message\":\"sunny has made a payment of 4500.\",\"student_name\":\"sunny\",\"amount\":4500}', NULL, '2025-09-09 00:52:38', '2025-09-09 00:52:38'),
+('9a045ec6-dc20-46fc-9466-d801f32e284a', 'App\\Notifications\\StudentPaymentReceived', 'App\\Models\\User', 15, '{\"message\":\"Pabel has made a payment of 4000.\",\"student_name\":\"Pabel\",\"amount\":4000}', '2025-08-19 03:10:36', '2025-08-19 00:38:22', '2025-08-19 03:10:36'),
+('9bb707fa-afd9-4254-8d50-c156688d167a', 'App\\Notifications\\InvoiceCreated', 'App\\Models\\User', 54, '{\"invoice_id\":99,\"invoice_name\":\"INV-1758344244-1\",\"message\":\"Your new invoice (INV-1758344244-1) for September 2025 has been created.\",\"created_at\":\"2025-09-20T04:57:25.467625Z\"}', NULL, '2025-09-19 22:57:25', '2025-09-19 22:57:25'),
+('9c21997f-d6f4-46d6-8ead-ac378618fabc', 'App\\Notifications\\InvoiceCreated', 'App\\Models\\User', 54, '{\"invoice_id\":100,\"invoice_name\":\"INV-1758604594-1\",\"message\":\"Your new invoice (INV-1758604594-1) for SEP-2025 has been created.\",\"created_at\":\"2025-09-23T05:16:39.397075Z\"}', NULL, '2025-09-22 23:16:39', '2025-09-22 23:16:39'),
+('9e959f43-81e9-4779-9e85-56ecee0209ba', 'App\\Notifications\\InvoiceCreated', 'App\\Models\\User', 18, '{\"invoice_id\":84,\"invoice_name\":\"INV-1755579334\",\"message\":\"Your new invoice (INV-1755579334) for August 2025 has been created.\",\"created_at\":\"2025-08-19T04:55:35.384197Z\"}', '2025-08-18 22:55:40', '2025-08-18 22:55:35', '2025-08-18 22:55:40'),
+('a20a51ad-ab59-4f59-b8b6-7bcfd40ddf38', 'App\\Notifications\\InvoiceCreated', 'App\\Models\\User', 55, '{\"invoice_id\":9,\"invoice_name\":\"INV-1758696997-2\",\"message\":\"Your new invoice (INV-1758696997-2) for SEP-2025 has been created.\",\"created_at\":\"2025-09-24T06:56:40.725385Z\"}', NULL, '2025-09-24 00:56:40', '2025-09-24 00:56:40'),
+('a6f25332-54f6-4378-a27a-cad369b641b8', 'App\\Notifications\\StudentPaymentReceived', 'App\\Models\\User', 15, '{\"message\":\"Pabel has made a payment of 4000.\",\"student_name\":\"Pabel\",\"amount\":4000}', '2025-08-21 04:08:19', '2025-08-20 00:27:12', '2025-08-21 04:08:19'),
+('a8bfc75b-3e1f-462b-8a74-697b4cc433f2', 'App\\Notifications\\InvoiceCreated', 'App\\Models\\User', 54, '{\"invoice_id\":3,\"invoice_name\":\"INV-1758621210-1\",\"message\":\"Your new invoice (INV-1758621210-1) for SEP-2025 has been created.\",\"created_at\":\"2025-09-23T09:53:33.298425Z\"}', NULL, '2025-09-23 03:53:33', '2025-09-23 03:53:33'),
+('aa5b89c1-8069-446f-99c8-4ad919557898', 'App\\Notifications\\StudentPaymentReceived', 'App\\Models\\User', 15, '{\"message\":\"sunny has made a payment of 2000.\",\"student_name\":\"sunny\",\"amount\":2000}', '2025-08-21 04:08:19', '2025-08-21 04:08:10', '2025-08-21 04:08:19'),
+('ab92705b-d631-4ce6-a1f5-ef842cbd8462', 'App\\Notifications\\InvoiceCreated', 'App\\Models\\User', 17, '{\"invoice_id\":92,\"invoice_name\":\"INV-1755770729\",\"message\":\"Your new invoice (INV-1755770729) for August 2025 has been created.\",\"created_at\":\"2025-08-21T10:05:31.894537Z\"}', '2025-08-21 04:05:38', '2025-08-21 04:05:31', '2025-08-21 04:05:38'),
+('af4a9219-d058-4817-89c6-757ad501892c', 'App\\Notifications\\StudentPaymentReceived', 'App\\Models\\User', 15, '{\"message\":\"Pabel has made a payment of 10000.\",\"student_name\":\"Pabel\",\"amount\":10000}', '2025-08-19 03:10:36', '2025-08-18 05:44:02', '2025-08-19 03:10:36'),
+('b821ec2b-ec55-4bcc-8ccd-d90584a87f83', 'App\\Notifications\\StudentPaymentReceived', 'App\\Models\\User', 15, '{\"message\":\"sunny has made a payment of 10000.\",\"student_name\":\"sunny\",\"amount\":10000}', '2025-08-21 04:08:19', '2025-08-19 05:00:42', '2025-08-21 04:08:19'),
+('bc59e4e4-4ac2-4499-81ed-717b01e07ea1', 'App\\Notifications\\InvoiceCreated', 'App\\Models\\User', 18, '{\"invoice_id\":85,\"invoice_name\":\"INV-1755590780\",\"message\":\"Your new invoice (INV-1755590780) for August 2025 has been created.\",\"created_at\":\"2025-08-19T08:06:22.336098Z\"}', NULL, '2025-08-19 02:06:22', '2025-08-19 02:06:22'),
+('cc9ad1db-a42f-41f3-b708-fd7b1a3bd8f2', 'App\\Notifications\\InvoiceCreated', 'App\\Models\\User', 18, '{\"invoice_id\":82,\"invoice_name\":\"INV-1755578996\",\"message\":\"Your new invoice (INV-1755578996) for August 2025 has been created.\",\"created_at\":\"2025-08-19T04:49:57.086157Z\"}', '2025-08-18 22:55:40', '2025-08-18 22:49:57', '2025-08-18 22:55:40'),
+('cd522c13-d8ef-45c2-9ea6-8e95055630d6', 'App\\Notifications\\InvoiceCreated', 'App\\Models\\User', 54, '{\"invoice_id\":1,\"invoice_name\":\"INV-1758619929-1\",\"message\":\"Your new invoice (INV-1758619929-1) for SEP-2025 has been created.\",\"created_at\":\"2025-09-23T09:32:17.946763Z\"}', NULL, '2025-09-23 03:32:17', '2025-09-23 03:32:17'),
+('d14d5ae0-5d95-4e63-8a94-e7dbb5c6b7fb', 'App\\Notifications\\InvoiceCreated', 'App\\Models\\User', 18, '{\"invoice_id\":81,\"invoice_name\":\"INV-1755578931\",\"message\":\"Your new invoice (INV-1755578931) for August 2025 has been created.\",\"created_at\":\"2025-08-19T04:48:58.196129Z\"}', '2025-08-18 22:55:40', '2025-08-18 22:48:58', '2025-08-18 22:55:40'),
+('d81a44c1-189c-4fbb-93ea-ddd55019a37f', 'App\\Notifications\\InvoiceCreated', 'App\\Models\\User', 17, '{\"invoice_id\":67,\"invoice_name\":\"INV-1755324257\",\"message\":\"Your new invoice (INV-1755324257) for August 2025 has been created.\",\"created_at\":\"2025-08-16T06:04:18.700603Z\"}', '2025-08-21 04:05:38', '2025-08-16 00:04:18', '2025-08-21 04:05:38'),
+('d93027b8-a864-45bc-926b-d773a5635733', 'App\\Notifications\\InvoiceCreated', 'App\\Models\\User', 18, '{\"invoice_id\":69,\"invoice_name\":\"INV-1755413705\",\"message\":\"Your new invoice (INV-1755413705) for August 2025 has been created.\",\"created_at\":\"2025-08-17T06:55:10.872094Z\"}', '2025-08-18 22:55:40', '2025-08-17 00:55:10', '2025-08-18 22:55:40'),
+('e0573d45-7daf-4a67-83e8-8dbdbfd6cde5', 'App\\Notifications\\InvoiceCreated', 'App\\Models\\User', 18, '{\"invoice_id\":70,\"invoice_name\":\"INV-1755415249\",\"message\":\"Your new invoice (INV-1755415249) for August 2025 has been created.\",\"created_at\":\"2025-08-17T07:20:50.532713Z\"}', '2025-08-18 22:55:40', '2025-08-17 01:20:50', '2025-08-18 22:55:40'),
+('e1b5afb1-4ef3-46d9-8952-c5b63f3f780c', 'App\\Notifications\\InvoiceCreated', 'App\\Models\\User', 18, '{\"invoice_id\":74,\"invoice_name\":\"INV-1755428488\",\"message\":\"Your new invoice (INV-1755428488) for August 2025 has been created.\",\"created_at\":\"2025-08-17T11:01:28.895629Z\"}', '2025-08-18 22:55:40', '2025-08-17 05:01:28', '2025-08-18 22:55:40'),
+('e3cc7d41-846d-4503-8694-79174cebc776', 'App\\Notifications\\InvoiceCreated', 'App\\Models\\User', 17, '{\"invoice_id\":97,\"invoice_name\":\"INV-1757397755-2\",\"message\":\"Your new invoice (INV-1757397755-2) for SEP-2025 has been created.\",\"created_at\":\"2025-09-09T06:02:35.884126Z\"}', NULL, '2025-09-09 00:02:35', '2025-09-09 00:02:35'),
+('e5574f21-551a-4bc7-9a10-e2f4554bce77', 'App\\Notifications\\StudentPaymentReceived', 'App\\Models\\User', 15, '{\"message\":\"Pabel has made a payment of 10000.\",\"student_name\":\"Pabel\",\"amount\":10000}', '2025-08-18 05:39:32', '2025-08-18 05:39:20', '2025-08-18 05:39:32'),
+('e5974cad-9933-4087-b9b0-306d9ba28f61', 'App\\Notifications\\InvoiceCreated', 'App\\Models\\User', 55, '{\"invoice_id\":10,\"invoice_name\":\"INV-1758701421-2\",\"message\":\"Your new invoice (INV-1758701421-2) for SEP-2025 has been created.\",\"created_at\":\"2025-09-24T08:10:24.290090Z\"}', NULL, '2025-09-24 02:10:24', '2025-09-24 02:10:24'),
+('edf60fb9-11ec-4600-8cb9-a0ecda969bff', 'App\\Notifications\\InvoiceCreated', 'App\\Models\\User', 18, '{\"invoice_id\":87,\"invoice_name\":\"INV-1755594629\",\"message\":\"Your new invoice (INV-1755594629) for August 2025 has been created.\",\"created_at\":\"2025-08-19T09:10:32.022912Z\"}', NULL, '2025-08-19 03:10:32', '2025-08-19 03:10:32'),
+('f65bd97e-4916-40ae-b195-99922d4c31b3', 'App\\Notifications\\InvoiceCreated', 'App\\Models\\User', 17, '{\"invoice_id\":95,\"invoice_name\":\"INV-1757396945-2\",\"message\":\"Your new invoice (INV-1757396945-2) for SEP-2025 has been created.\",\"created_at\":\"2025-09-09T05:49:08.266140Z\"}', NULL, '2025-09-08 23:49:08', '2025-09-08 23:49:08'),
+('feecda18-14d7-4d7c-af05-1da5b82912e4', 'App\\Notifications\\InvoiceCreated', 'App\\Models\\User', 18, '{\"invoice_id\":86,\"invoice_name\":\"INV-1755594351\",\"message\":\"Your new invoice (INV-1755594351) for August 2025 has been created.\",\"created_at\":\"2025-08-19T09:05:54.290376Z\"}', NULL, '2025-08-19 03:05:54', '2025-08-19 03:05:54'),
+('feee7280-238a-44a3-813f-a06016e258cb', 'App\\Notifications\\InvoiceCreated', 'App\\Models\\User', 18, '{\"invoice_id\":90,\"invoice_name\":\"INV-1755671156\",\"message\":\"Your new invoice (INV-1755671156) for August 2025 has been created.\",\"created_at\":\"2025-08-20T06:26:03.323846Z\"}', NULL, '2025-08-20 00:26:03', '2025-08-20 00:26:03');
 
 -- --------------------------------------------------------
 
@@ -879,6 +938,13 @@ CREATE TABLE `password_reset_tokens` (
   `token` varchar(255) NOT NULL,
   `created_at` timestamp NULL DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `password_reset_tokens`
+--
+
+INSERT INTO `password_reset_tokens` (`email`, `token`, `created_at`) VALUES
+('debnathsunny7852@gmail.com', '$2y$12$UCGbWnT420dc113ch4QrIuVI1fVf3V5zlKAdsN2giyEuZszd/vJD.', '2025-09-20 23:19:29');
 
 -- --------------------------------------------------------
 
@@ -894,7 +960,6 @@ CREATE TABLE `payments` (
   `payment_date` timestamp NOT NULL DEFAULT current_timestamp(),
   `method` enum('cash','bank_transfer','mobile_banking','cheque','online_gateway') NOT NULL COMMENT 'Method of payment',
   `transaction_ref` varchar(255) DEFAULT NULL COMMENT 'Reference number: Cheque No, bKash TXN ID, Bank Transfer Reference',
-  `status` tinyint(4) NOT NULL DEFAULT 0,
   `received_by` bigint(20) UNSIGNED DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL
@@ -904,8 +969,42 @@ CREATE TABLE `payments` (
 -- Dumping data for table `payments`
 --
 
-INSERT INTO `payments` (`id`, `student_id`, `invoice_id`, `amount`, `payment_date`, `method`, `transaction_ref`, `status`, `received_by`, `created_at`, `updated_at`) VALUES
-(3, 2, 3, 8000, '2025-08-04 03:52:26', 'cash', 'S01', 1, 17, '2025-08-04 03:52:26', '2025-08-04 03:53:25');
+INSERT INTO `payments` (`id`, `student_id`, `invoice_id`, `amount`, `payment_date`, `method`, `transaction_ref`, `received_by`, `created_at`, `updated_at`) VALUES
+(62, 20, 14, 505, '2025-10-14 02:20:19', 'cash', NULL, 15, '2025-10-14 02:20:19', '2025-10-14 02:20:19'),
+(63, 20, 16, 1000, '2025-10-18 04:22:59', 'cash', NULL, 15, '2025-10-18 04:22:59', '2025-10-18 04:22:59'),
+(64, 22, 22, 800, '2025-11-17 01:40:45', 'cash', NULL, 15, '2025-11-17 01:40:45', '2025-11-17 01:40:45');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `payroll_records`
+--
+
+CREATE TABLE `payroll_records` (
+  `id` bigint(20) UNSIGNED NOT NULL,
+  `salariable_type` varchar(255) NOT NULL,
+  `salariable_id` bigint(20) UNSIGNED NOT NULL,
+  `salary_structure_id` bigint(20) UNSIGNED DEFAULT NULL,
+  `pay_month` smallint(5) UNSIGNED NOT NULL,
+  `pay_year` smallint(5) UNSIGNED NOT NULL,
+  `gross_earning` int(10) UNSIGNED NOT NULL COMMENT 'Total salary components before any deductions.',
+  `deduction_percentage_used` smallint(5) UNSIGNED NOT NULL DEFAULT 0,
+  `deduction_amount` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `absent_days` smallint(5) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Number of days absent in the pay period.',
+  `absence_deduction_amount` int(10) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Amount deducted due to absences (calculated per institute policy).',
+  `total_deductions` int(10) UNSIGNED NOT NULL,
+  `net_payable` int(10) UNSIGNED NOT NULL,
+  `payment_date` timestamp NULL DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `payroll_records`
+--
+
+INSERT INTO `payroll_records` (`id`, `salariable_type`, `salariable_id`, `salary_structure_id`, `pay_month`, `pay_year`, `gross_earning`, `deduction_percentage_used`, `deduction_amount`, `absent_days`, `absence_deduction_amount`, `total_deductions`, `net_payable`, `payment_date`, `created_at`, `updated_at`) VALUES
+(1, 'App\\Models\\Teacher', 2, 4, 11, 2025, 15000, 10, 1500, 0, 0, 1500, 13500, NULL, '2025-11-05 23:25:05', '2025-11-05 23:25:05');
 
 -- --------------------------------------------------------
 
@@ -943,7 +1042,8 @@ INSERT INTO `roles` (`id`, `name`, `guard_name`, `created_at`, `updated_at`) VAL
 (1, 'admin', 'web', '2025-05-31 06:22:05', '2025-05-31 06:22:05'),
 (2, 'teacher', 'web', '2025-05-31 06:22:05', '2025-05-31 06:22:05'),
 (3, 'accounts', 'web', '2025-05-31 06:22:05', '2025-05-31 06:22:05'),
-(4, 'student', 'web', '2025-07-10 08:29:39', '2025-07-10 08:29:39');
+(4, 'student', 'web', '2025-07-10 08:29:39', '2025-07-10 08:29:39'),
+(5, 'front-desk', 'web', '2025-09-16 06:56:55', '2025-09-17 06:56:55');
 
 -- --------------------------------------------------------
 
@@ -976,7 +1076,41 @@ CREATE TABLE `rooms` (
 --
 
 INSERT INTO `rooms` (`id`, `name`, `capacity`, `status`, `created_at`, `updated_at`) VALUES
-(1, '202', 20, 0, NULL, NULL);
+(1, '202', 20, 0, NULL, NULL),
+(2, '203', 20, 0, '2025-09-02 11:47:07', '2025-09-03 11:47:07'),
+(3, '204', 30, 0, '2025-09-06 09:18:19', '2025-09-06 09:18:19');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `salary_structures`
+--
+
+CREATE TABLE `salary_structures` (
+  `id` bigint(20) UNSIGNED NOT NULL,
+  `salariable_type` varchar(255) NOT NULL,
+  `salariable_id` bigint(20) UNSIGNED NOT NULL,
+  `basic_salary` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `house_rent_allowance` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `medical_allowance` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `academic_allowance` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `transport_allowance` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `festival_bonus` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `designation_name` varchar(255) DEFAULT NULL,
+  `effective_date` date NOT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `salary_structures`
+--
+
+INSERT INTO `salary_structures` (`id`, `salariable_type`, `salariable_id`, `basic_salary`, `house_rent_allowance`, `medical_allowance`, `academic_allowance`, `transport_allowance`, `festival_bonus`, `designation_name`, `effective_date`, `created_at`, `updated_at`) VALUES
+(1, 'App\\Models\\Teacher', 1, 0, 0, 0, 0, 0, 0, 'Assistant Teacher', '2025-10-16', '2025-10-16 04:01:53', '2025-10-16 04:01:53'),
+(3, 'App\\Models\\User', 40, 2500, 1000, 1000, 500, 500, 0, 'front-desk', '2025-10-20', '2025-10-20 04:13:11', '2025-11-05 22:52:16'),
+(4, 'App\\Models\\Teacher', 2, 10000, 2000, 2000, 500, 500, 0, 'Junior Teacher', '2025-11-06', '2025-11-05 22:29:18', '2025-11-05 22:29:18'),
+(5, 'App\\Models\\User', 4, 10000, 0, 0, 0, 0, 0, 'Head Teacher', '2025-11-06', '2025-11-06 01:13:16', '2025-11-15 05:57:33');
 
 -- --------------------------------------------------------
 
@@ -1006,8 +1140,8 @@ INSERT INTO `sections` (`id`, `name`, `status`, `created_at`, `updated_at`) VALU
 (16, 'G', 0, '2025-08-09 22:23:04', '2025-08-09 22:23:04'),
 (17, 'H', 0, '2025-08-09 22:26:54', '2025-08-09 22:26:54'),
 (18, 'I', 0, '2025-08-09 22:33:13', '2025-08-09 22:33:13'),
-(19, 'J', 0, '2025-08-09 22:34:49', '2025-08-09 22:34:49'),
-(20, 'K', 0, '2025-08-09 22:46:30', '2025-08-09 22:46:30');
+(24, 'J', 0, '2025-09-21 23:59:44', '2025-09-21 23:59:44'),
+(26, 'L', 0, '2025-09-22 00:02:48', '2025-09-22 00:02:48');
 
 -- --------------------------------------------------------
 
@@ -1029,9 +1163,8 @@ CREATE TABLE `sessions` (
 --
 
 INSERT INTO `sessions` (`id`, `user_id`, `ip_address`, `user_agent`, `payload`, `last_activity`) VALUES
-('gMvqhYknlZt7zrg948FmKlxIjrWImnuMWN0seaAA', 17, '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36 Edg/139.0.0.0', 'YTo0OntzOjY6Il90b2tlbiI7czo0MDoiY1dGdVNPbk04SlJjeXA4UTA0V0xDZE04NzVKU3pocndreW1teVF1NSI7czo5OiJfcHJldmlvdXMiO2E6MTp7czozOiJ1cmwiO3M6Mzk6Imh0dHA6Ly8xMjcuMC4wLjE6ODAwMC9zdHVkZW50L2Rhc2hib2FyZCI7fXM6NjoiX2ZsYXNoIjthOjI6e3M6Mzoib2xkIjthOjA6e31zOjM6Im5ldyI7YTowOnt9fXM6NTA6ImxvZ2luX3dlYl81OWJhMzZhZGRjMmIyZjk0MDE1ODBmMDE0YzdmNThlYTRlMzA5ODlkIjtpOjE3O30=', 1755080585),
-('RlHen6wHcNDQd7sWfKgKcLEoRal6Fl8huQBT68Oa', 17, '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36 Edg/139.0.0.0', 'YTo1OntzOjY6Il90b2tlbiI7czo0MDoiYkZhcnk1TGl4RVJtVTJXbG45RGgwOXZDeHFLWVJqWlJsRUVEMVZoSSI7czozOiJ1cmwiO2E6MDp7fXM6OToiX3ByZXZpb3VzIjthOjE6e3M6MzoidXJsIjtzOjM5OiJodHRwOi8vMTI3LjAuMC4xOjgwMDAvc3R1ZGVudC9kYXNoYm9hcmQiO31zOjY6Il9mbGFzaCI7YToyOntzOjM6Im9sZCI7YTowOnt9czozOiJuZXciO2E6MDp7fX1zOjUwOiJsb2dpbl93ZWJfNTliYTM2YWRkYzJiMmY5NDAxNTgwZjAxNGM3ZjU4ZWE0ZTMwOTg5ZCI7aToxNzt9', 1755079850),
-('WOJW7Krm2KFBmDEJxPqOmue44qxstvZtSqXLANHb', 15, '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36 Edg/139.0.0.0', 'YTo0OntzOjY6Il90b2tlbiI7czo0MDoiRjdQVUJ3eklpakY2ejJXclJ1V3BMQWxWU0Z0S2tETms3OWhudGxvciI7czo2OiJfZmxhc2giO2E6Mjp7czozOiJvbGQiO2E6MDp7fXM6MzoibmV3IjthOjA6e319czo1MDoibG9naW5fd2ViXzU5YmEzNmFkZGMyYjJmOTQwMTU4MGYwMTRjN2Y1OGVhNGUzMDk4OWQiO2k6MTU7czo5OiJfcHJldmlvdXMiO2E6MTp7czozOiJ1cmwiO3M6NDY6Imh0dHA6Ly8xMjcuMC4wLjE6ODAwMC9hY2NvdW50cy9pbnZvaWNlcy9jcmVhdGUiO319', 1755080753);
+('2FFeiGBoTBT2VwzLXcpJzAJY9kfAUqaMdPjysuSo', 15, '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0', 'YTo1OntzOjY6Il90b2tlbiI7czo0MDoiMnJrVHI0SUxEV1JtajVLVFUzUTRhMDRSaE10V1BLZktyeExHaVVqciI7czozOiJ1cmwiO2E6MDp7fXM6OToiX3ByZXZpb3VzIjthOjE6e3M6MzoidXJsIjtzOjI3OiJodHRwOi8vMTI3LjAuMC4xOjgwMDAvbG9naW4iO31zOjY6Il9mbGFzaCI7YToyOntzOjM6Im9sZCI7YTowOnt9czozOiJuZXciO2E6MDp7fX1zOjUwOiJsb2dpbl93ZWJfNTliYTM2YWRkYzJiMmY5NDAxNTgwZjAxNGM3ZjU4ZWE0ZTMwOTg5ZCI7aToxNTt9', 1765083421),
+('Ygn8sOllzyj71s2qRJgemMJmbvrlaoOewToHz7Q9', 4, '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0', 'YTo0OntzOjY6Il90b2tlbiI7czo0MDoialhOeXk2aktkWG4zT1EwN254SEE4dWppaGZLSzZLcTY4MHdTZEhpVSI7czo5OiJfcHJldmlvdXMiO2E6MTp7czozOiJ1cmwiO3M6MzM6Imh0dHA6Ly8xMjcuMC4wLjE6ODAwMC9jbGFzcy1uYW1lcyI7fXM6NjoiX2ZsYXNoIjthOjI6e3M6Mzoib2xkIjthOjA6e31zOjM6Im5ldyI7YTowOnt9fXM6NTA6ImxvZ2luX3dlYl81OWJhMzZhZGRjMmIyZjk0MDE1ODBmMDE0YzdmNThlYTRlMzA5ODlkIjtpOjQ7fQ==', 1765084855);
 
 -- --------------------------------------------------------
 
@@ -1058,7 +1191,7 @@ CREATE TABLE `settings` (
 --
 
 INSERT INTO `settings` (`id`, `school_name`, `address`, `phone_number`, `email`, `principal_name`, `principal_signature`, `school_logo`, `current_session`, `created_at`, `updated_at`) VALUES
-(1, 'Blue-Bird', 'Shubid-Bazar', '01715-338863', 'debnathsunny7852@gmail.com', 'ABCD', 'ABCD', NULL, '2024-2025', '2025-08-10 07:21:49', '2025-08-10 01:23:58');
+(1, 'Blue Bird School', 'Shubid-Bazar', '01615338863', 'debnathsunny7852@gmail.com', 'Abdul Wahid', 'Abdul Wahid', 'assets/image/1764407317_logo_BBa4RY5Qbc.png', '2025', '2025-09-16 06:56:55', '2025-11-29 03:08:37');
 
 -- --------------------------------------------------------
 
@@ -1074,32 +1207,25 @@ CREATE TABLE `students` (
   `gender` varchar(255) NOT NULL,
   `admission_date` date NOT NULL,
   `age` int(11) NOT NULL,
+  `blood_group` varchar(255) DEFAULT NULL,
   `session_id` bigint(20) UNSIGNED NOT NULL,
   `section_id` bigint(20) UNSIGNED NOT NULL,
   `group_id` bigint(20) UNSIGNED NOT NULL,
-  `user_id` bigint(20) UNSIGNED NOT NULL,
+  `user_id` bigint(20) UNSIGNED DEFAULT NULL,
   `admission_number` varchar(255) NOT NULL,
   `roll_number` int(11) NOT NULL,
   `parent_name` varchar(255) NOT NULL,
   `address` varchar(255) NOT NULL,
   `contact` varchar(255) NOT NULL,
   `image` varchar(255) DEFAULT NULL,
-  `status` tinyint(1) NOT NULL DEFAULT 0 COMMENT '0: Active (Enrolled), 1: Inactive (Left/Graduated)',
-  `enrollment_status` varchar(255) NOT NULL DEFAULT 'applied' COMMENT 'e.g., applied, under_review, admitted, enrolled, rejected, waitlisted',
+  `status` tinyint(4) NOT NULL DEFAULT 0 COMMENT '0: Active (Enrolled), 1: Inactive (Left/Graduated)',
+  `enrollment_status` varchar(255) NOT NULL DEFAULT 'admitted' COMMENT 'e.g., applied, under_review, admitted, enrolled, rejected, waitlisted',
   `admission_fee_amount` int(11) DEFAULT NULL,
   `admission_fee_paid` tinyint(1) NOT NULL DEFAULT 0,
   `payment_method` varchar(255) DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
---
--- Dumping data for table `students`
---
-
-INSERT INTO `students` (`id`, `name`, `class_id`, `date_of_birth`, `gender`, `admission_date`, `age`, `session_id`, `section_id`, `group_id`, `user_id`, `admission_number`, `roll_number`, `parent_name`, `address`, `contact`, `image`, `status`, `enrollment_status`, `admission_fee_amount`, `admission_fee_paid`, `payment_method`, `created_at`, `updated_at`) VALUES
-(1, 'Pabel', 1, '2025-07-17', 'Male', '2025-07-17', 11, 1, 7, 4, 18, '401', 1, 'Poresh', 'Sylhet,Zindabazar', '01715777777', NULL, 0, 'applied', 1000000, 1, 'Cash', '2025-07-17 01:39:25', '2025-07-24 05:18:24'),
-(2, 'Sunny', 1, '2025-07-17', 'Male', '2025-07-17', 11, 1, 7, 4, 17, '402', 2, 'Poresh', 'Sylhet,Zindabazar', '01715777777', NULL, 0, 'applied', 1000000, 1, 'bKash', '2025-07-20 04:07:44', '2025-07-24 05:18:16');
 
 -- --------------------------------------------------------
 
@@ -1111,22 +1237,13 @@ CREATE TABLE `student_fee_assignments` (
   `id` bigint(20) UNSIGNED NOT NULL,
   `student_id` bigint(20) UNSIGNED NOT NULL,
   `fee_type_id` bigint(20) UNSIGNED NOT NULL,
-  `applies_from` date NOT NULL COMMENT 'The date from which this fee assignment is valid for the student.',
-  `applies_to` date DEFAULT NULL COMMENT 'The date until which this fee assignment is valid. Nullable for indefinite or one-time fees.',
-  `status` tinyint(1) NOT NULL DEFAULT 0 COMMENT '0: Active, 1: Inactive (for this specific assignment)',
+  `class_id` bigint(20) UNSIGNED NOT NULL,
+  `section_id` bigint(20) UNSIGNED NOT NULL,
+  `session_id` bigint(20) UNSIGNED NOT NULL,
+  `status` tinyint(1) NOT NULL DEFAULT 0 COMMENT '0: Active, 1: Inactive',
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
---
--- Dumping data for table `student_fee_assignments`
---
-
-INSERT INTO `student_fee_assignments` (`id`, `student_id`, `fee_type_id`, `applies_from`, `applies_to`, `status`, `created_at`, `updated_at`) VALUES
-(6, 1, 2, '2025-08-09', '2025-08-29', 0, '2025-08-09 03:29:18', '2025-08-09 03:29:18'),
-(7, 2, 2, '2025-08-09', '2025-08-29', 0, '2025-08-09 03:29:18', '2025-08-09 03:29:18'),
-(8, 1, 3, '2025-08-09', '2025-08-29', 0, '2025-08-09 03:30:01', '2025-08-09 03:30:01'),
-(9, 2, 3, '2025-08-09', '2025-08-29', 0, '2025-08-09 03:30:01', '2025-08-09 03:30:01');
 
 -- --------------------------------------------------------
 
@@ -1137,9 +1254,14 @@ INSERT INTO `student_fee_assignments` (`id`, `student_id`, `fee_type_id`, `appli
 CREATE TABLE `subjects` (
   `id` bigint(20) UNSIGNED NOT NULL,
   `name` varchar(255) NOT NULL,
-  `code` varchar(255) DEFAULT NULL,
-  `full_marks` int(10) UNSIGNED NOT NULL,
-  `passing_marks` int(10) UNSIGNED NOT NULL,
+  `full_marks` int(10) UNSIGNED NOT NULL COMMENT 'Total max marks (Subj + Obj + Pract).',
+  `passing_marks` int(10) UNSIGNED NOT NULL COMMENT 'Total passing marks.',
+  `subjective_full_marks` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `objective_full_marks` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `practical_full_marks` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `subjective_passing_marks` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `objective_passing_marks` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `practical_passing_marks` int(10) UNSIGNED NOT NULL DEFAULT 0,
   `status` tinyint(4) NOT NULL DEFAULT 0 COMMENT '0=Active, 1=Inactive',
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL
@@ -1149,11 +1271,22 @@ CREATE TABLE `subjects` (
 -- Dumping data for table `subjects`
 --
 
-INSERT INTO `subjects` (`id`, `name`, `code`, `full_marks`, `passing_marks`, `status`, `created_at`, `updated_at`) VALUES
-(1, 'Bangla', 'Ban-101', 100, 40, 0, '2025-07-27 08:42:15', '2025-07-27 08:42:15'),
-(2, 'English', 'Eng-111', 100, 40, 0, '2025-07-27 08:48:43', '2025-07-27 08:48:43'),
-(3, 'Math', 'Math-102', 100, 40, 0, '2025-07-27 08:49:49', '2025-07-27 08:49:49'),
-(4, 'Physics', 'Physics-115', 100, 40, 0, '2025-07-27 08:50:24', '2025-07-27 08:50:24');
+INSERT INTO `subjects` (`id`, `name`, `full_marks`, `passing_marks`, `subjective_full_marks`, `objective_full_marks`, `practical_full_marks`, `subjective_passing_marks`, `objective_passing_marks`, `practical_passing_marks`, `status`, `created_at`, `updated_at`) VALUES
+(3, 'Bangla 1st Paper', 100, 33, 70, 30, 0, 23, 10, 0, 0, '2025-10-30 01:22:35', '2025-10-30 01:22:35'),
+(4, 'Bangla 2nd Paper', 100, 33, 70, 30, 0, 23, 10, 0, 0, '2025-10-30 01:24:21', '2025-10-30 01:24:21'),
+(5, 'English 1st Paper', 100, 33, 100, 0, 0, 33, 0, 0, 0, '2025-10-30 01:25:47', '2025-10-30 01:25:47'),
+(6, 'English 2nd Paper', 100, 33, 100, 0, 0, 33, 0, 0, 0, '2025-10-30 01:27:31', '2025-10-30 01:27:31'),
+(8, 'Mathematics', 100, 33, 70, 30, 0, 23, 10, 0, 0, '2025-10-30 01:34:29', '2025-10-30 01:34:29'),
+(9, 'Bangladesh And Global Studies', 100, 33, 70, 30, 0, 23, 10, 0, 0, '2025-10-30 01:36:12', '2025-10-30 01:36:12'),
+(10, 'Physical Education and Health', 100, 33, 70, 30, 0, 23, 10, 0, 0, '2025-10-30 01:37:49', '2025-10-30 01:37:49'),
+(11, 'Agriculture Studies', 100, 33, 70, 30, 0, 23, 10, 0, 0, '2025-10-30 01:49:14', '2025-10-30 01:49:14'),
+(12, 'Arts and Crafts', 100, 33, 70, 30, 0, 23, 10, 0, 0, '2025-10-30 01:50:01', '2025-10-30 01:50:01'),
+(13, 'Home Science', 100, 33, 70, 30, 0, 23, 10, 0, 0, '2025-10-30 01:52:42', '2025-10-30 01:52:42'),
+(14, 'Physics', 100, 33, 70, 15, 15, 17, 8, 8, 0, '2025-10-30 01:57:33', '2025-10-30 01:57:33'),
+(16, 'Chemistry', 100, 33, 70, 15, 15, 17, 8, 8, 0, '2025-10-30 04:41:48', '2025-10-30 04:41:48'),
+(17, 'Biology', 100, 33, 70, 15, 15, 17, 8, 8, 0, '2025-10-30 04:43:08', '2025-10-30 04:43:08'),
+(18, 'ICT', 50, 16, 25, 25, 0, 8, 8, 0, 0, '2025-11-01 01:00:55', '2025-11-01 01:00:55'),
+(19, 'Career Education', 50, 16, 25, 25, 0, 8, 8, 0, 0, '2025-11-01 01:16:40', '2025-11-01 01:16:40');
 
 -- --------------------------------------------------------
 
@@ -1165,20 +1298,46 @@ CREATE TABLE `teachers` (
   `id` bigint(20) UNSIGNED NOT NULL,
   `user_id` bigint(20) UNSIGNED DEFAULT NULL,
   `name` varchar(255) NOT NULL,
+  `designation` enum('Head Teacher','Senior Teacher','Junior Teacher','Assistant Teacher') NOT NULL DEFAULT 'Junior Teacher',
+  `address` varchar(255) NOT NULL,
+  `joining_number` varchar(255) NOT NULL,
   `image` varchar(255) DEFAULT NULL,
   `subject_taught` varchar(255) NOT NULL,
-  `status` tinyint(4) NOT NULL DEFAULT 0,
+  `status` tinyint(4) NOT NULL DEFAULT 1 COMMENT '1 = Active, 0 = Inactive',
+  `phone_number` varchar(255) NOT NULL,
+  `qualification` varchar(255) DEFAULT NULL,
+  `joining_date` date DEFAULT NULL,
+  `class_id` bigint(20) UNSIGNED DEFAULT NULL,
+  `section_id` bigint(20) UNSIGNED DEFAULT NULL,
+  `group_id` bigint(20) UNSIGNED DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `teacher_attendances`
+--
+
+CREATE TABLE `teacher_attendances` (
+  `id` bigint(20) UNSIGNED NOT NULL,
+  `teacher_id` bigint(20) UNSIGNED NOT NULL,
+  `date` date NOT NULL,
+  `status` enum('Present','Absent','Leave','Half Day') NOT NULL DEFAULT 'Absent',
+  `in_time` time DEFAULT NULL,
+  `out_time` time DEFAULT NULL,
+  `note` text DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
--- Dumping data for table `teachers`
+-- Dumping data for table `teacher_attendances`
 --
 
-INSERT INTO `teachers` (`id`, `user_id`, `name`, `image`, `subject_taught`, `status`, `created_at`, `updated_at`) VALUES
-(5, 13, 'Smith', 'teachers/CvhEtWUImdeKmlJaAs7Ztk9Oeo3wPPGbG6dszone.jpg', 'Math', 0, '2025-06-05 20:33:25', '2025-06-05 20:33:25'),
-(6, 14, 'Jibon', 'teachers/z0LM3QHlVEQchUGssDoQJ1cuVsarAtcwthpWUsCQ.jpg', 'English', 0, '2025-06-05 20:41:10', '2025-06-05 20:41:10');
+INSERT INTO `teacher_attendances` (`id`, `teacher_id`, `date`, `status`, `in_time`, `out_time`, `note`, `created_at`, `updated_at`) VALUES
+(5, 2, '2025-11-17', 'Absent', NULL, NULL, NULL, '2025-11-17 04:29:24', '2025-11-17 04:29:24');
 
 -- --------------------------------------------------------
 
@@ -1190,25 +1349,22 @@ CREATE TABLE `users` (
   `id` bigint(20) UNSIGNED NOT NULL,
   `name` varchar(255) NOT NULL,
   `email` varchar(255) NOT NULL,
-  `contact_info` varchar(255) DEFAULT NULL,
   `email_verified_at` timestamp NULL DEFAULT NULL,
   `password` varchar(255) NOT NULL,
   `remember_token` varchar(100) DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT NULL,
-  `updated_at` timestamp NULL DEFAULT NULL
+  `updated_at` timestamp NULL DEFAULT NULL,
+  `contact_info` varchar(255) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
 -- Dumping data for table `users`
 --
 
-INSERT INTO `users` (`id`, `name`, `email`, `contact_info`, `email_verified_at`, `password`, `remember_token`, `created_at`, `updated_at`) VALUES
-(4, 'Admin', 'debnathsunny7852@gmail.com', '+8801615338863', '2025-06-05 07:58:20', '$2y$12$Rv/UEXMyHZ9FYCj8mLHmWug/c5LUVjvmFPtREVwPtq0.uDRPzB7ay', '4q8KznducHvxkCrwchhfw6QVRlP5fV8FjM5eJnIOS4vtNnbFzyOHn8t0hDtU', '2025-06-01 07:11:28', '2025-06-05 07:58:20'),
-(13, 'smith teacher', 'smithteacher@gmail.com', '+8801615887714', NULL, '$2y$12$xTHJncOELrMC6KZp1G.WDeOhcxlte5TEX3UGWnqUf5UHWm1JMdRVa', 'PeVZOUOmEOOfSaZ3vHntUD8tN6kXCXXZrOEphBXc0IRYHW9LVVfmo1Y30KnJ', '2025-06-05 20:32:25', '2025-06-05 20:32:25'),
-(14, 'Jibon', 'jibon.teacher@gmail.com', '+8801886338865', NULL, '$2y$12$/bT06ZRpUq1BZwdG5U/f/OP1R41vip8ELdmZPReNbVnmV.BXxznV2', 'mdgYBqTKBsQoglPxng5kYCvTw7BjXGU7xL0N1KhHlW4caHrxtTrgrItFGR59', '2025-06-05 20:39:10', '2025-06-05 20:39:10'),
-(15, 'Accountant', 'accountant@gmail.com', '+8801886338865', NULL, '$2y$12$wdirfOPDs41GkUpcqbfxBeqCb0v7LgckrO4zMoi48F3Xj/kLTpoQK', NULL, '2025-06-06 04:22:01', '2025-06-06 04:22:01'),
-(17, 'sunny', 'sunny@gmail.com', '01576943966', NULL, '$2y$12$Tm.WGn.Q2mxIj0CJUZQJZeHsx1T6VFkZc5/5AXm4kO7XziBkSGkr.', NULL, '2025-07-10 03:47:40', '2025-07-10 03:47:40'),
-(18, 'Pabel', 'pable.student@gmail.com', '+8801615338890', NULL, '$2y$12$4sHnrRX8/fpXdpuwWqrckOdlyj8wwHbV9/7DpP28iTBHtzw3Lftz2', NULL, '2025-07-15 22:52:16', '2025-07-15 22:52:16');
+INSERT INTO `users` (`id`, `name`, `email`, `email_verified_at`, `password`, `remember_token`, `created_at`, `updated_at`, `contact_info`) VALUES
+(4, 'Admin', 'debnathsunny7852@gmail.com', '2025-06-05 07:58:20', '$2y$12$mwUshrzURf0e1MRZlR/3ze95PxMgHDCl8AB4bSpjAUaWBoFux3fNq', 'ZGrE15D9mKMTa9JNQ13sdbBGLLfD5OPktge10slaTlIdSDXkOr1ezzgEmsea', '2025-06-01 07:11:28', '2025-09-10 03:15:04', NULL),
+(15, 'Accountant', 'accountant@gmail.com', NULL, '$2y$12$wdirfOPDs41GkUpcqbfxBeqCb0v7LgckrO4zMoi48F3Xj/kLTpoQK', NULL, '2025-06-06 04:22:01', '2025-06-06 04:22:01', NULL),
+(40, 'Front-desk', 'front-desk@gmail.com', NULL, '$2y$12$P2nZ864vtLtUPlaukeRod.N3VuyONpAOXpRa1p5JRlDQHrMfPv51S', NULL, '2025-09-16 22:23:29', '2025-09-20 00:21:57', '+8801950471237');
 
 --
 -- Indexes for dumped tables
@@ -1223,8 +1379,7 @@ ALTER TABLE `attendances`
   ADD KEY `attendances_class_id_foreign` (`class_id`),
   ADD KEY `attendances_session_id_foreign` (`session_id`),
   ADD KEY `attendances_section_id_foreign` (`section_id`),
-  ADD KEY `attendances_group_id_foreign` (`group_id`),
-  ADD KEY `attendances_subject_id_foreign` (`subject_id`);
+  ADD KEY `attendances_group_id_foreign` (`group_id`);
 
 --
 -- Indexes for table `books`
@@ -1238,8 +1393,8 @@ ALTER TABLE `books`
 --
 ALTER TABLE `borrow_books`
   ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `unique_borrow_per_student_book` (`book_id`,`student_id`,`return_date`),
-  ADD KEY `borrow_books_student_id_foreign` (`student_id`);
+  ADD KEY `borrow_books_book_id_foreign` (`book_id`),
+  ADD KEY `borrow_books_admission_number_index` (`admission_number`);
 
 --
 -- Indexes for table `bus_schedules`
@@ -1276,7 +1431,8 @@ ALTER TABLE `class_fee_structures`
 -- Indexes for table `class_names`
 --
 ALTER TABLE `class_names`
-  ADD PRIMARY KEY (`id`);
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `class_names_class_name_unique` (`class_name`);
 
 --
 -- Indexes for table `class_sessions`
@@ -1302,18 +1458,28 @@ ALTER TABLE `class_subjects`
 --
 ALTER TABLE `class_times`
   ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `unique_class_section_timeslot` (`class_name_id`,`section_id`,`session_id`,`day_of_week`,`start_time`),
-  ADD UNIQUE KEY `unique_teacher_timeslot` (`teacher_id`,`session_id`,`day_of_week`,`start_time`),
-  ADD UNIQUE KEY `unique_room_timeslot` (`room_id`,`session_id`,`day_of_week`,`start_time`),
+  ADD UNIQUE KEY `unique_class_section_group_timeslot` (`class_name_id`,`section_id`,`group_id`,`session_id`,`day_of_week`,`class_time_slot_id`),
+  ADD UNIQUE KEY `unique_teacher_timeslot` (`teacher_id`,`session_id`,`day_of_week`,`class_time_slot_id`),
+  ADD UNIQUE KEY `unique_room_timeslot` (`room_id`,`session_id`,`day_of_week`,`class_time_slot_id`),
   ADD KEY `class_times_subject_id_foreign` (`subject_id`),
   ADD KEY `class_times_section_id_foreign` (`section_id`),
-  ADD KEY `class_times_session_id_foreign` (`session_id`);
+  ADD KEY `class_times_session_id_foreign` (`session_id`),
+  ADD KEY `class_times_group_id_foreign` (`group_id`),
+  ADD KEY `class_times_class_time_slot_id_foreign` (`class_time_slot_id`);
+
+--
+-- Indexes for table `class_time_slots`
+--
+ALTER TABLE `class_time_slots`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `class_time_slots_name_unique` (`name`);
 
 --
 -- Indexes for table `exams`
 --
 ALTER TABLE `exams`
   ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `exams_exam_name_session_id_unique` (`exam_name`,`session_id`),
   ADD KEY `exams_session_id_foreign` (`session_id`);
 
 --
@@ -1333,22 +1499,36 @@ ALTER TABLE `exam_results`
 --
 ALTER TABLE `exam_schedules`
   ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `exam_schedule_exam_time_unique` (`exam_id`,`class_id`,`section_id`,`session_id`,`subject_id`,`exam_date`,`start_time`),
-  ADD UNIQUE KEY `exam_schedule_room_time_unique` (`room_id`,`exam_date`,`start_time`),
-  ADD UNIQUE KEY `exam_schedule_teacher_time_unique` (`teacher_id`,`exam_date`,`start_time`),
+  ADD UNIQUE KEY `exam_schedule_room_time_unique` (`room_id`,`exam_date`,`exam_slot_id`),
+  ADD UNIQUE KEY `exam_schedule_teacher_time_unique` (`teacher_id`,`exam_date`,`exam_slot_id`),
+  ADD UNIQUE KEY `exam_schedule_exam_time_unique` (`exam_id`,`class_id`,`section_id`,`session_id`,`group_id`,`subject_id`,`exam_date`,`exam_slot_id`),
   ADD KEY `exam_schedules_class_id_foreign` (`class_id`),
   ADD KEY `exam_schedules_section_id_foreign` (`section_id`),
   ADD KEY `exam_schedules_session_id_foreign` (`session_id`),
-  ADD KEY `exam_schedules_subject_id_foreign` (`subject_id`);
+  ADD KEY `exam_schedules_group_id_foreign` (`group_id`),
+  ADD KEY `exam_schedules_subject_id_foreign` (`subject_id`),
+  ADD KEY `exam_schedules_exam_slot_id_foreign` (`exam_slot_id`);
 
 --
 -- Indexes for table `exam_seat_plans`
 --
 ALTER TABLE `exam_seat_plans`
   ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `unique_exam_student_assignment` (`exam_schedule_id`,`student_id`),
-  ADD UNIQUE KEY `unique_exam_seat_number_per_schedule` (`exam_schedule_id`,`seat_number`),
+  ADD UNIQUE KEY `unique_exam_class_section_session_group_student_assignment` (`exam_id`,`class_id`,`section_id`,`session_id`,`group_id`,`student_id`),
+  ADD UNIQUE KEY `unique_exam_class_section_session_group_seat_number` (`exam_id`,`class_id`,`section_id`,`session_id`,`group_id`,`room_id`,`seat_number`),
+  ADD KEY `exam_seat_plans_class_id_foreign` (`class_id`),
+  ADD KEY `exam_seat_plans_section_id_foreign` (`section_id`),
+  ADD KEY `exam_seat_plans_session_id_foreign` (`session_id`),
+  ADD KEY `exam_seat_plans_room_id_foreign` (`room_id`),
+  ADD KEY `exam_seat_plans_group_id_foreign` (`group_id`),
   ADD KEY `exam_seat_plans_student_id_foreign` (`student_id`);
+
+--
+-- Indexes for table `exam_time_slots`
+--
+ALTER TABLE `exam_time_slots`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `exam_time_slots_name_unique` (`name`);
 
 --
 -- Indexes for table `failed_jobs`
@@ -1411,13 +1591,13 @@ ALTER TABLE `job_batches`
 --
 ALTER TABLE `marks`
   ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `unique_marks_record` (`student_id`,`class_id`,`session_id`,`section_id`,`exam_id`,`group_id`,`subject_id`),
+  ADD UNIQUE KEY `unique_marks_record` (`student_id`,`exam_id`,`subject_id`,`class_id`,`session_id`,`section_id`,`group_id`),
+  ADD KEY `marks_exam_id_foreign` (`exam_id`),
+  ADD KEY `marks_subject_id_foreign` (`subject_id`),
   ADD KEY `marks_class_id_foreign` (`class_id`),
   ADD KEY `marks_session_id_foreign` (`session_id`),
   ADD KEY `marks_section_id_foreign` (`section_id`),
-  ADD KEY `marks_group_id_foreign` (`group_id`),
-  ADD KEY `marks_exam_id_foreign` (`exam_id`),
-  ADD KEY `marks_subject_id_foreign` (`subject_id`);
+  ADD KEY `marks_group_id_foreign` (`group_id`);
 
 --
 -- Indexes for table `migrations`
@@ -1470,6 +1650,15 @@ ALTER TABLE `payments`
   ADD KEY `payments_received_by_foreign` (`received_by`);
 
 --
+-- Indexes for table `payroll_records`
+--
+ALTER TABLE `payroll_records`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `unique_payroll_period` (`salariable_id`,`salariable_type`,`pay_month`,`pay_year`),
+  ADD KEY `payroll_records_salariable_type_salariable_id_index` (`salariable_type`,`salariable_id`),
+  ADD KEY `payroll_records_salary_structure_id_foreign` (`salary_structure_id`);
+
+--
 -- Indexes for table `permissions`
 --
 ALTER TABLE `permissions`
@@ -1498,6 +1687,13 @@ ALTER TABLE `rooms`
   ADD UNIQUE KEY `rooms_name_unique` (`name`);
 
 --
+-- Indexes for table `salary_structures`
+--
+ALTER TABLE `salary_structures`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `salary_structures_salariable_type_salariable_id_index` (`salariable_type`,`salariable_id`);
+
+--
 -- Indexes for table `sections`
 --
 ALTER TABLE `sections`
@@ -1524,7 +1720,6 @@ ALTER TABLE `settings`
 ALTER TABLE `students`
   ADD PRIMARY KEY (`id`),
   ADD UNIQUE KEY `students_admission_number_unique` (`admission_number`),
-  ADD UNIQUE KEY `students_roll_number_unique` (`roll_number`),
   ADD KEY `students_class_id_foreign` (`class_id`),
   ADD KEY `students_session_id_foreign` (`session_id`),
   ADD KEY `students_section_id_foreign` (`section_id`),
@@ -1536,23 +1731,37 @@ ALTER TABLE `students`
 --
 ALTER TABLE `student_fee_assignments`
   ADD PRIMARY KEY (`id`),
-  ADD KEY `student_fee_assignments_student_id_foreign` (`student_id`),
-  ADD KEY `student_fee_assignments_fee_type_id_foreign` (`fee_type_id`);
+  ADD UNIQUE KEY `unique_fee_assignment` (`student_id`,`fee_type_id`,`class_id`,`section_id`,`session_id`),
+  ADD KEY `student_fee_assignments_fee_type_id_foreign` (`fee_type_id`),
+  ADD KEY `student_fee_assignments_class_id_foreign` (`class_id`),
+  ADD KEY `student_fee_assignments_section_id_foreign` (`section_id`),
+  ADD KEY `student_fee_assignments_session_id_foreign` (`session_id`);
 
 --
 -- Indexes for table `subjects`
 --
 ALTER TABLE `subjects`
   ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `subjects_name_unique` (`name`),
-  ADD UNIQUE KEY `subjects_code_unique` (`code`);
+  ADD UNIQUE KEY `subjects_name_unique` (`name`);
 
 --
 -- Indexes for table `teachers`
 --
 ALTER TABLE `teachers`
   ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `teachers_user_id_unique` (`user_id`);
+  ADD UNIQUE KEY `teachers_joining_number_unique` (`joining_number`),
+  ADD UNIQUE KEY `teachers_phone_number_unique` (`phone_number`),
+  ADD UNIQUE KEY `teachers_user_id_unique` (`user_id`),
+  ADD UNIQUE KEY `unique_class_teacher` (`class_id`,`section_id`,`group_id`),
+  ADD KEY `teachers_section_id_foreign` (`section_id`),
+  ADD KEY `teachers_group_id_foreign` (`group_id`);
+
+--
+-- Indexes for table `teacher_attendances`
+--
+ALTER TABLE `teacher_attendances`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `teacher_attendances_teacher_id_date_unique` (`teacher_id`,`date`);
 
 --
 -- Indexes for table `users`
@@ -1569,79 +1778,91 @@ ALTER TABLE `users`
 -- AUTO_INCREMENT for table `attendances`
 --
 ALTER TABLE `attendances`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=15;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=48;
 
 --
 -- AUTO_INCREMENT for table `books`
 --
 ALTER TABLE `books`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
 -- AUTO_INCREMENT for table `borrow_books`
 --
 ALTER TABLE `borrow_books`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
 
 --
 -- AUTO_INCREMENT for table `bus_schedules`
 --
 ALTER TABLE `bus_schedules`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=16;
 
 --
 -- AUTO_INCREMENT for table `class_fee_structures`
 --
 ALTER TABLE `class_fee_structures`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=15;
 
 --
 -- AUTO_INCREMENT for table `class_names`
 --
 ALTER TABLE `class_names`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
 
 --
 -- AUTO_INCREMENT for table `class_sessions`
 --
 ALTER TABLE `class_sessions`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=17;
 
 --
 -- AUTO_INCREMENT for table `class_subjects`
 --
 ALTER TABLE `class_subjects`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=41;
 
 --
 -- AUTO_INCREMENT for table `class_times`
 --
 ALTER TABLE `class_times`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
+
+--
+-- AUTO_INCREMENT for table `class_time_slots`
+--
+ALTER TABLE `class_time_slots`
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
 
 --
 -- AUTO_INCREMENT for table `exams`
 --
 ALTER TABLE `exams`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
 -- AUTO_INCREMENT for table `exam_results`
 --
 ALTER TABLE `exam_results`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=13;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=11;
 
 --
 -- AUTO_INCREMENT for table `exam_schedules`
 --
 ALTER TABLE `exam_schedules`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=19;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
 
 --
 -- AUTO_INCREMENT for table `exam_seat_plans`
 --
 ALTER TABLE `exam_seat_plans`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=19;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
+
+--
+-- AUTO_INCREMENT for table `exam_time_slots`
+--
+ALTER TABLE `exam_time_slots`
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
 
 --
 -- AUTO_INCREMENT for table `failed_jobs`
@@ -1653,7 +1874,7 @@ ALTER TABLE `failed_jobs`
 -- AUTO_INCREMENT for table `fee_types`
 --
 ALTER TABLE `fee_types`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=12;
 
 --
 -- AUTO_INCREMENT for table `grade_configures`
@@ -1665,25 +1886,25 @@ ALTER TABLE `grade_configures`
 -- AUTO_INCREMENT for table `groups`
 --
 ALTER TABLE `groups`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
 
 --
 -- AUTO_INCREMENT for table `invoices`
 --
 ALTER TABLE `invoices`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=42;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=23;
 
 --
 -- AUTO_INCREMENT for table `invoice_items`
 --
 ALTER TABLE `invoice_items`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=83;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=16;
 
 --
 -- AUTO_INCREMENT for table `jobs`
 --
 ALTER TABLE `jobs`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=109;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=360;
 
 --
 -- AUTO_INCREMENT for table `marks`
@@ -1695,19 +1916,25 @@ ALTER TABLE `marks`
 -- AUTO_INCREMENT for table `migrations`
 --
 ALTER TABLE `migrations`
-  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=92;
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=158;
 
 --
 -- AUTO_INCREMENT for table `notices`
 --
 ALTER TABLE `notices`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
 -- AUTO_INCREMENT for table `payments`
 --
 ALTER TABLE `payments`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=65;
+
+--
+-- AUTO_INCREMENT for table `payroll_records`
+--
+ALTER TABLE `payroll_records`
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
 -- AUTO_INCREMENT for table `permissions`
@@ -1719,19 +1946,25 @@ ALTER TABLE `permissions`
 -- AUTO_INCREMENT for table `roles`
 --
 ALTER TABLE `roles`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
 
 --
 -- AUTO_INCREMENT for table `rooms`
 --
 ALTER TABLE `rooms`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+
+--
+-- AUTO_INCREMENT for table `salary_structures`
+--
+ALTER TABLE `salary_structures`
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
 
 --
 -- AUTO_INCREMENT for table `sections`
 --
 ALTER TABLE `sections`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=21;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=29;
 
 --
 -- AUTO_INCREMENT for table `settings`
@@ -1743,31 +1976,37 @@ ALTER TABLE `settings`
 -- AUTO_INCREMENT for table `students`
 --
 ALTER TABLE `students`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=19;
 
 --
 -- AUTO_INCREMENT for table `student_fee_assignments`
 --
 ALTER TABLE `student_fee_assignments`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
 -- AUTO_INCREMENT for table `subjects`
 --
 ALTER TABLE `subjects`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=21;
 
 --
 -- AUTO_INCREMENT for table `teachers`
 --
 ALTER TABLE `teachers`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=17;
+
+--
+-- AUTO_INCREMENT for table `teacher_attendances`
+--
+ALTER TABLE `teacher_attendances`
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
 
 --
 -- AUTO_INCREMENT for table `users`
 --
 ALTER TABLE `users`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=19;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=159;
 
 --
 -- Constraints for dumped tables
@@ -1781,15 +2020,7 @@ ALTER TABLE `attendances`
   ADD CONSTRAINT `attendances_group_id_foreign` FOREIGN KEY (`group_id`) REFERENCES `groups` (`id`) ON DELETE CASCADE,
   ADD CONSTRAINT `attendances_section_id_foreign` FOREIGN KEY (`section_id`) REFERENCES `sections` (`id`) ON DELETE CASCADE,
   ADD CONSTRAINT `attendances_session_id_foreign` FOREIGN KEY (`session_id`) REFERENCES `class_sessions` (`id`) ON DELETE CASCADE,
-  ADD CONSTRAINT `attendances_student_id_foreign` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`) ON DELETE CASCADE,
-  ADD CONSTRAINT `attendances_subject_id_foreign` FOREIGN KEY (`subject_id`) REFERENCES `subjects` (`id`) ON DELETE CASCADE;
-
---
--- Constraints for table `borrow_books`
---
-ALTER TABLE `borrow_books`
-  ADD CONSTRAINT `borrow_books_book_id_foreign` FOREIGN KEY (`book_id`) REFERENCES `books` (`id`) ON DELETE CASCADE,
-  ADD CONSTRAINT `borrow_books_student_id_foreign` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`) ON DELETE CASCADE;
+  ADD CONSTRAINT `attendances_student_id_foreign` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `bus_schedules`
@@ -1798,31 +2029,12 @@ ALTER TABLE `bus_schedules`
   ADD CONSTRAINT `bus_schedules_class_id_foreign` FOREIGN KEY (`class_id`) REFERENCES `class_names` (`id`) ON DELETE SET NULL;
 
 --
--- Constraints for table `class_fee_structures`
---
-ALTER TABLE `class_fee_structures`
-  ADD CONSTRAINT `class_fee_structures_class_id_foreign` FOREIGN KEY (`class_id`) REFERENCES `class_names` (`id`) ON DELETE CASCADE,
-  ADD CONSTRAINT `class_fee_structures_fee_type_id_foreign` FOREIGN KEY (`fee_type_id`) REFERENCES `fee_types` (`id`) ON DELETE CASCADE,
-  ADD CONSTRAINT `class_fee_structures_group_id_foreign` FOREIGN KEY (`group_id`) REFERENCES `groups` (`id`) ON DELETE CASCADE,
-  ADD CONSTRAINT `class_fee_structures_section_id_foreign` FOREIGN KEY (`section_id`) REFERENCES `sections` (`id`) ON DELETE CASCADE,
-  ADD CONSTRAINT `class_fee_structures_session_id_foreign` FOREIGN KEY (`session_id`) REFERENCES `class_sessions` (`id`) ON DELETE CASCADE;
-
---
--- Constraints for table `class_subjects`
---
-ALTER TABLE `class_subjects`
-  ADD CONSTRAINT `class_subjects_class_name_id_foreign` FOREIGN KEY (`class_name_id`) REFERENCES `class_names` (`id`) ON DELETE CASCADE,
-  ADD CONSTRAINT `class_subjects_group_id_foreign` FOREIGN KEY (`group_id`) REFERENCES `groups` (`id`) ON DELETE CASCADE,
-  ADD CONSTRAINT `class_subjects_section_id_foreign` FOREIGN KEY (`section_id`) REFERENCES `sections` (`id`) ON DELETE CASCADE,
-  ADD CONSTRAINT `class_subjects_session_id_foreign` FOREIGN KEY (`session_id`) REFERENCES `class_sessions` (`id`) ON DELETE CASCADE,
-  ADD CONSTRAINT `class_subjects_subject_id_foreign` FOREIGN KEY (`subject_id`) REFERENCES `subjects` (`id`) ON DELETE CASCADE,
-  ADD CONSTRAINT `class_subjects_teacher_id_foreign` FOREIGN KEY (`teacher_id`) REFERENCES `teachers` (`id`) ON DELETE CASCADE;
-
---
 -- Constraints for table `class_times`
 --
 ALTER TABLE `class_times`
   ADD CONSTRAINT `class_times_class_name_id_foreign` FOREIGN KEY (`class_name_id`) REFERENCES `class_names` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `class_times_class_time_slot_id_foreign` FOREIGN KEY (`class_time_slot_id`) REFERENCES `class_time_slots` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `class_times_group_id_foreign` FOREIGN KEY (`group_id`) REFERENCES `groups` (`id`) ON DELETE CASCADE,
   ADD CONSTRAINT `class_times_room_id_foreign` FOREIGN KEY (`room_id`) REFERENCES `rooms` (`id`) ON DELETE CASCADE,
   ADD CONSTRAINT `class_times_section_id_foreign` FOREIGN KEY (`section_id`) REFERENCES `sections` (`id`) ON DELETE CASCADE,
   ADD CONSTRAINT `class_times_session_id_foreign` FOREIGN KEY (`session_id`) REFERENCES `class_sessions` (`id`) ON DELETE CASCADE,
@@ -1840,7 +2052,7 @@ ALTER TABLE `exams`
 --
 ALTER TABLE `exam_results`
   ADD CONSTRAINT `exam_results_class_id_foreign` FOREIGN KEY (`class_id`) REFERENCES `class_names` (`id`) ON DELETE CASCADE,
-  ADD CONSTRAINT `exam_results_exam_id_foreign` FOREIGN KEY (`exam_id`) REFERENCES `exams` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `exam_results_exam_id_foreign` FOREIGN KEY (`exam_id`) REFERENCES `exams` (`id`) ON DELETE SET NULL,
   ADD CONSTRAINT `exam_results_group_id_foreign` FOREIGN KEY (`group_id`) REFERENCES `groups` (`id`) ON DELETE CASCADE,
   ADD CONSTRAINT `exam_results_section_id_foreign` FOREIGN KEY (`section_id`) REFERENCES `sections` (`id`) ON DELETE CASCADE,
   ADD CONSTRAINT `exam_results_session_id_foreign` FOREIGN KEY (`session_id`) REFERENCES `class_sessions` (`id`) ON DELETE CASCADE,
@@ -1852,6 +2064,8 @@ ALTER TABLE `exam_results`
 ALTER TABLE `exam_schedules`
   ADD CONSTRAINT `exam_schedules_class_id_foreign` FOREIGN KEY (`class_id`) REFERENCES `class_names` (`id`) ON DELETE CASCADE,
   ADD CONSTRAINT `exam_schedules_exam_id_foreign` FOREIGN KEY (`exam_id`) REFERENCES `exams` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `exam_schedules_exam_slot_id_foreign` FOREIGN KEY (`exam_slot_id`) REFERENCES `exam_time_slots` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `exam_schedules_group_id_foreign` FOREIGN KEY (`group_id`) REFERENCES `groups` (`id`) ON DELETE SET NULL,
   ADD CONSTRAINT `exam_schedules_room_id_foreign` FOREIGN KEY (`room_id`) REFERENCES `rooms` (`id`) ON DELETE SET NULL,
   ADD CONSTRAINT `exam_schedules_section_id_foreign` FOREIGN KEY (`section_id`) REFERENCES `sections` (`id`) ON DELETE CASCADE,
   ADD CONSTRAINT `exam_schedules_session_id_foreign` FOREIGN KEY (`session_id`) REFERENCES `class_sessions` (`id`) ON DELETE CASCADE,
@@ -1862,28 +2076,20 @@ ALTER TABLE `exam_schedules`
 -- Constraints for table `exam_seat_plans`
 --
 ALTER TABLE `exam_seat_plans`
-  ADD CONSTRAINT `exam_seat_plans_exam_schedule_id_foreign` FOREIGN KEY (`exam_schedule_id`) REFERENCES `exam_schedules` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `exam_seat_plans_class_id_foreign` FOREIGN KEY (`class_id`) REFERENCES `class_names` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `exam_seat_plans_exam_id_foreign` FOREIGN KEY (`exam_id`) REFERENCES `exams` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `exam_seat_plans_group_id_foreign` FOREIGN KEY (`group_id`) REFERENCES `groups` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `exam_seat_plans_room_id_foreign` FOREIGN KEY (`room_id`) REFERENCES `rooms` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `exam_seat_plans_section_id_foreign` FOREIGN KEY (`section_id`) REFERENCES `sections` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `exam_seat_plans_session_id_foreign` FOREIGN KEY (`session_id`) REFERENCES `class_sessions` (`id`) ON DELETE CASCADE,
   ADD CONSTRAINT `exam_seat_plans_student_id_foreign` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`) ON DELETE CASCADE;
-
---
--- Constraints for table `invoices`
---
-ALTER TABLE `invoices`
-  ADD CONSTRAINT `invoices_student_id_foreign` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`) ON DELETE CASCADE;
-
---
--- Constraints for table `invoice_items`
---
-ALTER TABLE `invoice_items`
-  ADD CONSTRAINT `invoice_items_fee_type_id_foreign` FOREIGN KEY (`fee_type_id`) REFERENCES `fee_types` (`id`) ON DELETE SET NULL,
-  ADD CONSTRAINT `invoice_items_invoice_id_foreign` FOREIGN KEY (`invoice_id`) REFERENCES `invoices` (`id`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `marks`
 --
 ALTER TABLE `marks`
   ADD CONSTRAINT `marks_class_id_foreign` FOREIGN KEY (`class_id`) REFERENCES `class_names` (`id`) ON DELETE CASCADE,
-  ADD CONSTRAINT `marks_exam_id_foreign` FOREIGN KEY (`exam_id`) REFERENCES `exams` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `marks_exam_id_foreign` FOREIGN KEY (`exam_id`) REFERENCES `exams` (`id`) ON DELETE SET NULL,
   ADD CONSTRAINT `marks_group_id_foreign` FOREIGN KEY (`group_id`) REFERENCES `groups` (`id`) ON DELETE CASCADE,
   ADD CONSTRAINT `marks_section_id_foreign` FOREIGN KEY (`section_id`) REFERENCES `sections` (`id`) ON DELETE CASCADE,
   ADD CONSTRAINT `marks_session_id_foreign` FOREIGN KEY (`session_id`) REFERENCES `class_sessions` (`id`) ON DELETE CASCADE,
@@ -1891,37 +2097,10 @@ ALTER TABLE `marks`
   ADD CONSTRAINT `marks_subject_id_foreign` FOREIGN KEY (`subject_id`) REFERENCES `subjects` (`id`) ON DELETE CASCADE;
 
 --
--- Constraints for table `model_has_permissions`
+-- Constraints for table `payroll_records`
 --
-ALTER TABLE `model_has_permissions`
-  ADD CONSTRAINT `model_has_permissions_permission_id_foreign` FOREIGN KEY (`permission_id`) REFERENCES `permissions` (`id`) ON DELETE CASCADE;
-
---
--- Constraints for table `model_has_roles`
---
-ALTER TABLE `model_has_roles`
-  ADD CONSTRAINT `model_has_roles_role_id_foreign` FOREIGN KEY (`role_id`) REFERENCES `roles` (`id`) ON DELETE CASCADE;
-
---
--- Constraints for table `notices`
---
-ALTER TABLE `notices`
-  ADD CONSTRAINT `notices_created_by_foreign` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE CASCADE;
-
---
--- Constraints for table `payments`
---
-ALTER TABLE `payments`
-  ADD CONSTRAINT `payments_invoice_id_foreign` FOREIGN KEY (`invoice_id`) REFERENCES `invoices` (`id`) ON DELETE SET NULL,
-  ADD CONSTRAINT `payments_received_by_foreign` FOREIGN KEY (`received_by`) REFERENCES `users` (`id`) ON DELETE SET NULL,
-  ADD CONSTRAINT `payments_student_id_foreign` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`) ON DELETE CASCADE;
-
---
--- Constraints for table `role_has_permissions`
---
-ALTER TABLE `role_has_permissions`
-  ADD CONSTRAINT `role_has_permissions_permission_id_foreign` FOREIGN KEY (`permission_id`) REFERENCES `permissions` (`id`) ON DELETE CASCADE,
-  ADD CONSTRAINT `role_has_permissions_role_id_foreign` FOREIGN KEY (`role_id`) REFERENCES `roles` (`id`) ON DELETE CASCADE;
+ALTER TABLE `payroll_records`
+  ADD CONSTRAINT `payroll_records_salary_structure_id_foreign` FOREIGN KEY (`salary_structure_id`) REFERENCES `salary_structures` (`id`) ON DELETE SET NULL;
 
 --
 -- Constraints for table `students`
@@ -1937,14 +2116,26 @@ ALTER TABLE `students`
 -- Constraints for table `student_fee_assignments`
 --
 ALTER TABLE `student_fee_assignments`
+  ADD CONSTRAINT `student_fee_assignments_class_id_foreign` FOREIGN KEY (`class_id`) REFERENCES `class_names` (`id`) ON DELETE CASCADE,
   ADD CONSTRAINT `student_fee_assignments_fee_type_id_foreign` FOREIGN KEY (`fee_type_id`) REFERENCES `fee_types` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `student_fee_assignments_section_id_foreign` FOREIGN KEY (`section_id`) REFERENCES `sections` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `student_fee_assignments_session_id_foreign` FOREIGN KEY (`session_id`) REFERENCES `class_sessions` (`id`) ON DELETE CASCADE,
   ADD CONSTRAINT `student_fee_assignments_student_id_foreign` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `teachers`
 --
 ALTER TABLE `teachers`
+  ADD CONSTRAINT `teachers_class_id_foreign` FOREIGN KEY (`class_id`) REFERENCES `class_names` (`id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `teachers_group_id_foreign` FOREIGN KEY (`group_id`) REFERENCES `groups` (`id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `teachers_section_id_foreign` FOREIGN KEY (`section_id`) REFERENCES `sections` (`id`) ON DELETE SET NULL,
   ADD CONSTRAINT `teachers_user_id_foreign` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `teacher_attendances`
+--
+ALTER TABLE `teacher_attendances`
+  ADD CONSTRAINT `teacher_attendances_teacher_id_foreign` FOREIGN KEY (`teacher_id`) REFERENCES `teachers` (`id`) ON DELETE CASCADE;
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;

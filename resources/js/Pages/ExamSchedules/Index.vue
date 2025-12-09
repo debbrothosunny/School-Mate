@@ -1,16 +1,14 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import { Head, Link, useForm, usePage } from '@inertiajs/vue3';
+import { Head, Link, useForm } from '@inertiajs/vue3';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import DangerButton from '@/Components/DangerButton.vue';
 import TextInput from '@/Components/TextInput.vue';
 import InputLabel from '@/Components/InputLabel.vue';
-import { ref, watch, watchEffect } from 'vue';
+import { ref, watch, watchEffect, computed } from 'vue';
 
-// Define the component's props, just like the original code.
-// This data is passed from the Laravel controller.
 const props = defineProps({
-    examSchedules: Object, // Paginated data of exam schedules
+    examSchedules: Object,
     exams: Array,
     classes: Array,
     sections: Array,
@@ -18,17 +16,17 @@ const props = defineProps({
     teachers: Array,
     subjects: Array,
     rooms: Array,
-    selectedFilters: Object, // Current filters applied to the index
-    flash: Object, // Laravel flash messages
+    groups: Array,
+    selectedFilters: Object,
+    flash: Object,
 });
 
-// Use the useForm hook from Inertia.js to manage filter state.
-// This allows filter values to be tracked and submitted.
 const filterForm = useForm({
     exam_id: props.selectedFilters.exam_id || '',
     class_id: props.selectedFilters.class_id || '',
     section_id: props.selectedFilters.section_id || '',
     session_id: props.selectedFilters.session_id || '',
+    group_id: props.selectedFilters.group_id || '',
     teacher_id: props.selectedFilters.teacher_id || '',
     subject_id: props.selectedFilters.subject_id || '',
     room_id: props.selectedFilters.room_id || '',
@@ -36,20 +34,23 @@ const filterForm = useForm({
     status: props.selectedFilters.status || '',
 });
 
-// Reactive state for the delete confirmation modal.
 const showDeleteModal = ref(false);
 const scheduleToDelete = ref(null);
-
-// Form for the delete action.
 const deleteForm = useForm({});
 
-// --- Utility Functions for Display ---
+// --- CRITICAL FILTER CHECK ---
+const areCriticalFiltersSet = computed(() => {
+    return (
+        filterForm.exam_id !== '' &&
+        filterForm.class_id !== '' &&
+        filterForm.section_id !== '' &&
+        filterForm.session_id !== '' &&
+        filterForm.group_id !== '' &&
+        filterForm.room_id !== ''
+    );
+});
 
-/**
- * Returns a human-readable string for the exam status.
- * @param {number} status - The status code (0: Active, 1: Canceled, 2: Rescheduled).
- * @returns {string} The status text.
- */
+// Utility Functions
 const getStatusText = (status) => {
     switch (status) {
         case 0: return 'Active';
@@ -59,11 +60,6 @@ const getStatusText = (status) => {
     }
 };
 
-/**
- * Formats a date string into DD-MM-YYYY format.
- * @param {string} dateString - The date string to format.
- * @returns {string} The formatted date or 'N/A' if invalid.
- */
 const formatExamDate = (dateString) => {
     if (!dateString) return 'N/A';
     try {
@@ -78,11 +74,6 @@ const formatExamDate = (dateString) => {
     }
 };
 
-/**
- * Formats a time string into a 12-hour format with AM/PM.
- * @param {string} timeString - The time string to format (e.g., "10:00:00", "13:30").
- * @returns {string} The formatted time (e.g., "10:00 AM", "01:30 PM").
- */
 const formatTime = (timeString) => {
     if (!timeString) return 'N/A';
     try {
@@ -100,29 +91,19 @@ const formatTime = (timeString) => {
     }
 };
 
-/**
- * Formats a time range (start and end) into a single string.
- * @param {string} start - The start time string.
- * @param {string} end - The end time string.
- * @returns {string} The formatted time range (e.g., "10:00 AM - 12:00 PM").
- */
 const formatTimeRange = (start, end) => {
     const formattedStart = formatTime(start);
     const formattedEnd = formatTime(end);
     return `${formattedStart} - ${formattedEnd}`;
 };
 
-// --- Filter Logic ---
-
-/**
- * This watch effect automatically submits the form whenever a filter value changes,
- * providing a real-time filtering experience without needing a manual button click.
- */
+// Filter Logic
 watch([
     () => filterForm.exam_id,
     () => filterForm.class_id,
     () => filterForm.section_id,
     () => filterForm.session_id,
+    () => filterForm.group_id,
     () => filterForm.teacher_id,
     () => filterForm.subject_id,
     () => filterForm.room_id,
@@ -133,8 +114,7 @@ watch([
 });
 
 const applyFilters = () => {
-    // Submits the form with the current filter values.
-    // `preserveState` and `replace` prevent page reload and unnecessary history entries.
+    console.log('Applied Filters:', filterForm.data()); // Debug filter values
     filterForm.get(route('exam-schedules.index'), {
         preserveState: true,
         replace: true,
@@ -142,11 +122,11 @@ const applyFilters = () => {
 };
 
 const resetFilters = () => {
-    // Resets all filter form fields to their default empty state.
     filterForm.exam_id = '';
     filterForm.class_id = '';
     filterForm.section_id = '';
     filterForm.session_id = '';
+    filterForm.group_id = '';
     filterForm.teacher_id = '';
     filterForm.subject_id = '';
     filterForm.room_id = '';
@@ -155,12 +135,7 @@ const resetFilters = () => {
     applyFilters();
 };
 
-// --- Delete Logic ---
-
-/**
- * Opens the delete confirmation modal for a specific schedule.
- * @param {object} schedule - The schedule object to be deleted.
- */
+// Delete Logic
 const confirmDelete = (schedule) => {
     scheduleToDelete.value = schedule;
     showDeleteModal.value = true;
@@ -168,9 +143,8 @@ const confirmDelete = (schedule) => {
 
 const deleteSchedule = () => {
     if (scheduleToDelete.value) {
-        // Submits the delete request to the backend.
         deleteForm.delete(route('exam-schedules.destroy', scheduleToDelete.value.id), {
-            preserveScroll: true, // Keeps the scroll position after deletion
+            preserveScroll: true,
             onSuccess: () => {
                 closeDeleteModal();
             },
@@ -187,7 +161,7 @@ const closeDeleteModal = () => {
     scheduleToDelete.value = null;
 };
 
-// Watch for flash messages and display them.
+// Flash Messages
 watchEffect(() => {
     if (props.flash && props.flash.message) {
         if (typeof Swal !== 'undefined') {
@@ -202,12 +176,22 @@ watchEffect(() => {
                 timerProgressBar: true,
             });
         } else {
-            // Fallback for when SweetAlert2 is not loaded.
-            // My instructions forbid the use of `alert()`, so a console warning is used instead.
             console.warn(`Flash Message: ${props.flash.message}`);
         }
     }
 });
+
+// Compute seat plan route with filters   
+const seatPlanRoute = () => {
+    const query = {};
+    if (filterForm.exam_id) query.exam_id = filterForm.exam_id;
+    if (filterForm.class_id) query.class_id = filterForm.class_id;
+    if (filterForm.section_id) query.section_id = filterForm.section_id;
+    if (filterForm.session_id) query.session_id = filterForm.session_id;
+    if (filterForm.group_id) query.group_id = filterForm.group_id;
+    if (filterForm.room_id) query.room_id = filterForm.room_id;
+    return route('class-section-seat-plan.show', query);
+};
 </script>
 
 <template>
@@ -215,49 +199,84 @@ watchEffect(() => {
     <AuthenticatedLayout>
         <div class="bg-gray-100 min-h-screen py-6 px-4 sm:px-6 lg:px-8">
             <div class="max-w-7xl mx-auto">
-                <!-- Header and Add Button -->
+                <!-- Header and Buttons -->
                 <div class="flex flex-col sm:flex-row justify-between items-center mb-8 border-b-2 pb-4 border-gray-200">
                     <h3 class="text-3xl font-extrabold text-gray-900 tracking-tight mb-4 sm:mb-0">Exam Schedules</h3>
-                    <Link :href="route('exam-schedules.create')" aria-label="Add New Schedule">
-                        <PrimaryButton class="shadow-lg hover:shadow-xl transition-shadow duration-300">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-                                <path fill-rule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clip-rule="evenodd" />
-                            </svg>
-                            Add New Schedule
-                        </PrimaryButton>
-                    </Link>
-                </div>
+                    <div class="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-3">
+                        
+                        <!-- Main Class Seat Plan Button with Filter Requirement Check -->
+                        <div class="relative group">
+                            <Link 
+                                :href="areCriticalFiltersSet ? seatPlanRoute() : '#'" 
+                                aria-label="View Class Seat Plan"
+                                :class="{'opacity-50 pointer-events-none': !areCriticalFiltersSet}"
+                                @click.prevent="!areCriticalFiltersSet ? null : undefined"
+                            >
+                                <PrimaryButton 
+                                    :disabled="!areCriticalFiltersSet"
+                                    class="shadow-lg hover:shadow-xl transition-shadow duration-300 bg-green-600 hover:bg-green-700 focus:ring-green-500"
+                                    :class="{'!bg-gray-400 !hover:bg-gray-400': !areCriticalFiltersSet}"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                                        <path d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" />
+                                    </svg>
+                                    Class Seat Plan
+                                </PrimaryButton>
+                            </Link>
 
+                            <!-- Warning message for missing filters -->
+                            <div v-if="!areCriticalFiltersSet" class="absolute left-1/2 -bottom-10 transform -translate-x-1/2 p-2 text-xs text-white bg-red-600 rounded-lg shadow-xl whitespace-nowrap z-10">
+                                Select all: **Exam, Class, Section, Session, Group, and Room** filters to narrow down to a unique schedule.
+                            </div>
+                        </div>
+                        
+                        <Link :href="route('exam-schedules.create')" aria-label="Add New Schedule">
+                            <PrimaryButton class="shadow-lg hover:shadow-xl transition-shadow duration-300">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clip-rule="evenodd" />
+                                </svg>
+                                Add New Schedule
+                            </PrimaryButton>
+                        </Link>
+                    </div>
+                </div>
                 <!-- Filter Section - Card Design -->
                 <div class="mb-8 p-6 bg-white rounded-2xl shadow-lg">
                     <h4 class="text-xl font-bold text-gray-800 mb-6">Filter Schedules</h4>
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
                         <div class="space-y-1">
-                            <InputLabel for="filter_exam" value="Exam" />
-                            <select id="filter_exam" v-model="filterForm.exam_id" class="block w-full rounded-xl border-gray-300 shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+                            <InputLabel for="filter_exam" value="Exam" class="text-red-600 font-bold"/>
+                            <select id="filter_exam" v-model="filterForm.exam_id" class="block w-full rounded-xl border-gray-300 shadow-sm focus:ring-indigo-500 focus:border-indigo-500" :class="{'border-2 border-red-500': filterForm.exam_id === '' && !areCriticalFiltersSet}">
                                 <option value="">All Exams</option>
                                 <option v-for="exam in exams" :key="exam.id" :value="exam.id">{{ exam.exam_name }}</option>
                             </select>
                         </div>
                         <div class="space-y-1">
-                            <InputLabel for="filter_class" value="Class" />
-                            <select id="filter_class" v-model="filterForm.class_id" class="block w-full rounded-xl border-gray-300 shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+                            <InputLabel for="filter_class" value="Class (Required)" class="text-red-600 font-bold"/>
+                            <select id="filter_class" v-model="filterForm.class_id" class="block w-full rounded-xl border-gray-300 shadow-sm focus:ring-indigo-500 focus:border-indigo-500" :class="{'border-2 border-red-500': filterForm.class_id === '' && !areCriticalFiltersSet}">
                                 <option value="">All Classes</option>
                                 <option v-for="cls in classes" :key="cls.id" :value="cls.id">{{ cls.class_name }}</option>
                             </select>
                         </div>
                         <div class="space-y-1">
-                            <InputLabel for="filter_section" value="Section" />
-                            <select id="filter_section" v-model="filterForm.section_id" class="block w-full rounded-xl border-gray-300 shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+                            <InputLabel for="filter_section" value="Section (Required)" class="text-red-600 font-bold"/>
+                            <select id="filter_section" v-model="filterForm.section_id" class="block w-full rounded-xl border-gray-300 shadow-sm focus:ring-indigo-500 focus:border-indigo-500" :class="{'border-2 border-red-500': filterForm.section_id === '' && !areCriticalFiltersSet}">
                                 <option value="">All Sections</option>
                                 <option v-for="section in sections" :key="section.id" :value="section.id">{{ section.name }}</option>
                             </select>
                         </div>
                         <div class="space-y-1">
-                            <InputLabel for="filter_session" value="Session" />
-                            <select id="filter_session" v-model="filterForm.session_id" class="block w-full rounded-xl border-gray-300 shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+                            <InputLabel for="filter_session" value="Session (Required)" class="text-red-600 font-bold"/>
+                            <select id="filter_session" v-model="filterForm.session_id" class="block w-full rounded-xl border-gray-300 shadow-sm focus:ring-indigo-500 focus:border-indigo-500" :class="{'border-2 border-red-500': filterForm.session_id === '' && !areCriticalFiltersSet}">
                                 <option value="">All Sessions</option>
                                 <option v-for="session in sessions" :key="session.id" :value="session.id">{{ session.name }}</option>
+                            </select>
+                        </div>
+                        <div class="space-y-1">
+                            <InputLabel for="filter_group" value="Group (Required)" class="text-red-600 font-bold"/>
+                            <select id="filter_group" v-model="filterForm.group_id" class="block w-full rounded-xl border-gray-300 shadow-sm focus:ring-indigo-500 focus:border-indigo-500" :class="{'border-2 border-red-500': filterForm.group_id === '' && !areCriticalFiltersSet}">
+                                <option value="">All Groups</option>
+                                <option v-for="group in groups" :key="group.id" :value="group.id">{{ group.name }}</option>
                             </select>
                         </div>
                         <div class="space-y-1">
@@ -275,8 +294,8 @@ watchEffect(() => {
                             </select>
                         </div>
                         <div class="space-y-1">
-                            <InputLabel for="filter_room" value="Room" />
-                            <select id="filter_room" v-model="filterForm.room_id" class="block w-full rounded-xl border-gray-300 shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+                            <InputLabel for="filter_room" value="Room (Required)" class="text-red-600 font-bold"/>
+                            <select id="filter_room" v-model="filterForm.room_id" class="block w-full rounded-xl border-gray-300 shadow-sm focus:ring-indigo-500 focus:border-indigo-500" :class="{'border-2 border-red-500': filterForm.room_id === '' && !areCriticalFiltersSet}">
                                 <option value="">All Rooms</option>
                                 <option v-for="room in rooms" :key="room.id" :value="room.id">{{ room.name }}</option>
                             </select>
@@ -300,7 +319,6 @@ watchEffect(() => {
                         <button type="button" @click="resetFilters" class="inline-flex items-center justify-center px-6 py-3 bg-gray-200 border border-gray-300 rounded-xl font-semibold text-xs text-gray-700 uppercase tracking-widest shadow-sm hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-25 transition ease-in-out duration-150 w-full sm:w-auto">Reset Filters</button>
                     </div>
                 </div>
-
                 <!-- Exam Schedules Cards -->
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     <div v-if="examSchedules.data.length === 0" class="col-span-full text-center py-10 text-lg text-gray-500">No exam schedules found.</div>
@@ -326,20 +344,16 @@ watchEffect(() => {
                                 <p><span class="font-medium text-gray-900">Time:</span> {{ formatTimeRange(schedule.exam_slot?.start_time, schedule.exam_slot?.end_time) }}</p>
                             </div>
                         </div>
-                        <div class="flex flex-col sm:flex-row justify-end space-y-3 sm:space-y-0 sm:space-x-3 mt-4 pt-4 border-t border-gray-100">
-                            <Link :href="route('exam-schedules.edit', schedule.id)" class="text-blue-600 hover:text-blue-800 font-medium transition duration-150 text-center">Edit</Link>
-                            <Link :href="route('exam-seat-plan.show', schedule.id)" class="text-indigo-600 hover:text-indigo-800 font-medium transition duration-150 text-center">Seat Plan</Link>
+                        <div class="flex flex-col sm:flex-row justify-end space-y-3 sm:space-y-0 sm:space-x-3 mt-4 pt-4 border-t border-gray-200">
                             <DangerButton @click="confirmDelete(schedule)" class="py-1 px-3 text-sm">Delete</DangerButton>
                         </div>
                     </div>
                 </div>
-
                 <!-- Pagination -->
                 <div class="mt-8 flex flex-col sm:flex-row justify-between items-center space-y-4 sm:space-y-0">
                     <span class="text-sm text-gray-600" v-if="examSchedules.total > 0">
                         Showing <span class="font-semibold">{{ examSchedules.from }}</span> to <span class="font-semibold">{{ examSchedules.to }}</span> of <span class="font-semibold">{{ examSchedules.total }}</span> results
                     </span>
-                    
                     <div class="flex flex-wrap items-center space-x-2">
                         <Link
                             v-for="link in examSchedules.links"
@@ -356,7 +370,6 @@ watchEffect(() => {
                 </div>
             </div>
         </div>
-
         <!-- Delete Confirmation Modal -->
         <div v-if="showDeleteModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 transition-opacity duration-300">
             <div class="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-sm transform transition-transform duration-300 scale-100">
@@ -377,6 +390,18 @@ watchEffect(() => {
         </div>
     </AuthenticatedLayout>
 </template>
+
 <style scoped>
-/* All styles are handled by Tailwind CSS */
+.text-green-600 {
+    color: #28a745;
+}
+.text-green-600:hover {
+    color: #218838;
+}
+html.dark .text-green-600 {
+    color: #34d399;
+}
+html.dark .text-green-600:hover {
+    color: #2dd4bf;
+}
 </style>

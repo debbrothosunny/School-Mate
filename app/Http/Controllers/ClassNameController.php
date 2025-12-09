@@ -5,24 +5,54 @@ namespace App\Http\Controllers;
 use App\Models\ClassName; // Make sure this is imported
 use App\Models\Group; // Make sure this is imported
 use App\Models\Teacher; 
+use App\Models\Section; 
+use App\Models\ClassSubject; 
 use Illuminate\Http\Request;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Foundation\Validation\ValidatesRequests;
+use Illuminate\Validation\Rules\RequiredIf;
 use Inertia\Inertia; // Assuming you're using Inertia.js
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
 
 class ClassNameController extends Controller
 {
+    // Make sure this trait is here!
+    use AuthorizesRequests, ValidatesRequests;
+    
     /**
      * Display a listing of the resource.
     */
     public function index()
     {
-        $classes = ClassName::with('teacher')->paginate(10);
+        // Get the search query from the request
+        $search = request('search');
+
+        $query = ClassName::orderBy('id');
+
+        // Apply the search filter if a query is present
+        if ($search) {
+            $query->where('class_name', 'like', '%' . $search . '%')
+                // Assuming 'status' is an integer, you'll need to handle it differently
+                // or just search by class_name if you only want to search the string fields efficiently.
+                // For simplicity and matching your Vue logic (searching both):
+                ->orWhere('status', 'like', '%' . $search . '%');
+        }
+
+        $classNames = $query->paginate(10);
+
+        // Append the search query to the pagination links (important!)
+        // This makes sure that when clicking a pagination link, the search query is preserved.
+        $classNames->appends(request()->only('search'));
 
         return Inertia::render('ClassNames/Index', [
-            'classes' => $classes,
-            'message' => session('message'), // Pass flash message
-            'type' => session('type'), // Pass flash type e.g., 'success' or 'error'
+            'classNames' => $classNames, // Pass the paginated data
+            // For 'classes' prop name consistency with Vue, rename 'classNames' to 'classes' if you prefer,
+            // but let's stick to 'classNames' for now and update Vue.
+            'message' => session('message'),
+            'type' => session('type'),
+            // You might want to pass the current search term back to pre-fill the input
+            'currentSearch' => $search,
         ]);
     }
 
@@ -32,12 +62,8 @@ class ClassNameController extends Controller
     */
     public function create()
     {
-        // Fetch all teachers to populate the dropdown for assigning a class teacher
-        $teachers = Teacher::all();
-
-        return Inertia::render('ClassNames/Create', [
-            'teachers' => $teachers,
-        ]);
+        // No related models (Teacher, Section, Group) are needed here anymore.
+        return Inertia::render('ClassNames/Create');
     }
 
     /**
@@ -46,23 +72,22 @@ class ClassNameController extends Controller
     public function store(Request $request)
     {
         $request->validate([
+            // Validation for the basic class name and status
             'class_name' => 'required|string|max:255|unique:class_names,class_name',
-            'status' => 'required|integer|in:0,1',
-            'total_classes' => 'required|integer|min:0',
-            'teacher_id' => 'required|exists:teachers,id', // Validate that the selected teacher exists
+            'status'     => 'required|in:0,1',
+        ],
+        [
+            'class_name.unique' => 'এই ক্লাসের নাম ইতিমধ্যে বিদ্যমান।',
         ]);
 
+        // Create the new class name entry
         ClassName::create([
             'class_name' => $request->class_name,
             'status' => $request->status,
-            'total_classes' => $request->total_classes,
-            'teacher_id' => $request->teacher_id,
-        ]);
+        ]); 
 
-        return redirect()->route('class-names.index')->with('flash', [
-            'message' => 'Class created successfully!',
-            'type' => 'success'
-        ]);
+        return redirect()->route('class-names.index')
+            ->with('message', ['text' => 'ক্লাসের নাম সফলভাবে তৈরি হয়েছে!', 'type' => 'success']);
     }
 
     /**
@@ -70,13 +95,9 @@ class ClassNameController extends Controller
     */
     public function edit(ClassName $className)
     {
-        // Fetch the list of all teachers and the current class to edit
-        $teachers = Teacher::all();
-        $className->load('teacher'); // Eager load the teacher relationship for the edit form
-
+        // Only pass the ClassName object itself
         return Inertia::render('ClassNames/Edit', [
             'className' => $className,
-            'teachers' => $teachers,
         ]);
     }
 
@@ -86,52 +107,45 @@ class ClassNameController extends Controller
     public function update(Request $request, ClassName $className)
     {
         $request->validate([
+            // Class name must be unique, ignoring the current record
             'class_name' => [
                 'required',
                 'string',
                 'max:255',
-                Rule::unique('class_names', 'class_name')->ignore($className->id),
+                \Illuminate\Validation\Rule::unique('class_names', 'class_name')->ignore($className->id),
             ],
-            'status' => 'required|integer|in:0,1',
-            'total_classes' => 'required|integer|min:0',
-            'teacher_id' => 'required|exists:teachers,id', // Validate that the selected teacher exists
+            'status' => 'required|in:0,1',
+        ],
+        [
+            'class_name.unique' => 'এই ক্লাসের নাম ইতিমধ্যে বিদ্যমান।',
         ]);
 
-        $className->update([
-            'class_name' => $request->class_name,
-            'status' => $request->status,
-            'total_classes' => $request->total_classes,
-            'teacher_id' => $request->teacher_id,
-        ]);
+        // Update the class name entry
+        $className->update($request->only(['class_name', 'status']));
 
-        return redirect()->route('class-names.index')->with('flash', [
-            'message' => 'Class updated successfully!',
-            'type' => 'success'
-        ]);
+        return redirect()->route('class-names.index')
+            ->with('message', ['text' => 'ক্লাসের নাম সফলভাবে আপডেট হয়েছে!', 'type' => 'success']);
     }
 
     /**
      * Remove the specified resource from storage.
     */
+
     public function destroy(ClassName $className)
     {
+        // 1. Check if the current user is authorized to perform the 'delete' action
+        // on this specific $className instance.
+        $this->authorize('delete', $className); // Laravel will throw an exception if not authorized
+
         try {
             $className->delete();
-            return redirect()->back()->with([
-                'message' => 'Class deleted successfully!',
-                'type' => 'success',
-            ]);
+            return redirect()->back()->with(['message' => 'Class deleted successfully!', 'type' => 'success']);
         } catch (\Exception $e) {
-            return redirect()->back()->with([
-            'message' => 'Class deleted successfully!',
-            'type' => 'success',
-        ]);
+            // ...
         }
-
     }
-
-
     
+
     // Group Functions
 
     public function groupIndex()
@@ -147,7 +161,6 @@ class ClassNameController extends Controller
     }
 
 
-
      public function groupCreate()
     {
         // Pass the allowed group types to the frontend for dropdowns/checkboxes
@@ -159,7 +172,7 @@ class ClassNameController extends Controller
 
     /**
      * Store a newly created resource in storage.
-     */
+    */
     public function groupStore(Request $request)
     {
         $validated = $request->validate([
@@ -177,7 +190,7 @@ class ClassNameController extends Controller
 
     /**
      * Show the form for editing the specified resource.
-     */
+    */
     public function groupEdit(Group $group)
     {
         return Inertia::render('Groups/Edit', [

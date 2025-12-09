@@ -18,8 +18,6 @@ const flash = computed(() => usePage().props.flash || {});
 const form = useForm({
     exam_name: props.exam.exam_name,
     session_id: props.exam.session_id,
-    total_marks: props.exam.total_marks, // ✨ Initialize with existing total_marks ✨
-    passing_marks: props.exam.passing_marks, // ✨ Initialize with existing passing_marks ✨
     status: props.exam.status, // Use the actual numeric status from the database
 });
 
@@ -98,32 +96,6 @@ watchEffect(() => {
                                     <option v-for="session in sessions" :key="session.id" :value="session.id">{{ session.name }}</option>
                                 </select>
                                 <InputError class="mt-2" :message="form.errors.session_id" />
-                            </div>
-
-                            <div class="col-12">
-                                <InputLabel for="total_marks" value="Total Marks (for each subject in this exam)" class="form-label" />
-                                <TextInput
-                                    id="total_marks"
-                                    type="number"
-                                    class="form-control"
-                                    v-model.number="form.total_marks"
-                                    required
-                                    min="0"
-                                />
-                                <InputError class="mt-2" :message="form.errors.total_marks" />
-                            </div>
-
-                            <div class="col-12">
-                                <InputLabel for="passing_marks" value="Passing Marks (for each subject in this exam)" class="form-label" />
-                                <TextInput
-                                    id="passing_marks"
-                                    type="number"
-                                    class="form-control"
-                                    v-model.number="form.passing_marks"
-                                    required
-                                    min="0"
-                                />
-                                <InputError class="mt-2" :message="form.errors.passing_marks" />
                             </div>
 
                             <div class="col-12">

@@ -130,7 +130,7 @@
                 <th>Overall GPA</th>
                 <td>{{ $overallGPA }}</td>
             </tr>
-            <tr>
+            <tr>   
                 <th>Overall Letter Grade</th>
                 <td>{{ $overallLetterGrade }}</td>
             </tr>

@@ -2,6 +2,8 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { Head } from '@inertiajs/vue3';
 import { computed, ref, watch } from 'vue';
+
+
 const props = defineProps({
     message: String,
     userName: String,
@@ -15,67 +17,32 @@ const props = defineProps({
     overallTotalBalanceDue: Number,
     reportLinks: Object,
 });
+
+
 const formatBDT = (value) => {
-    if (typeof value !== 'number' || isNaN(value)) {
-        return '৳ 0.00';
-    }
-    return `৳ ${Number(value).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+    if (typeof value !== 'number' || isNaN(value)) return '৳ 0.00';
+    return `৳ ${Number(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
-const cardItems = computed(() => {
-    const items = [
-        {
-            title: 'Total Students',
-            value: props.totalStudents ?? 'N/A',
-            color: 'indigo',
-            icon: 'fas fa-user-graduate',
-            isCurrency: false,
-        },
-        {
-            title: 'Collected (This Month)',
-            value: props.totalAmountPaidThisMonth,
-            color: 'emerald',
-            icon: 'fas fa-calendar-check',
-            isCurrency: true,
-        },
-        {
-            title: 'Due (This Month)',
-            value: props.totalBalanceDueThisMonth,
-            color: 'amber',
-            icon: 'fas fa-balance-scale-right',
-            isCurrency: true,
-        },
-        {
-            title: 'Collected (This Year)',
-            value: props.totalAmountPaidThisYear,
-            color: 'cyan',
-            icon: 'fas fa-chart-line',
-            isCurrency: true,
-        },
-        {
-            title: 'Due (This Year)',
-            value: props.totalBalanceDueThisYear,
-            color: 'rose',
-            icon: 'fas fa-piggy-bank',
-            isCurrency: true,
-        },
-    ];
-    return items.filter(card => card.value !== 0);
-});
+
+
+const cardItems = computed(() => [
+
+    { title: 'Collected (This Month)', value: props.totalAmountPaidThisMonth, color: 'emerald', icon: 'fa-sack-dollar', gradient: 'from-emerald-500 to-teal-600' },
+    { title: 'Due (This Month)', value: props.totalBalanceDueThisMonth, color: 'amber', icon: 'fa-scale-unbalanced-flip', gradient: 'from-amber-500 to-orange-600' },
+
+    { title: 'Due (This Year)', value: props.totalBalanceDueThisYear, color: 'rose', icon: 'fa-piggy-bank', gradient: 'from-rose-500 to-pink-600' },
+].filter(card => card.value > 0));
+
+
 const overallTotals = computed(() => [
-    {
-        title: 'Total Paid',
-        value: props.overallTotalAmountPaid,
-        icon: 'fas fa-money-bill-wave',
-    },
-    {
-        title: 'Total Due',
-        value: props.overallTotalBalanceDue,
-        icon: 'fas fa-hand-holding-usd',
-    },
+    { title: 'Total Paid All Time', value: props.overallTotalAmountPaid, icon: 'fa-money-bill-trend-up', gradient: 'from-green-500 to-emerald-600' },
+    { title: 'Total Due All Time', value: props.overallTotalBalanceDue, icon: 'fa-hand-holding-dollar', gradient: 'from-red-500 to-rose-600' },
 ]);
+
 const typedMessage = ref('');
-const typingSpeed = 45;
+const typingSpeed = 50;
 const isTyping = ref(false);
+
 const typeWriterEffect = (text) => {
     let i = 0;
     typedMessage.value = '';
@@ -91,105 +58,111 @@ const typeWriterEffect = (text) => {
     }, typingSpeed);
 };
 
-// Compose dynamic welcome text including userName prop
 watch(() => props.userName, (newName) => {
-    if (newName) {
-        const welcomeText = `Welcome, ${newName}! This is your financial overview dashboard.`;
-        typeWriterEffect(welcomeText);
-    } else {
-        typeWriterEffect('Welcome! This is your financial overview dashboard.');
-    }
+    const welcomeText = newName 
+        ? `Welcome back, ${newName.split(' ')[0]}! 👋` 
+        : 'Welcome to your Financial Data Center';
+    typeWriterEffect(welcomeText);
 }, { immediate: true });
 </script>
 
 <template>
-  <Head title="Accounts Dashboard" />
-  <AuthenticatedLayout>
-    <template #header>
-      <h2 class="font-extrabold text-3xl text-gray-900 dark:text-gray-100 leading-tight mb-10">
-        Accounts Dashboard
-      </h2>
-    </template>
-    <section class="min-h-screen py-16 px-6 sm:px-12 lg:px-16 rounded-3xl max-w-7xl mx-auto">
-      
-      <!-- Welcome Section -->
-      <section class="flex flex-col md:flex-row items-center justify-center space-y-6 md:space-y-0 md:space-x-10 bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 rounded-3xl p-14 shadow-lg text-white select-none mb-16">
-        <div class="bg-white bg-opacity-25 rounded-full p-5 flex items-center justify-center shadow-md">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
-            <path d="M12 14l9-5-9-5-9 5 9 5z" />
-            <path d="M12 14l6.16-3.422a12.083 12.083 0 011.5 6.695M12 14v7M6.837 17.382a12.086 12.086 0 011.5-6.695L12 14m-5.163 3.382V5.5l-3.655 2.085" />
-          </svg>
-        </div>
-        <div>
-          <h1 class="text-2xl font-extrabold leading-tight tracking-wider">
-            {{ typedMessage }}<span class="typewriter-cursor">|</span>
-          </h1>
-          <p class="mt-4 max-w-xl opacity-80 font-light tracking-wide leading-relaxed text-white text-lg">
-            Manage your finances effectively with a clear vision of your collections and dues.
-          </p>
-        </div>
-      </section>
-      <!-- Overall Summary -->
-      <section class="mb-12 grid grid-cols-1 md:grid-cols-2 gap-10">
-        <div class="rounded-3xl p-10 border border-gray-300 dark:border-gray-700 shadow-lg text-gray-900 dark:text-white">
-          <h3 class="text-2xl font-bold mb-6">Overall Financial Summary</h3>
-          <div class="space-y-8">
-            <div v-for="total in overallTotals" :key="total.title" class="flex items-center space-x-5">
-              <i :class="[total.icon, 'text-5xl text-indigo-400 flex-shrink-0']"></i>
-              <div>
-                <div class="text-sm opacity-70">{{ total.title }}</div>
-                <div class="text-4xl font-extrabold">{{ formatBDT(Number(total.value)) }}</div>
-              </div>
+    <AuthenticatedLayout>
+        <Head title="Accounts Dashboard" />
+
+        <template #header>
+            <h2 class="text-3xl font-extrabold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+                Financial Dashboard
+            </h2>
+        </template>
+
+        <div class="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 py-12 px-4">
+            <div class="max-w-7xl mx-auto">
+                <!-- Hero Greeting Card -->
+                <div class="relative overflow-hidden rounded-3xl bg-white/10 backdrop-blur-xl border border-white/20 shadow-2xl mb-10">
+                    <div class="absolute inset-0 bg-gradient-to-r from-violet-600/30 to-indigo-600/30"></div>
+                    <div class="relative p-10 md:p-16 text-white">
+                        <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-8">
+                            <div class="max-w-3xl">
+                                <h1 class="text-4xl md:text-6xl font-black tracking-tight leading-tight">
+                                    {{ typedMessage }}
+                                    <span class="inline-block w-1 h-12 ml-2 bg-purple-400 animate-pulse"></span>
+                                </h1>
+                                <p class="mt-4 text-xl opacity-90 font-light">
+                                    Real-time insights into your institution's financial performance
+                                </p>
+                            </div>
+                            <div class="text-8xl opacity-20">
+                                <i class="fa-solid fa-chart-pie"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-purple-400 to-transparent"></div>
+                </div>
+
+                <!-- Overall Totals - Premium Glass Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
+                    <div v-for="total in overallTotals" :key="total.title"
+                         class="group relative overflow-hidden rounded-3xl bg-white/10 backdrop-blur-md border border-white/20 shadow-2xl transform transition-all duration-500 hover:scale-105 hover:shadow-purple-500/25">
+                        <div :class="`absolute inset-0 bg-gradient-to-br ${total.gradient} opacity-80`"></div>
+                        <div class="relative p-8 text-white">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-lg font-medium opacity-90">{{ total.title }}</p>
+                                    <p class="text-4xl md:text-5xl font-black mt-3 tracking-tight">
+                                        {{ formatBDT(Number(total.value)) }}
+                                    </p>
+                                </div>
+                                <div class="text-6xl opacity-30 group-hover:scale-110 transition-transform duration-500">
+                                    <i :class="`fa-solid ${total.icon}`"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Key Metrics Grid -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 mb-12">
+                    <div v-for="card in cardItems" :key="card.title"
+                         class="relative group overflow-hidden rounded-2xl bg-white/5 backdrop-blur-xl border border-white/10 shadow-xl transition-all duration-500 hover:shadow-2xl hover:shadow-purple-600/30 hover:-translate-y-2">
+                        <div :class="`absolute inset-0 bg-gradient-to-br ${card.gradient} opacity-60 group-hover:opacity-80 transition-opacity`"></div>
+                        <div class="relative p-6 text-white">
+                            <div class="flex items-center justify-between mb-4">
+                                <i :class="`fa-solid ${card.icon} text-3xl opacity-80`"></i>
+                                <span class="text-xs font-medium bg-white/20 px-3 py-1 rounded-full backdrop-blur">
+                                    {{ card.title.includes('Month') ? 'Monthly' : card.title.includes('Year') ? 'Yearly' : 'Total' }}
+                                </span>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quick Reports Section -->
+                <section v-if="reportLinks" class="mt-16">
+                    <h3 class="text-2xl font-bold text-white mb-8 flex items-center gap-3">
+                        <i class="fa-solid fa-folder-open text-yellow-400"></i>
+                        Instant Financial Reports
+                    </h3>
+                    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-5">
+                        <a v-for="(url, key) in reportLinks" :key="key" :href="url"
+                           class="group relative overflow-hidden rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 p-6 text-center text-white font-semibold transition-all duration-300 hover:bg-white/20 hover:border-purple-400 hover:shadow-xl hover:shadow-purple-500/30">
+                            <div class="text-4xl mb-4 group-hover:scale-110 transition-transform">
+                                <i class="fa-solid fa-file-pdf text-rose-400"></i>
+                            </div>
+                            <span class="block text-sm">{{ key.replace(/([A-Z])/g, ' $1').trim() }}</span>
+                            <div class="absolute inset-x-0 bottom-0 h-1 bg-gradient-to-r from-purple-500 to-pink-500 transform scale-x-0 group-hover:scale-x-100 transition-transform"></div>
+                        </a>
+                    </div>
+                </section>
             </div>
-          </div>
         </div>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
-          <div v-for="card in cardItems" :key="card.title"
-               :class="[
-                  'p-8 rounded-2xl border-t-4 border-gray-300 dark:border-gray-700 shadow-md hover:shadow-xl transition cursor-pointer bg-white dark:bg-gray-800',
-                  `border-${card.color}-400`,
-                  `hover:border-${card.color}-600`
-               ]" >
-            <div class="flex justify-between items-center">
-              <div>
-                <h4 :class="[`text-md font-semibold mb-3 text-${card.color}-600 dark:text-${card.color}-400`]">
-                  {{ card.title }}
-                </h4>
-                <p class="text-3xl font-extrabold text-gray-900 dark:text-white">
-                  {{ card.isCurrency ? formatBDT(Number(card.value)) : card.value }}
-                </p>
-              </div>
-              <div class="text-5xl text-opacity-25" :class="`text-${card.color}-400`">
-                <i :class="card.icon" v-if="!card.isCurrency"></i>
-                <span v-else class="text-4xl font-bold">৳</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-      <!-- Quick Reports -->
-      <section v-if="reportLinks" class="mt-10">
-        <h3 class="font-semibold text-xl mb-6 text-gray-900 dark:text-gray-100">📂 Quick Financial Reports</h3>
-        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
-          <a v-for="(url, key) in reportLinks" :key="key" :href="url"
-             class="py-4 px-6 rounded-xl border border-gray-300 dark:border-gray-700 hover:bg-indigo-600 hover:text-white transition text-center font-semibold capitalize">
-            {{ key.replace(/([A-Z])/g, ' $1') }}
-          </a>
-        </div>
-      </section>
-    </section>
-  </AuthenticatedLayout>
+    </AuthenticatedLayout>
 </template>
+
 <style scoped>
 @keyframes blink {
-  50% { opacity: 0; }
-}
-.typewriter-cursor {
-  font-weight: 600;
-  font-size: 1.4rem;
-  animation: blink 0.7s infinite step-end;
-  display: inline-block;
-  vertical-align: bottom;
-  color: #a78bfa; /* violet-400 */
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
 }
 </style>

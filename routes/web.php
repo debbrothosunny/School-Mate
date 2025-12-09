@@ -19,6 +19,7 @@ use App\Http\Controllers\BusScheduleController;
 use App\Http\Controllers\NoticeController;
 use App\Http\Controllers\ResultController;
 use App\Http\Controllers\FeeController;
+use App\Http\Controllers\SalaryController;
 use App\Http\Controllers\SettingController;
 use App\Http\Controllers\Auth\RegisteredUserController;
 use Inertia\Inertia;
@@ -29,6 +30,13 @@ Route::get('/', function () {
 });
 
 Route::post('/check-contact', [RegisteredUserController::class, 'checkContactInfo'])->name('check.contact');
+
+
+// New route for teacher login by joining number
+Route::post('/teacher-login', [UserController::class, 'teacherLogin'])->name('teacher.login');
+
+// New route for teacher login by joining number
+Route::post('/student-login', [UserController::class, 'studentLogin'])->name('student.login');
 
 Route::middleware(['auth'])->group(function () {
    
@@ -68,7 +76,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/subjects/create', [SubjectController::class, 'create'])->name('subjects.create');
         Route::post('/subjects', [SubjectController::class, 'store'])->name('subjects.store');
         Route::get('/subjects/{subject}/edit', [SubjectController::class, 'edit'])->name('subjects.edit');
-        Route::post('/subjects/{subject}', [SubjectController::class, 'update'])->name('subjects.update');
+        Route::put('/subjects/{subject}', [SubjectController::class, 'update'])->name('subjects.update');
         Route::delete('/subjects/{subject}', [SubjectController::class, 'destroy'])->name('subjects.destroy');
 
 
@@ -129,6 +137,7 @@ Route::middleware(['auth'])->group(function () {
 
          Route::post('/timetables/check-conflicts', [ClassTimeController::class, 'checkConflicts'])->name('timetable.checkConflicts');
 
+         
          // NEW API endpoint to get occupied slots for real-time display
         Route::get('/timetables/occupied-slots', [ClassTimeController::class, 'getOccupiedSlots'])->name('timetable.getOccupiedSlots');
   
@@ -136,14 +145,11 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/timetables/filtered-data', [ClassTimeController::class, 'getFilteredData'])
         ->name('timetable.getFilteredData');
 
+        // PDF Generation Route for Timetable
+        Route::get('/timetable/pdf', [ClassTimeController::class, 'generatePDF'])->name('timetable.pdf');
 
-        // TEACHER MANAGEMENT ROUTES (Individual Definitions)
-        Route::get('/teachers', [TeacherController::class, 'index'])->name('teachers.index');
-        Route::get('/teachers/create', [TeacherController::class, 'create'])->name('teachers.create');
-        Route::post('/teachers', [TeacherController::class, 'store'])->name('teachers.store');
-        Route::get('/teachers/{teacher}/edit', [TeacherController::class, 'edit'])->name('teachers.edit');
-        Route::post('/teachers/{teacher}', [TeacherController::class, 'update'])->name('teachers.update');
-        Route::delete('/teachers/{teacher}', [TeacherController::class, 'destroy'])->name('teachers.destroy');
+
+        
 
        // CLASS MANAGEMENT ROUTES (Individual Definitions) - Adjusted for ClassNameController and  schema
         Route::get('/class-names', [ClassNameController::class, 'index'])->name('class-names.index');
@@ -154,23 +160,37 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('/class-names/{className}', [ClassNameController::class, 'destroy'])->name('class-names.destroy');
 
 
+        // TEACHER ATTENDANCE ROUTES
+        // 1. Index (List all attendance, potentially for a date range/day)
+        Route::get('/attendance/teachers', [AttendanceController::class, 'index'])->name('attendance.teachers.index');
+        
+        
+        // 3. Store (Handle creation/daily marking) - This can be the most used POST
+        Route::post('/attendance/teachers', [AttendanceController::class, 'store'])->name('attendance.teachers.store');
+        
+        
+
+        // 5. Update (Handle update submission)
+        Route::put('/attendance/teachers/{teacherAttendance}', [AttendanceController::class, 'update'])->name('attendance.teachers.update');
+
+
+        Route::get('attendance/teachers/print/range', [AttendanceController::class, 'printRangePdf'])->name('attendance.teachers.print.range');
+
+
 
         
         // Student Management
         // NEW: Placing specific student routes at the top to avoid conflicts.
         Route::post('/students/promote', [StudentController::class, 'promoteStudents'])->name('students.promote');
         Route::get('/students/passed', [StudentController::class, 'passedStudents'])->name('students.passed');
-        Route::get('/students/create', [StudentController::class, 'create'])->name('students.create');
-        Route::post('/students', [StudentController::class, 'store'])->name('students.store');
-        Route::get('/students', [StudentController::class, 'index'])->name('students.index');
-        Route::get('/students/{student}/edit', [StudentController::class, 'edit'])->name('students.edit');
-        Route::post('/students/{student}', [StudentController::class, 'update'])->name('students.update');
-        Route::delete('/students/{student}', [StudentController::class, 'destroy'])->name('students.destroy');
-        // The generic show route must be at the bottom of the student routes.
-        Route::get('/students/{id}', [StudentController::class, 'show'])->name('students.show');
 
-        Route::get('/attendance', [AttendanceController::class, 'index'])->name('attendance.index');
-        Route::post('/attendance', [AttendanceController::class, 'store'])->name('attendance.store');
+        Route::get('/attendance-report', [AttendanceController::class, 'report'])->name('attendance.report');
+        Route::get('/attendance-report/pdf', [AttendanceController::class, 'exportPDF'])->name('attendance.report.pdf');
+
+
+
+
+
 
 
         // Exam Management Routes
@@ -229,16 +249,12 @@ Route::middleware(['auth'])->group(function () {
 
 
         // Route to display and manage seat plans for a specific exam schedule
-        Route::get('/exam-schedules/{examSchedule}/seat-plan', [ExamController::class, 'show'])
-        ->name('exam-seat-plan.show');
 
-        // Route to save/update seat assignments (manual assignment)
-        Route::post('/exam-schedules/{examSchedule}/seat-plan', [ExamController::class, 'seatStore'])
-        ->name('exam-seat-plan.store');
 
-        // Route for auto-assigning seats
-        Route::post('/exam-schedules/{examSchedule}/seat-plan/auto-assign', [ExamController::class, 'autoAssign'])
-        ->name('exam-seat-plan.auto-assign');
+        Route::get('/class-section-seat-plan', [ExamController::class, 'show'])->name('class-section-seat-plan.show');
+        Route::post('/class-section-seat-plan/auto-assign', [ExamController::class, 'autoAssign'])->name('class-section-seat-plan.auto-assign');
+        Route::post('/class-section-seat-plan/store', [ExamController::class, 'seatStore'])->name('class-section-seat-plan.store');
+        Route::get('/class-section-seat-plan/pdf', [ExamController::class, 'generateSeatPlanPDF'])->name('class-section-seat-plan.pdf');
 
 
         // Marks Router
@@ -261,10 +277,21 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('/books/{book}', [BookController::class, 'destroy'])->name('books.destroy');
 
 
+        // Student Borrow Book Functionality Route
+        Route::post('/books/{book}/borrow', [BookController::class, 'borrowBookStore'])
+        ->name('books.borrow.store');
+
+  
         // Admin Borrow Records Management (URIs adjusted)
         Route::get('/borrow-records', [BookController::class, 'adminBorrowRecordsIndex'])->name('borrow-records.index');
-        Route::post('/borrow-records/{borrowBook}/approve', [BookController::class, 'approveReturn'])->name('borrow-records.approve-return');
-        Route::post('/borrow-records/{borrowBook}/mark-lost', [BookController::class, 'markAsLost'])->name('borrow-records.mark-lost');
+
+        Route::put('/borrows/{borrow}/return', [BookController::class, 'returnBook'])->name('borrows.return');
+
+
+
+
+        // Route::post('/borrow-records/{borrowBook}/approve', [BookController::class, 'approveReturn'])->name('borrow-records.approve-return');
+        // Route::post('/borrow-records/{borrowBook}/mark-lost', [BookController::class, 'markAsLost'])->name('borrow-records.mark-lost');
 
 
 
@@ -279,14 +306,7 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('/bus-schedules/{busSchedule}', [BusScheduleController::class, 'destroy'])->name('bus-schedules.destroy');
         
         
-        // Notice Route
-        Route::get('/notices', [NoticeController::class, 'index'])->name('notices.index');
-        Route::get('/notices/create', [NoticeController::class, 'create'])->name('notices.create');
-        Route::post('/notices', [NoticeController::class, 'store'])->name('notices.store');
-        Route::get('/notices/edit/{notice}', [NoticeController::class, 'edit'])->name('notices.edit');
-        // Using POST for update as per your input, consider PUT/PATCH for RESTful consistency
-        Route::post('/notices/update/{notice}', [NoticeController::class, 'update'])->name('notices.update');
-        Route::delete('/notices/{notice}', [NoticeController::class, 'destroy'])->name('notices.destroy');
+        
         
         
         // Group  Route
@@ -311,16 +331,23 @@ Route::middleware(['auth'])->group(function () {
 
         //Exam Result Route
 
-
         Route::get('/results/show', [ResultController::class, 'showResults'])->name('results.show');
 
         Route::post('/results/finalize/{exam}', [ResultController::class, 'storeExamResults'])->name('results.store');
 
-        Route::get('/results/download-pdf/{student}/{exam}', [ResultController::class, 'downloadResultPdf'])->name('results.download-pdf');
+    
+
+        Route::get('/results/download-pdf-all', [ResultController::class, 'downloadPdfAll'])->name('results.download-pdf-all');
 
 
 
+        // Define this route, accessible via GET for downloading/streaming
+        Route::get('/results/download-all-pdf', [ResultController::class, 'downloadAllResultsPdf'])->name('results.download-all-pdf');
 
+
+
+        // Route for the Payment History page
+        Route::get('/payments/history', [FeeController::class, 'paymentHistoryindex'])->name('admin.payments.history');
 
         
         
@@ -431,72 +458,172 @@ Route::middleware(['auth'])->group(function () {
         // New route for notifications
         Route::post('/notifications/mark-all-as-read', [FeeController::class, 'markAllAsRead'])->name('notifications.markAllAsRead');
 
-        // Route::get('/admin/payments/pending', [FeeController::class, 'pendingPayments'])->name('admin.payments.pending');
-        // Route::post('/admin/payments/{paymentId}/approve', [FeeController::class, 'approvePayment'])->name('admin.payments.approve');
-        // Route::post('/admin/payments/{paymentId}/reject', [FeeController::class, 'rejectPayment'])->name('admin.payments.reject');
+
+        // Fee Types Routes
+        Route::get('/admin/fee-types', [FeeController::class, 'FeeTypeIndex'])->name('fee-types.index');
+        Route::get('/admin/fee-types/create', [FeeController::class, 'FeeTypeCreate'])->name('fee-types.create');
+        Route::post('/admin/fee-types', [FeeController::class, 'FeeTypeStore'])->name('fee-types.store');
+        Route::get('/admin/fee-types/{feeType}/edit', [FeeController::class, 'FeeTypeEdit'])->name('fee-types.edit');
+        Route::post('/admin/fee-types/{feeType}', [FeeController::class, 'FeeTypeUpdate'])->name('fee-types.update');
+        Route::delete('/admin/fee-types/{feeType}', [FeeController::class, 'FeeTypeDestroy'])->name('fee-types.destroy');
+
+        // Class Fee Structure Routes
+        Route::get('/admin/class-fee-structures', [FeeController::class, 'index'])->name('class-fee-structures.index');
+        Route::get('/admin/class-fee-structures/create', [FeeController::class, 'create'])->name('class-fee-structures.create');
+        Route::post('/admin/class-fee-structures', [FeeController::class, 'store'])->name('class-fee-structures.store');
+        Route::get('/admin/class-fee-structures/{classFeeStructure}', [FeeController::class, 'show'])->name('class-fee-structures.show');
+        Route::get('/admin/class-fee-structures/{classFeeStructure}/edit', [FeeController::class, 'edit'])->name('class-fee-structures.edit');
+        Route::post('/admin/class-fee-structures/{classFeeStructure}', [FeeController::class, 'update'])->name('class-fee-structures.update');
+        Route::delete('/admin/class-fee-structures/{classFeeStructure}', [FeeController::class, 'destroy'])->name('class-fee-structures.destroy');
+
+        // Student Fee Assignment Routes
+        Route::get('/admin/student-fee-assignments', [FeeController::class, 'StudentFeeAssignmentIndex'])->name('student-fee-assignments.index');
+        Route::get('/admin/student-fee-assignments/create', [FeeController::class, 'StudentFeeAssignmentCreate'])->name('student-fee-assignments.create');
+        Route::post('/admin/student-fee-assignments', [FeeController::class, 'StudentFeeAssignmentStore'])->name('student-fee-assignments.store');
+        Route::get('/admin/student-fee-assignments/{studentFeeAssignment}/edit', [FeeController::class, 'StudentFeeAssignmentEdit'])->name('student-fee-assignments.edit');
+        Route::post('/admin/student-fee-assignments/{studentFeeAssignment}', [FeeController::class, 'StudentFeeAssignmentUpdate'])->name('student-fee-assignments.update');
+        Route::delete('/admin/student-fee-assignments/{studentFeeAssignment}', [FeeController::class, 'StudentFeeAssignmentDestroy'])->name('student-fee-assignments.destroy');
+        Route::get('/admin/get-students-by-class', [FeeController::class, 'getStudentsByClass'])->name('get-students-by-class');
+        Route::post('/admin/bulk-store-assignments', [FeeController::class, 'bulkStoreAssignments'])->name('bulk-store-assignments');
+
+        // Invoice Routes
+        Route::get('/admin/invoices', [FeeController::class, 'invoiceIndex'])->name('admin.invoices.index');
+        Route::get('/admin/invoices/create', [FeeController::class, 'invoiceCreate'])->name('admin.invoices.create');
+        Route::post('/admin/invoices', [FeeController::class, 'invoiceStore'])->name('admin.invoices.store');
 
 
-    });
+        Route::get('invoices/{invoice}', [FeeController::class, 'invoiceShow'])
+        ->name('admin.invoices.show');
 
 
-    // TEACHER ONLY ROUTES
-    Route::middleware('role:teacher')->group(function () {
+        // Route for showing the edit form
+        Route::get('invoices/{invoice}/edit', [FeeController::class, 'invoiceEdit'])
+            ->name('admin.invoices.edit');
+
+        // Route for submitting the update form (MUST use PUT method)
+        Route::put('invoices/{invoice}', [FeeController::class, 'invoiceUpdate'])
+            ->name('admin.invoices.update');
+
         
-    Route::get('/teacher/dashboard', [DashboardController::class, 'teacherIndex'])->name('teacher.dashboard');
 
-    Route::get('teacher/marks', [MarkController::class, 'teacherMarksIndex'])->name('teachermarks.index');
-    Route::post('teacher/marks', [MarkController::class, 'teacherMarksStore'])->name('teachermarks.store');
+        Route::get('/admin/students/{studentId}/id-card/download', [StudentController::class, 'downloadIdCard'])
+        ->name('admin.students.download.idcard');
 
-    Route::get('/teacher/my-notices', [NoticeController::class, 'myNotices'])->name('teacher.my-notices');
+        Route::get('/students/next-roll', [StudentController::class, 'nextRoll'])->name('students.next-roll');
 
-    // ✨ NEW Teacher Attendance Routes - Adjusted to fit here ✨
-    Route::get('/teacher/attendance', [AttendanceController::class, 'teacherAttendanceIndex'])->name('teacherattendance.index');
-    Route::post('/teacher/attendance', [AttendanceController::class, 'teacherAttendanceStore'])->name('teacherattendance.store');
 
-    });
+        Route::get('admin/students/print-class-idcards/{classId}', [StudentController::class, 'printClassIdCards'])->name('students.print.classidcards');
+
+
+        //    
+        Route::get('/admin/students/{student}/certificate', [StudentController::class, 'downloadTransferCertificate'])
+        ->name('students.certificate.download');
+
+
+        // Techer Single ID Card Download Route
+
+        Route::get('/admin/teachers/{teacher}/id-card/download-pdf', [TeacherController::class, 'downloadPdfTeacher'])
+        ->name('teachers.download_pdf');
+
+        // All Teacher ID Card Printing Route
+
+        Route::get('admin/teachers/print-all', [TeacherController::class, 'printAllIdCards'])
+        ->name('teachers.print_all');
+
+        // Serve Teacher Image
+        Route::get('admin/teacher-image/{filename}', [TeacherController::class, 'serveImage'])->where('filename', '.*')->name('teachers.image.serve');
+
+        // Serve Student Image
+        Route::get('admin/student-image/{filename}', [StudentController::class, 'serveImageStudents'])->where('filename', '.*')->name('students.image.serve');
+        
+        // Route for serving the School Logo (using the exact same logic)
+        Route::get('/settings/logo/{filename}', [App\Http\Controllers\SettingController::class, 'serveLogo'])
+         ->name('settings.logo.serve');
+
+        
+
+
+
+        // 1. INDEX: Displays the list of all staff and their current salary status.
+        // URL: /salaries
+        Route::get('/salaries', [SalaryController::class, 'index'])
+            ->name('salaries.index');
+
+        // 2. CREATE: Shows the form for creating/assigning a new salary structure.
+        // URL: /salaries/create
+        Route::get('/salaries/create', [SalaryController::class, 'create'])
+            ->name('salaries.create');
+
+        // 3. STORE: Handles the form submission to save the new salary structure.
+        // URL: /salaries
+        Route::post('/salaries', [SalaryController::class, 'store'])
+        ->name('salaries.store');
+
+
+        Route::put('/salaries/{salaryStructure}', [SalaryController::class, 'update'])->name('salaries.update');
+
+        // Salary Createb Route 
+        Route::get('/payroll', [SalaryController::class, 'staffSalaryIndex'])->name('salaries.payroll.index');
+
+
+        Route::post('/payroll/{staffId}/make', [SalaryController::class, 'makeSalary'])
+        ->name('payroll.make');
+
+        Route::post('/payroll/process', [SalaryController::class, 'processMonthlyPayroll'])->name('payroll.process.monthly');
+            });
+
+        Route::get('/payroll/records-for-print', [SalaryController::class, 'getPayrollRecordsForPrint'])->name('payroll.records-for-print');
+
+
+        // TEACHER ONLY ROUTES
+        Route::middleware('role:teacher')->group(function () {
+            
+        Route::get('/teacher/dashboard', [DashboardController::class, 'teacherIndex'])->name('teacher.dashboard');
+
+        Route::get('teacher/marks', [MarkController::class, 'teacherMarksIndex'])->name('teachermarks.index');
+        Route::post('teacher/marks', [MarkController::class, 'teacherMarksStore'])->name('teachermarks.store');
+
+        Route::get('/teacher/my-notices', [NoticeController::class, 'myNotices'])->name('teacher.my-notices');
+
+        // ✨ NEW Teacher Attendance Routes - Adjusted to fit here ✨
+        Route::get('/teacher/attendance', [AttendanceController::class, 'teacherAttendanceIndex'])->name('teacherattendance.index');
+        Route::post('/teacher/attendance', [AttendanceController::class, 'teacherAttendanceStore'])->name('teacherattendance.store');
+
+
+
+        Route::get('/accounts/{student_id}/history', [StudentController::class, 'showStudentHistory'])->name('students.history');
+
+        });
 
 
     
-    // ACCOUNTS ONLY ROUTES (New dedicated route)
-    Route::middleware('role:accounts')->group(function () {
-    Route::get('/accounts/dashboard', [AccountsController::class, 'index'])->name('accounts.dashboard');
+        // ACCOUNTS ONLY ROUTES (New dedicated route)
+        Route::middleware('role:accounts')->group(function () {
+        Route::get('/accounts/dashboard', [AccountsController::class, 'index'])->name('accounts.dashboard');
 
-    // Fee Types Routes
-    Route::get('/accounts/fee-types', [FeeController::class, 'FeeTypeIndex'])->name('fee-types.index');
-    Route::get('/accounts/fee-types/create', [FeeController::class, 'FeeTypeCreate'])->name('fee-types.create');
-    Route::post('/accounts/fee-types', [FeeController::class, 'FeeTypeStore'])->name('fee-types.store');
-    Route::get('/accounts/fee-types/{feeType}/edit', [FeeController::class, 'FeeTypeEdit'])->name('fee-types.edit');
-    Route::post('/accounts/fee-types/{feeType}', [FeeController::class, 'FeeTypeUpdate'])->name('fee-types.update');
-    Route::delete('/accounts/fee-types/{feeType}', [FeeController::class, 'FeeTypeDestroy'])->name('fee-types.destroy');
+    
 
-    // Class Fee Structure Routes
-    Route::get('/accounts/class-fee-structures', [FeeController::class, 'index'])->name('class-fee-structures.index');
-    Route::get('/accounts/class-fee-structures/create', [FeeController::class, 'create'])->name('class-fee-structures.create');
-    Route::post('/accounts/class-fee-structures', [FeeController::class, 'store'])->name('class-fee-structures.store');
-    Route::get('/accounts/class-fee-structures/{classFeeStructure}', [FeeController::class, 'show'])->name('class-fee-structures.show');
-    Route::get('/accounts/class-fee-structures/{classFeeStructure}/edit', [FeeController::class, 'edit'])->name('class-fee-structures.edit');
-    Route::post('/accounts/class-fee-structures/{classFeeStructure}', [FeeController::class, 'update'])->name('class-fee-structures.update');
-    Route::delete('/accounts/class-fee-structures/{classFeeStructure}', [FeeController::class, 'destroy'])->name('class-fee-structures.destroy');
-
-    // Student Fee Assignment Routes
-    Route::get('/accounts/student-fee-assignments', [FeeController::class, 'StudentFeeAssignmentIndex'])->name('student-fee-assignments.index');
-    Route::get('/accounts/student-fee-assignments/create', [FeeController::class, 'StudentFeeAssignmentCreate'])->name('student-fee-assignments.create');
-    Route::post('/accounts/student-fee-assignments', [FeeController::class, 'StudentFeeAssignmentStore'])->name('student-fee-assignments.store');
-    Route::get('/accounts/student-fee-assignments/{studentFeeAssignment}/edit', [FeeController::class, 'StudentFeeAssignmentEdit'])->name('student-fee-assignments.edit');
-    Route::post('/accounts/student-fee-assignments/{studentFeeAssignment}', [FeeController::class, 'StudentFeeAssignmentUpdate'])->name('student-fee-assignments.update');
-    Route::delete('/accounts/student-fee-assignments/{studentFeeAssignment}', [FeeController::class, 'StudentFeeAssignmentDestroy'])->name('student-fee-assignments.destroy');
-    Route::get('/accounts/get-students-by-class', [FeeController::class, 'getStudentsByClass'])->name('get-students-by-class');
-    Route::post('/accounts/bulk-store-assignments', [FeeController::class, 'bulkStoreAssignments'])->name('bulk-store-assignments');
-
-    // Invoice Routes
-    Route::get('/accounts/invoices', [FeeController::class, 'invoiceIndex'])->name('admin.invoices.index');
-    Route::get('/accounts/invoices/create', [FeeController::class, 'invoiceCreate'])->name('admin.invoices.create');
-    Route::post('/accounts/invoices', [FeeController::class, 'invoiceStore'])->name('admin.invoices.store');
-    Route::get('/accounts/invoices/{id}/download-pdf', [FeeController::class, 'downloadPdf'])->name('account.invoices.download-pdf');
 
 
     Route::get('/accounts/invoices/{invoice}', [FeeController::class, 'invoiceShow'])->name('admin.invoices.show');
-    Route::get('/accounts/invoices/get-academic-data', [StudentController::class, 'getAcademicData'])->name('invoices.get-academic-data');
+  
+
+
+
+    // Payment Collection Routes
+    Route::get('/accountant/payments/collect', [FeeController::class, 'collectPayment'])->name('accountant.payments.collect');
+
+    // Existing route to handle a payment
+    Route::post('/accountant/payments/store', [FeeController::class, 'storePayment'])->name('accountant.payments.store');
+
+
+    Route::get('/accounts/invoices/{invoice}/download-pdf', [FeeController::class, 'downloadInvoicePdf'])->name('invoices.download.pdf');
+
+
+
+
+    // Existing route for fetching a specific student's invoice
+    Route::get('/get-student-invoice/{student}', [FeeController::class, 'getStudentInvoice']);
 
 
 
@@ -515,7 +642,7 @@ Route::middleware(['auth'])->group(function () {
 
 
 
-    Route::get('/accounts/{student_id}/history', [StudentController::class, 'showStudentHistory'])->name('students.history');
+    
 
 
 
@@ -528,9 +655,9 @@ Route::middleware(['auth'])->group(function () {
 
 
     // Payment Routes
-    Route::get('/accounts/payments/pending', [FeeController::class, 'pendingPayments'])->name('admin.payments.pending');
-    Route::post('/accounts/payments/{paymentId}/approve', [FeeController::class, 'approvePayment'])->name('admin.payments.approve');
-    Route::post('/accounts/payments/{paymentId}/reject', [FeeController::class, 'rejectPayment'])->name('admin.payments.reject');
+    // Route::get('/accounts/payments/pending', [FeeController::class, 'pendingPayments'])->name('admin.payments.pending');
+    // Route::post('/accounts/payments/{paymentId}/approve', [FeeController::class, 'approvePayment'])->name('admin.payments.approve');
+    // Route::post('/accounts/payments/{paymentId}/reject', [FeeController::class, 'rejectPayment'])->name('admin.payments.reject');
 
     // Report Routes
     Route::get('/income-statement', [AccountsController::class, 'incomeStatement'])->name('reports.income_statement');
@@ -572,10 +699,70 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/student/invoices/process-payment', [FeeController::class, 'processPayment'])->name('student.invoices.process-payment');
 
     Route::get('/invoices/{invoice}/download-pdf', [FeeController::class, 'generatePdf'])->name('student.invoices.download-pdf');
+    });
+
+
+    // Front-Desk ONLY ROUTES
+    Route::middleware('role:front-desk')->group(function () {
+
+
+        Route::get('/front-desk/dashboard', [DashboardController::class, 'frontDeskIndex'])->name('front-desk.dashboard');
+    
+        
+    
+       // Student Management
+
+        Route::get('/students', [StudentController::class, 'index'])->name('students.index');
+
+        Route::get('/students/create', [StudentController::class, 'create'])->name('students.create');
+
+        Route::post('/students', [StudentController::class, 'store'])->name('students.store');
+       
+        Route::get('/students/{student}/edit', [StudentController::class, 'edit'])->name('students.edit');
+        
+        Route::post('/students/{student}', [StudentController::class, 'update'])->name('students.update');
+
+        Route::delete('/students/{student}', [StudentController::class, 'destroy'])->name('students.destroy');
+
+        // The generic show route must be at the bottom of the student routes.
+        Route::get('/students/{id}', [StudentController::class, 'show'])->name('students.show');
+
+
+        // TEACHER MANAGEMENT ROUTES (Individual Definitions)
+        Route::get('/teachers', [TeacherController::class, 'index'])->name('teachers.index');
+        Route::get('/teachers/create', [TeacherController::class, 'create'])->name('teachers.create');
+        Route::post('/teachers', [TeacherController::class, 'store'])->name('teachers.store');
+        Route::get('/teachers/{teacher}/edit', [TeacherController::class, 'edit'])->name('teachers.edit');
+        Route::post('/teachers/{teacher}', [TeacherController::class, 'update'])->name('teachers.update');
+        Route::delete('/teachers/{teacher}', [TeacherController::class, 'destroy'])->name('teachers.destroy');
+
+
+        // Notice Route
+        Route::get('/notices', [NoticeController::class, 'index'])->name('notices.index');
+        Route::get('/notices/create', [NoticeController::class, 'create'])->name('notices.create');
+        Route::post('/notices', [NoticeController::class, 'store'])->name('notices.store');
+        Route::get('/notices/edit/{notice}', [NoticeController::class, 'edit'])->name('notices.edit');
+        // Using POST for update as per your input, consider PUT/PATCH for RESTful consistency
+        Route::post('/notices/update/{notice}', [NoticeController::class, 'update'])->name('notices.update');
+        Route::delete('/notices/{notice}', [NoticeController::class, 'destroy'])->name('notices.destroy');
+
+
+
+        // TEACHER ATTENDANCE ROUTES
+        // 1. Index (List all attendance, potentially for a date range/day)
+        Route::get('/attendance/teachers', [AttendanceController::class, 'index'])->name('attendance.teachers.index');
+        
+        
+        // 3. Store (Handle creation/daily marking) - This can be the most used POST
+        Route::post('/attendance/teachers', [AttendanceController::class, 'store'])->name('attendance.teachers.store');
+        
+        
+
+        // 5. Update (Handle update submission)
+        Route::put('/attendance/teachers/{teacherAttendance}', [AttendanceController::class, 'update'])->name('attendance.teachers.update');
+
+    });
+
 });
-});
-
-
-
 
 require __DIR__.'/auth.php';

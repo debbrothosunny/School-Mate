@@ -4,6 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use App\Models\GradeConfigure; // Ensure this is imported for grading logic
 
 class Mark extends Model
 {
@@ -17,152 +19,231 @@ class Mark extends Model
         'group_id',
         'exam_id',
         'subject_id',
-        'class_test_marks',
-        'assignment_marks',
-        'exam_marks',
-        'attendance_marks',
+        // Component Marks
+        'subjective_marks',
+        'objective_marks',
+        'practical_marks',
+        // Calculated/Status (Cached DB Fields)
+        'total_marks_obtained',
+        'subject_percentage',
+        'subject_letter_grade',
+        'subject_grade_point',
+        'subject_pass_status',
+        'is_absent',
     ];
 
-    // Define relationships
-    public function student()
+    /**
+     * Cast numeric marks and cached results to appropriate types.
+     */
+    protected $casts = [
+        'subjective_marks' => 'integer',
+        'objective_marks' => 'integer',
+        'practical_marks' => 'integer',
+        'total_marks_obtained' => 'integer',
+        'subject_percentage' => 'float',      // Cast for cached result
+        'subject_grade_point' => 'float',     // Cast for cached result
+        'is_absent' => 'boolean',
+    ];
+
+    /**
+     * The "booting" method of the model.
+     * This is where we calculate the result and cache it into the database columns on save.
+     */
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::saving(function (self $mark) {
+            // 1. Calculate and set total marks obtained
+            $totalObtained = $mark->calculateTotalSubjectMarksObtained();
+            $mark->total_marks_obtained = $totalObtained;
+
+            // Load Subject to get configuration data (full marks, passing marks, etc.)
+            $subjectConfig = $mark->getExamSubjectConfig();
+            
+            // Do not proceed with grading/percentage if subject config is missing
+            if (!$subjectConfig) {
+                $mark->subject_percentage = 0.0;
+                $mark->subject_letter_grade = 'N/A';
+                $mark->subject_grade_point = 0.0;
+                $mark->subject_pass_status = 'N/A';
+                return;
+            }
+
+            // 2. Calculate and set percentage
+            $mark->subject_percentage = $mark->calculateSubjectPercentage($totalObtained, $subjectConfig);
+            $percentage = $mark->subject_percentage;
+            
+            // 3. Calculate and set pass status (must run before grade/GPA)
+            $mark->subject_pass_status = $mark->calculateSubjectPassStatus($totalObtained, $subjectConfig);
+
+            // 4. Calculate and set Letter Grade and Grade Point
+            $gradingResult = $mark->calculateGradeAndGPA($percentage, $mark->subject_pass_status);
+            $mark->subject_letter_grade = $gradingResult['letter_grade'];
+            $mark->subject_grade_point = $gradingResult['grade_point'];
+
+            // Note: The original Accessors for grade, GPA, percentage, and pass status were removed
+            // so that Laravel reads the newly cached column values.
+        });
+    }
+
+    // --- Relationships ---
+
+    public function student(): BelongsTo
     {
         return $this->belongsTo(Student::class);
     }
 
-    public function class()
+    public function class(): BelongsTo
     {
-        return $this->belongsTo(ClassName::class, 'class_id'); // Assuming ClassName model
+        return $this->belongsTo(ClassName::class, 'class_id'); 
     }
 
-    public function session()
+    public function session(): BelongsTo
     {
-        return $this->belongsTo(ClassSession::class, 'session_id'); // Assuming ClassSession model
+        return $this->belongsTo(ClassSession::class, 'session_id'); 
     }
 
-    public function section()
+    public function section(): BelongsTo
     {
         return $this->belongsTo(Section::class);
     }
 
-    public function group()
+    public function group(): BelongsTo
     {
         return $this->belongsTo(Group::class);
     }
 
-    public function exam()
+    public function exam(): BelongsTo
     {
         return $this->belongsTo(Exam::class);
     }
 
-    public function subject()
+    public function subject(): BelongsTo
     {
         return $this->belongsTo(Subject::class);
     }
 
-
-    public function classSubjectDetail()
-    {
-        // Adjust foreign keys if your class_subjects table uses different names
-        return $this->belongsTo(ClassSubject::class, 'subject_id', 'subject_id')
-                    ->where('class_name_id', $this->class_id)
-                    ->where('session_id', $this->session_id);
-                    // Add section_id and group_id if your class_subjects pivot
-                    // also filters by these to find the exact total_subject_marks
-                    // ->where('section_id', $this->section_id);
-                    // ->where('group_id', $this->group_id);
-    }
-
-    // --- Accessors for Mark Calculations ---
+    // --- Helper to get Exam/Subject Configuration ---
 
     /**
-     * Get the total marks obtained for this subject.
-     * Combines class test, assignment, exam, and attendance marks.
-     * @return int
+     * Gets the full marks and passing marks configuration from the related Subject.
+     * @return Subject|null The related Subject model instance.
      */
-    public function getTotalSubjectMarksObtainedAttribute()
+    protected function getExamSubjectConfig(): ?Subject
     {
-        // Ensure that nullable fields default to 0 if not set
-        $classTest = $this->class_test_marks ?? 0;
-        $assignment = $this->assignment_marks ?? 0;
-        $exam = $this->exam_marks ?? 0;
-        $attendance = $this->attendance_marks ?? 0; // Assuming attendance_marks is already numeric
-
-        return $classTest + $assignment + $exam + $attendance;
+        // Load the subject relationship if it hasn't been already
+        if (!$this->relationLoaded('subject') && $this->subject_id) {
+            $this->load('subject');
+        }
+        return $this->subject;
     }
 
+
+    // --- Internal Calculation Methods (Used in the saving event) ---
+
     /**
-     * Get the percentage obtained for this subject.
-     * Requires the related Exam model to have 'total_marks'.
+     * Calculate the total marks obtained for this subject by summing all components.
      * @return float
      */
-    public function getSubjectPercentageAttribute()
+    protected function calculateTotalSubjectMarksObtained(): float
     {
-        if ($this->relationLoaded('exam') && $this->exam && $this->exam->total_marks > 0) {
-            $totalObtained = $this->total_subject_marks_obtained;
-            $totalPossible = $this->exam->total_marks; // <--- This line is key
-            return ($totalObtained / $totalPossible) * 100;
+        // Ensure that nullable fields default to 0 for calculation
+        $subjective = $this->subjective_marks ?? 0;
+        $objective = $this->objective_marks ?? 0;
+        $practical = $this->practical_marks ?? 0;
+
+        return (float)($subjective + $objective + $practical);
+    }
+
+    /**
+     * Calculate the percentage obtained for this subject.
+     * @param float $totalObtained
+     * @param Subject $subjectConfig
+     * @return float
+     */
+    protected function calculateSubjectPercentage(float $totalObtained, Subject $subjectConfig): float
+    {
+        if ($subjectConfig->full_marks > 0) {
+            $totalPossible = $subjectConfig->full_marks;
+            return round(($totalObtained / $totalPossible) * 100, 2);
         }
         return 0.0;
     }
 
     /**
-     * Get the letter grade for this subject's marks.
-     * Requires access to GradeConfigure model and subject_percentage.
-     * You need to fetch your grading scale here.
-     * @return string
+     * Calculate the Grade and GPA based on the subject percentage and pass status.
+     * @param float $percentage
+     * @param string $passStatus
+     * @return array
      */
-    public function getSubjectLetterGradeAttribute()
+    protected function calculateGradeAndGPA(float $percentage, string $passStatus): array
     {
-        $percentage = $this->subject_percentage;
+        // If failed or absent, immediately return F and 0.0
+        if ($passStatus === 'Fail' || $passStatus === 'Absent') {
+            return [
+                'letter_grade' => ($passStatus === 'Absent' ? 'Absent' : 'F'),
+                'grade_point' => 0.0
+            ];
+        }
 
-        // Fetch the grading scale. You might want to cache this or pass it from the controller
-        // For simplicity, fetching it here, but ideally optimize for performance if called frequently
-        $gradingScale = GradeConfigure::where('status', 0) // Assuming 0 is active
-                                    ->orderBy('grade_point', 'desc')
-                                    ->get();
+        if (!class_exists(GradeConfigure::class)) {
+            return ['letter_grade' => 'N/A', 'grade_point' => 0.0];
+        }
+
+        // Fetch grading scale (optimally this should be cached via a service provider/repository)
+        $gradingScale = GradeConfigure::where('status', 0)
+            ->orderBy('grade_point', 'desc')
+            ->get();
 
         foreach ($gradingScale as $gradeConfig) {
-            list($min, $max) = explode('-', $gradeConfig->class_interval);
-            if ($percentage >= (float)$min && $percentage <= (float)$max) {
-                return $gradeConfig->letter_grade;
+             // Assuming class_interval is a string like "80-100"
+            if (str_contains($gradeConfig->class_interval, '-')) {
+                list($min, $max) = explode('-', $gradeConfig->class_interval);
+                if ($percentage >= (float)$min && $percentage <= (float)$max) {
+                    return [
+                        'letter_grade' => $gradeConfig->letter_grade,
+                        'grade_point' => (float)$gradeConfig->grade_point,
+                    ];
+                }
             }
         }
-        return 'F'; // Default to F if no grade matches or if percentage is very low
+        return ['letter_grade' => 'F', 'grade_point' => 0.0]; 
     }
 
     /**
-     * Get the grade point for this subject's marks.
-     * Requires access to GradeConfigure model and subject_percentage.
-     * @return float
-     */
-    public function getSubjectGradePointAttribute()
-    {
-        $percentage = $this->subject_percentage;
-
-        $gradingScale = GradeConfigure::where('status', 0) // Assuming 0 is active
-                                    ->orderBy('grade_point', 'desc')
-                                    ->get();
-
-        foreach ($gradingScale as $gradeConfig) {
-            list($min, $max) = explode('-', $gradeConfig->class_interval);
-            if ($percentage >= (float)$min && $percentage <= (float)$max) {
-                return (float)$gradeConfig->grade_point;
-            }
-        }
-        return 0.0; // Default to 0.0 if no grade matches or if percentage is very low
-    }
-
-    /**
-     * Get the pass/fail status for this subject.
-     * Requires the related Exam model to have 'passing_marks'.
+     * Calculate the pass/fail status for this subject based on components and overall total.
+     * @param float $totalObtained
+     * @param Subject $subjectConfig
      * @return string
-    */
-    public function getSubjectPassStatusAttribute()
+     */
+    protected function calculateSubjectPassStatus(float $totalObtained, Subject $subjectConfig): string
     {
-        if ($this->relationLoaded('exam') && $this->exam && $this->exam->passing_marks !== null) {
-            // This line checks against the exam's passing_marks
-            return ($this->total_subject_marks_obtained >= $this->exam->passing_marks) ? 'Pass' : 'Fail';
+        if ($this->is_absent) {
+            return 'Absent';
         }
-        return 'N/A';
+
+        // If overall passing marks aren't set, we can't determine pass/fail.
+        if ($subjectConfig->passing_marks === null) {
+            return 'N/A';
+        }
+
+        // --- 1. Component-wise Pass/Fail Check ---
+        // Checks if the marks obtained in any component (subjective, objective, practical) 
+        // fall below the required passing marks for that component.
+        
+        if (($this->subjective_marks ?? 0) < (float)($subjectConfig->subjective_passing_marks ?? 0)) {
+            return 'Fail';
+        }
+        if (($this->objective_marks ?? 0) < (float)($subjectConfig->objective_passing_marks ?? 0)) {
+            return 'Fail';
+        }
+        if (($this->practical_marks ?? 0) < (float)($subjectConfig->practical_passing_marks ?? 0)) {
+            return 'Fail';
+        }
+        
+        // --- 2. Overall Total Pass/Fail Check ---
+        // If all components passed, check against the overall passing marks.
+        return ($totalObtained >= (float)$subjectConfig->passing_marks) ? 'Pass' : 'Fail';
     }
 }

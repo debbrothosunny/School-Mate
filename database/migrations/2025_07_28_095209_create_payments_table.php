@@ -22,8 +22,9 @@ return new class extends Migration
             $table->integer('amount'); // Amount received (in smallest currency unit)
             $table->timestamp('payment_date')->useCurrent(); // When the payment was actually made/recorded
             $table->enum('method', ['cash', 'bank_transfer', 'mobile_banking', 'cheque', 'online_gateway'])->comment('Method of payment');
+            
             $table->string('transaction_ref')->nullable()->unique()->comment('Reference number: Cheque No, bKash TXN ID, Bank Transfer Reference'); // Unique if applicable
-            $table->tinyInteger('status')->default(0); 
+
             
             // Foreign key to users table to track who recorded the payment (ensure 'users' table exists)
             $table->foreignId('received_by')->nullable()->constrained('users')->onDelete('set null'); 

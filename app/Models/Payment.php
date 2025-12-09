@@ -22,7 +22,6 @@ class Payment extends Model
         'method',
         'transaction_ref',
         'received_by',
-        'status',
     ];
 
     protected $casts = [
