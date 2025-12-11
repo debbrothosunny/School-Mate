@@ -180,6 +180,7 @@ class FeeController extends Controller
     /**
      * Remove the specified class fee structure from storage.
     */
+    
     public function destroy(ClassFeeStructure $classFeeStructure)
     {
         try {
@@ -195,11 +196,6 @@ class FeeController extends Controller
             ]);
         }
     }
-
-
-
-
-
 
     // Student Fee Assignment Functions
 
@@ -1148,8 +1144,6 @@ class FeeController extends Controller
     }
 
 
-
-
     // Student Invoice PDF Download Function
 
     public function downloadInvoicePdf(Invoice $invoice)
@@ -1163,10 +1157,14 @@ class FeeController extends Controller
             // Fetch the school settings data
             $settings = Setting::first();
 
-            // Pass both the invoice and settings data to the Blade view
-            $pdf = Pdf::loadView('pdfs.invoice', compact('invoice', 'settings'));
+            // Get the name of the currently logged-in user (Accountant)
+            // Ensure you are using the correct model attribute for the user's name
+            $collectorName = Auth::check() ? Auth::user()->name : 'System User'; // ADD THIS LINE
 
-            return $pdf->download('invoice-' . $invoice->invoice_number . '.pdf');
+            // Pass all necessary data: invoice, settings, and the collector's name
+            $pdf = PDF::loadView('pdfs.invoice', compact('invoice', 'settings', 'collectorName')); // UPDATE 'compact'
+
+            return $pdf->stream('invoice-' . $invoice->invoice_number . '.pdf');
         }
 
         // Redirect back with an error if the invoice isn't paid
@@ -1260,101 +1258,101 @@ class FeeController extends Controller
     /**
      * Process a payment for a student's invoice.
     */
-    public function processPayment(Request $request)
-    {
-        $user = $request->user();
-        $student = $user->student;
+    // public function processPayment(Request $request)
+    // {
+    //     $user = $request->user();
+    //     $student = $user->student;
 
-        if (!$student) {
-            return redirect()->back()->with('flash', ['type' => 'error', 'message' => 'Student profile not found.']);
-        }
+    //     if (!$student) {
+    //         return redirect()->back()->with('flash', ['type' => 'error', 'message' => 'Student profile not found.']);
+    //     }
 
-        $validated = $request->validate([
-            'invoice_id' => 'required|exists:invoices,id',
-            'amount' => 'required|numeric|min:0.01',
-            'method' => 'required|in:cash,bank_transfer,mobile_banking,cheque,online_gateway',
-            'transaction_ref' => 'nullable|string|max:255',
-        ]);
+    //     $validated = $request->validate([
+    //         'invoice_id' => 'required|exists:invoices,id',
+    //         'amount' => 'required|numeric|min:0.01',
+    //         'method' => 'required|in:cash,bank_transfer,mobile_banking,cheque,online_gateway',
+    //         'transaction_ref' => 'nullable|string|max:255',
+    //     ]);
 
-        $invoice = Invoice::where('id', $validated['invoice_id'])
-            ->where('student_id', $student->id)
-            ->first();
+    //     $invoice = Invoice::where('id', $validated['invoice_id'])
+    //         ->where('student_id', $student->id)
+    //         ->first();
 
-        if (!$invoice) {
-            return redirect()->back()->with('flash', ['type' => 'error', 'message' => 'Invoice not found or does not belong to you.']);
-        }
+    //     if (!$invoice) {
+    //         return redirect()->back()->with('flash', ['type' => 'error', 'message' => 'Invoice not found or does not belong to you.']);
+    //     }
 
-        // Prevent payment if invoice is already fully paid or cancelled
-        if ($invoice->status === 'paid' || $invoice->status === 'cancelled') {
-            return redirect()->back()->with('flash', ['type' => 'error', 'message' => 'This invoice is already paid or cancelled.']);
-        }
+    //     // Prevent payment if invoice is already fully paid or cancelled
+    //     if ($invoice->status === 'paid' || $invoice->status === 'cancelled') {
+    //         return redirect()->back()->with('flash', ['type' => 'error', 'message' => 'This invoice is already paid or cancelled.']);
+    //     }
 
-        // Prevent payment if the invoice is already pending approval
-        if ($invoice->status === 'pending_payment_approval') {
-            return redirect()->back()->with('flash', ['type' => 'error', 'message' => 'This invoice is already awaiting payment approval.']);
-        }
+    //     // Prevent payment if the invoice is already pending approval
+    //     if ($invoice->status === 'pending_payment_approval') {
+    //         return redirect()->back()->with('flash', ['type' => 'error', 'message' => 'This invoice is already awaiting payment approval.']);
+    //     }
 
-        // Prevent overpayment based on current balance
-        if ($validated['amount'] > $invoice->balance_due) {
-            return redirect()->back()->with('flash', ['type' => 'error', 'message' => 'Payment amount exceeds the remaining balance.']);
-        }
+    //     // Prevent overpayment based on current balance
+    //     if ($validated['amount'] > $invoice->balance_due) {
+    //         return redirect()->back()->with('flash', ['type' => 'error', 'message' => 'Payment amount exceeds the remaining balance.']);
+    //     }
 
-        try {
-            DB::transaction(function () use ($validated, $invoice, $student, $user) {
-                // 1. Create the Payment record with its status set to 0 (pending_approval)
-                $payment = Payment::create([
-                    'student_id' => $student->id,
-                    'invoice_id' => $invoice->id,
-                    'amount' => $validated['amount'],
-                    'method' => $validated['method'],
-                    'transaction_ref' => $validated['transaction_ref'],
-                    'payment_date' => now(),
-                    'received_by' => $user->id,
-                    'status' => 0, // This is the status for the *payment record itself*
-                ]);
+    //     try {
+    //         DB::transaction(function () use ($validated, $invoice, $student, $user) {
+    //             // 1. Create the Payment record with its status set to 0 (pending_approval)
+    //             $payment = Payment::create([
+    //                 'student_id' => $student->id,
+    //                 'invoice_id' => $invoice->id,
+    //                 'amount' => $validated['amount'],
+    //                 'method' => $validated['method'],
+    //                 'transaction_ref' => $validated['transaction_ref'],
+    //                 'payment_date' => now(),
+    //                 'received_by' => $user->id,
+    //                 'status' => 0, // This is the status for the *payment record itself*
+    //             ]);
 
-                // 2. Update the Invoice status to 'pending_payment_approval'
-                // This is the status for the *invoice* that the student sees.
-                $invoice->status = 'pending_payment_approval';
-                $invoice->save();
+    //             // 2. Update the Invoice status to 'pending_payment_approval'
+    //             // This is the status for the *invoice* that the student sees.
+    //             $invoice->status = 'pending_payment_approval';
+    //             $invoice->save();
 
-                // 3. Find the accountant(s) to notify.
-                // Assuming you have a 'role' relationship on the User model
-                $accountants = User::role('accounts')->get();
+    //             // 3. Find the accountant(s) to notify.
+    //             // Assuming you have a 'role' relationship on the User model
+    //             $accountants = User::role('accounts')->get();
 
-                // 4. Send the notification to the accountant(s).
-                // Use the student's name for a more personalized message.
-                $studentName = $student->user->name;
-                foreach ($accountants as $accountant) {
-                    $accountant->notify(new StudentPaymentReceived($studentName, $validated['amount']));
-                }
-            });
+    //             // 4. Send the notification to the accountant(s).
+    //             // Use the student's name for a more personalized message.
+    //             $studentName = $student->user->name;
+    //             foreach ($accountants as $accountant) {
+    //                 $accountant->notify(new StudentPaymentReceived($studentName, $validated['amount']));
+    //             }
+    //         });
 
-            return redirect()->back()->with('flash', ['type' => 'success', 'message' => 'Payment submitted for approval!']);
+    //         return redirect()->back()->with('flash', ['type' => 'success', 'message' => 'Payment submitted for approval!']);
 
-        } catch (\Exception $e) {
-            Log::error("Payment submission failed for invoice {$invoice->id}: " . $e->getMessage());
-            return redirect()->back()->with('flash', ['type' => 'error', 'message' => 'An error occurred during payment submission. Please try again.']);
-        }
-    }
+    //     } catch (\Exception $e) {
+    //         Log::error("Payment submission failed for invoice {$invoice->id}: " . $e->getMessage());
+    //         return redirect()->back()->with('flash', ['type' => 'error', 'message' => 'An error occurred during payment submission. Please try again.']);
+    //     }
+    // }
 
 
 
 
     // Student PDF Generation Function
-    public function generatePdf($id)
-    {
-        $invoice = Invoice::with(['invoiceItems.feeType', 'student'])
-                        ->findOrFail($id);
+    // public function generatePdf($id)
+    // {
+    //     $invoice = Invoice::with(['invoiceItems.feeType', 'student'])
+    //                     ->findOrFail($id);
 
-        // Does this invoice belong to *my* student?
-        if (Auth::id() !== $invoice->student->user_id) {
-            abort(403, 'Unauthorized action.');
-        }
+    //     // Does this invoice belong to *my* student?
+    //     if (Auth::id() !== $invoice->student->user_id) {
+    //         abort(403, 'Unauthorized action.');
+    //     }
 
-        $pdf = Pdf::loadView('StudentPdf.invoice_pdf', ['invoice' => $invoice]);
-        return $pdf->stream("Invoice-{$invoice->invoice_number}.pdf");
-    }
+    //     $pdf = Pdf::loadView('StudentPdf.invoice_pdf', ['invoice' => $invoice]);
+    //     return $pdf->stream("Invoice-{$invoice->invoice_number}.pdf");
+    // }
 
 
 
@@ -1362,98 +1360,98 @@ class FeeController extends Controller
     // ===================================================
     // Admin Functions (Payment Approval)============================
 
-    public function pendingPayments()
-    {
-        // Fetch invoices that have a status of 'pending_payment_approval'
-        // Eager load the student (and their user details) and any associated payments
-        $pendingInvoices = Invoice::where('status', 'pending_payment_approval')
-                                  ->with(['student.user', 'payments' => function($query) {
-                                      // Only load payments that are currently pending approval (status 0)
-                                      // This ensures we get the specific payment details for display on the admin side.
-                                      $query->where('status', 0);
-                                  }])
-                                  ->orderBy('due_date', 'desc')
-                                  ->get();
+    // public function pendingPayments()
+    // {
+    //     // Fetch invoices that have a status of 'pending_payment_approval'
+    //     // Eager load the student (and their user details) and any associated payments
+    //     $pendingInvoices = Invoice::where('status', 'pending_payment_approval')
+    //                               ->with(['student.user', 'payments' => function($query) {
+    //                                   // Only load payments that are currently pending approval (status 0)
+    //                                   // This ensures we get the specific payment details for display on the admin side.
+    //                                   $query->where('status', 0);
+    //                               }])
+    //                               ->orderBy('due_date', 'desc')
+    //                               ->get();
 
-        return Inertia::render('Accountant/PendingPayments', [
-            'pendingInvoices' => $pendingInvoices, // Renamed prop to better reflect content
-        ]);
-    }
+    //     return Inertia::render('Accountant/PendingPayments', [
+    //         'pendingInvoices' => $pendingInvoices, // Renamed prop to better reflect content
+    //     ]);
+    // }
 
-    public function approvePayment(Request $request, $invoiceId)
-    {
-        $invoice = Invoice::find($invoiceId);
+    // public function approvePayment(Request $request, $invoiceId)
+    // {
+    //     $invoice = Invoice::find($invoiceId);
 
-        if (!$invoice || $invoice->status !== 'pending_payment_approval') {
-            return redirect()->back()->with('flash', ['type' => 'error', 'message' => 'Invoice not found or not in pending approval status.']);
-        }
+    //     if (!$invoice || $invoice->status !== 'pending_payment_approval') {
+    //         return redirect()->back()->with('flash', ['type' => 'error', 'message' => 'Invoice not found or not in pending approval status.']);
+    //     }
 
-        $pendingPayment = $invoice->payments()->where('status', 0)->first();
+    //     $pendingPayment = $invoice->payments()->where('status', 0)->first();
 
-        if (!$pendingPayment) {
-            return redirect()->back()->with('flash', ['type' => 'error', 'message' => 'No pending payment found for this invoice.']);
-        }
+    //     if (!$pendingPayment) {
+    //         return redirect()->back()->with('flash', ['type' => 'error', 'message' => 'No pending payment found for this invoice.']);
+    //     }
 
-        try {
-            DB::transaction(function () use ($invoice, $pendingPayment) {
-                $pendingPayment->status = 1; // Approved
-                $pendingPayment->save();
+    //     try {
+    //         DB::transaction(function () use ($invoice, $pendingPayment) {
+    //             $pendingPayment->status = 1; // Approved
+    //             $pendingPayment->save();
 
-                $invoice->amount_paid += $pendingPayment->amount;
-                $invoice->balance_due -= $pendingPayment->amount;
+    //             $invoice->amount_paid += $pendingPayment->amount;
+    //             $invoice->balance_due -= $pendingPayment->amount;
 
-                if ($invoice->balance_due <= 0) {
-                    $invoice->status = 'paid';
-                    $invoice->paid_at = now();
-                } elseif ($invoice->amount_paid > 0 && $invoice->balance_due > 0) {
-                    $invoice->status = 'partially_paid';
-                }
-                $invoice->save();
-            });
+    //             if ($invoice->balance_due <= 0) {
+    //                 $invoice->status = 'paid';
+    //                 $invoice->paid_at = now();
+    //             } elseif ($invoice->amount_paid > 0 && $invoice->balance_due > 0) {
+    //                 $invoice->status = 'partially_paid';
+    //             }
+    //             $invoice->save();
+    //         });
 
-            return redirect()->back()->with('flash', ['type' => 'success', 'message' => 'Payment approved successfully! Invoice status updated.']);
+    //         return redirect()->back()->with('flash', ['type' => 'success', 'message' => 'Payment approved successfully! Invoice status updated.']);
 
-        } catch (\Exception $e) {
-            Log::error("Payment approval failed for invoice {$invoiceId}: " . $e->getMessage());
-            return redirect()->back()->with('flash', ['type' => 'error', 'message' => 'An error occurred during payment approval. Please try again.']);
-        }
-    }
+    //     } catch (\Exception $e) {
+    //         Log::error("Payment approval failed for invoice {$invoiceId}: " . $e->getMessage());
+    //         return redirect()->back()->with('flash', ['type' => 'error', 'message' => 'An error occurred during payment approval. Please try again.']);
+    //     }
+    // }
 
-    public function rejectPayment(Request $request, $invoiceId)
-    {
-        $invoice = Invoice::find($invoiceId);
+    // public function rejectPayment(Request $request, $invoiceId)
+    // {
+    //     $invoice = Invoice::find($invoiceId);
 
-        if (!$invoice || $invoice->status !== 'pending_payment_approval') {
-            return redirect()->back()->with('flash', ['type' => 'error', 'message' => 'Invoice not found or not in pending approval status.']);
-        }
+    //     if (!$invoice || $invoice->status !== 'pending_payment_approval') {
+    //         return redirect()->back()->with('flash', ['type' => 'error', 'message' => 'Invoice not found or not in pending approval status.']);
+    //     }
 
-        $pendingPayment = $invoice->payments()->where('status', 0)->first();
+    //     $pendingPayment = $invoice->payments()->where('status', 0)->first();
 
-        if (!$pendingPayment) {
-            return redirect()->back()->with('flash', ['type' => 'error', 'message' => 'No pending payment found for this invoice to reject.']);
-        }
+    //     if (!$pendingPayment) {
+    //         return redirect()->back()->with('flash', ['type' => 'error', 'message' => 'No pending payment found for this invoice to reject.']);
+    //     }
 
-        try {
-            DB::transaction(function () use ($invoice, $pendingPayment) {
-                $pendingPayment->status = 2; // Rejected
-                $pendingPayment->save();
+    //     try {
+    //         DB::transaction(function () use ($invoice, $pendingPayment) {
+    //             $pendingPayment->status = 2; // Rejected
+    //             $pendingPayment->save();
 
-                // Revert invoice status based on its current financial state
-                if ($invoice->amount_paid == 0) {
-                    $invoice->status = 'pending';
-                } else {
-                    $invoice->status = 'partially_paid';
-                }
-                $invoice->save();
-            });
+    //             // Revert invoice status based on its current financial state
+    //             if ($invoice->amount_paid == 0) {
+    //                 $invoice->status = 'pending';
+    //             } else {
+    //                 $invoice->status = 'partially_paid';
+    //             }
+    //             $invoice->save();
+    //         });
 
-            return redirect()->back()->with('flash', ['type' => 'success', 'message' => 'Payment rejected successfully. Invoice status reverted.']);
+    //         return redirect()->back()->with('flash', ['type' => 'success', 'message' => 'Payment rejected successfully. Invoice status reverted.']);
 
-        } catch (\Exception $e) {
-            Log::error("Payment rejection failed for invoice {$invoiceId}: " . $e->getMessage());
-            return redirect()->back()->with('flash', ['type' => 'error', 'message' => 'An error occurred during payment rejection. Please try again.']);
-        }
-    }
+    //     } catch (\Exception $e) {
+    //         Log::error("Payment rejection failed for invoice {$invoiceId}: " . $e->getMessage());
+    //         return redirect()->back()->with('flash', ['type' => 'error', 'message' => 'An error occurred during payment rejection. Please try again.']);
+    //     }
+    // }
 
 
 

@@ -75,123 +75,7 @@ const formatDate = (dateString) => {
     }).format(date);
 };
 
-/**
- * Generates a clean, temporary print window containing only the receipt details
- * and triggers the native print dialog.
- * @param {Object} invoice The invoice object including current balance and amounts.
- */
-const printReceipt = (invoice) => {
-    // We must ensure the invoice data is fresh. We'll use the current data.
-    const student = selectedStudent.value;
-
-    if (!invoice || !student) {
-        Swal.fire('Error', 'Missing student or invoice data for printing.', 'error');
-        return;
-    }
-    
-    // --- 1. Construct the Printable HTML Content (Receipt Mockup) ---
-    const printContent = `
-        <style>
-            @media print {
-                body {
-                    font-family: Arial, sans-serif;
-                    margin: 0;
-                    padding: 0;
-                    color: #333;
-                }
-                .receipt-container {
-                    width: 80mm; /* Standard receipt width */
-                    margin: 0 auto;
-                    padding: 10px;
-                    border: 1px solid #ccc;
-                    box-sizing: border-box;
-                }
-                .header {
-                    text-align: center;
-                    border-bottom: 2px dashed #888;
-                    padding-bottom: 10px;
-                    margin-bottom: 10px;
-                }
-                .header h3 {
-                    margin: 0;
-                    font-size: 1.2em;
-                }
-                .details p {
-                    margin: 3px 0;
-                    font-size: 0.9em;
-                }
-                .amounts {
-                    margin-top: 10px;
-                    border-top: 2px dashed #888;
-                    padding-top: 10px;
-                }
-                .amounts div {
-                    display: flex;
-                    justify-content: space-between;
-                    margin-bottom: 5px;
-                    font-size: 1em;
-                    font-weight: bold;
-                }
-                .amounts .label {
-                    font-weight: normal;
-                }
-                .footer {
-                    text-align: center;
-                    margin-top: 15px;
-                    border-top: 2px dashed #888;
-                    padding-top: 10px;
-                    font-size: 0.8em;
-                }
-            }
-        </style>
-        <div class="receipt-container">
-            <div class="header">
-                <h3>Payment Receipt</h3>
-                <p>Date: ${formatDate(new Date())}</p>
-            </div>
-            <div class="details">
-                <p><strong>Student:</strong> ${student.name}</p>
-                <p><strong>Admission No:</strong> ${student.admission_number}</p>
-                <p><strong>Invoice ID:</strong> #${invoice.invoice_number}</p>
-                <p><strong>Payment Method:</strong> ${paymentForm.payment_method.toUpperCase()}</p>
-            </div>
-            <div class="amounts">
-                <div><span class="label">Total Amount Due:</span> <span>TK ${invoice.total_amount_due}</span></div>
-                <div><span class="label">Total Paid (including this):</span> <span>TK ${invoice.amount_paid}</span></div>
-                <div><span class="label">Remaining Balance:</span> <span>TK ${invoice.balance_due}</span></div>
-            </div>
-            <div class="footer">  
-                Thank you for your payment.
-                <p class="generation-info">
-                    Generated on: ${new Date().toLocaleDateString('en-GB').replace(/\//g, '-')}. Design and Developed by Smith IT
-                </p>
-            </div>
-
-            
-            
-        </div>
-    `;
-
-    // --- 2. Open Temporary Window and Print ---
-    const printWindow = window.open('', 'Print', 'height=600,width=800');
-    if (!printWindow) {
-        Swal.fire('Error', 'Could not open print window. Please check your browser pop-up blocker settings.', 'error');
-        return;
-    }
-    
-    printWindow.document.write('<html><head><title>Payment Receipt</title></head><body>');
-    printWindow.document.write(printContent);
-    printWindow.document.write('</body></html>');
-    printWindow.document.close();
-    
-    // Wait for content to render before calling print
-    printWindow.onload = () => {
-        printWindow.focus(); // Focus the window to ensure print dialogue appears
-        printWindow.print();
-        // Optional: Close the window after printing, or let the user close it
-        // setTimeout(() => printWindow.close(), 1000); 
-    };
-};
+// **LOGIC REMOVED:** The printReceipt function and all associated logic for client-side printing have been removed.
 
 // Function to handle payment submission for a specific invoice
 const submitPayment = (invoice) => {
@@ -210,7 +94,6 @@ const submitPayment = (invoice) => {
         return; // Prevent the form from submitting
     }
 
-    // --- START: FIX FOR SUBMISSION ---
     // Create a new form object with only the data needed for this specific payment
     const paymentData = {
         invoice_id: invoice.id,
@@ -230,31 +113,16 @@ const submitPayment = (invoice) => {
             // Clear the amount for the specific invoice after successful submission
             delete paymentForm.amounts[invoice.id];
 
-            // --- NEW: Ask to print immediately after success ---
+            // Show simple success message and inform user about download button
             Swal.fire({
                 title: 'Payment Collected!',
-                text: 'Payment collected successfully. Would you like to print the receipt now?',
+                text: 'Payment collected successfully. You can now download the official receipt.',
                 icon: 'success',
-                showCancelButton: true,
-                confirmButtonText: 'Print Receipt',
-                cancelButtonText: 'Close',
-                reverseButtons: true
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    // Find the newly updated invoice data (Inertia should have updated props)
-                    const updatedInvoice = props.students
-                        .find(s => s.id === selectedStudent.value.id)?.invoices
-                        .find(i => i.id === invoice.id);
-                        
-                    if (updatedInvoice) {
-                        printReceipt(updatedInvoice);
-                    } else {
-                        // Fallback message if updated data is missing for some reason
-                         Swal.fire('Print Error', 'Successfully collected payment, but failed to load updated receipt data for printing.', 'warning');
-                    }
-                }
+                showConfirmButton: false,
+                timer: 3000
             });
-            // --- END NEW ---
+            // The Inertia request automatically updates the props, which will make the 
+            // 'Download Receipt' button appear for the newly updated invoice.
         },
         onError: (errors) => {
             // Display a generic error message or specific errors
@@ -268,7 +136,6 @@ const submitPayment = (invoice) => {
             console.error(errors);
         }
     });
-    // --- END: FIX FOR SUBMISSION ---
 };
 
 // Function to handle search submission
@@ -419,35 +286,19 @@ const selectStudent = (student) => {
                                     <p class="text-center text-green-500 font-medium p-2">Amount is fully paid. 🎉</p>
                                 </div>
                                 
-                                <!-- START: NEW PRINT BUTTON AND DOWNLOAD SECTION -->
                                 <div v-if="invoice.status === 'paid' || invoice.status === 'partially_paid'" class="mt-4 flex flex-col sm:flex-row justify-end gap-3">
-                                    <button
-                                        type="button"
-                                        @click="printReceipt(invoice)"
-                                        class="inline-flex items-center justify-center px-4 py-2 bg-pink-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-pink-700 active:bg-pink-800 focus:outline-none focus:border-pink-800 focus:ring focus:ring-pink-300 disabled:opacity-25 transition w-full sm:w-auto"
-                                    >
-                                        <!-- Print Icon SVG -->
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" viewBox="0 0 20 20" fill="currentColor">
-                                            <path fill-rule="evenodd" d="M5 4v3h10V4a2 2 0 00-2-2H7a2 2 0 00-2 2zm0 6h10v7a2 2 0 01-2 2H7a2 2 0 01-2-2v-7zm0 1h10v4H5v-4z" clip-rule="evenodd" />
-                                            <path d="M5 13a1 1 0 11-2 0 1 1 0 012 0zm7-7a1 1 0 100-2 1 1 0 000 2z" />
-                                        </svg>
-                                        Print Receipt
-                                    </button>
 
                                     <a :href="route('invoices.download.pdf', { invoice: invoice.id })"
                                         target="_blank"
                                         class="inline-flex items-center justify-center px-4 py-2 bg-blue-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-700 active:bg-blue-800 focus:outline-none focus:border-blue-800 focus:ring focus:ring-blue-300 disabled:opacity-25 transition w-full sm:w-auto"
                                     >
-                                        <!-- Download Icon SVG -->
                                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" viewBox="0 0 20 20" fill="currentColor">
                                             <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L10 11.586l1.293-1.293a1 1 0 111.414 1.414l-2 2a1 1 0 01-1.414 0l-2-2a1 1 0 010-1.414z" clip-rule="evenodd" />
                                             <path fill-rule="evenodd" d="M10 2a1 1 0 011 1v7a1 1 0 11-2 0V3a1 1 0 011-1z" clip-rule="evenodd" />
                                         </svg>
                                         Download Receipt
                                     </a>
-                                </div>
-                                <!-- END: NEW PRINT BUTTON AND DOWNLOAD SECTION -->
-
+                                </div>                                
                             </div>
                         </div>
                         <div v-else class="text-center text-gray-500 p-12">

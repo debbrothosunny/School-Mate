@@ -907,7 +907,7 @@ class ExamController extends Controller
             'message' => 'Exam time slot deleted successfully.',
             'type' => 'success',
         ]);
-    }
+    } 
 
 
 

@@ -698,8 +698,6 @@ class StudentController extends Controller
     }
 
 
-
-
     // New method to show a specific student's exam and invoice history
 
     public function showStudentHistory($student_id)
