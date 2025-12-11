@@ -4,12 +4,15 @@ import InputError from '@/Components/InputError.vue';
 import InputLabel from '@/Components/InputLabel.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import { Head, Link, useForm, usePage } from '@inertiajs/vue3';
-import { ref, computed, watch } from 'vue';
+import { ref, watch, computed} from 'vue';
 import axios from 'axios';
+import Swal from 'sweetalert2';
 
-// Get the CSRF token from the page props
-const csrfToken = usePage().props.csrf_token;
+// SAFELY get flash (prevents undefined error)
+const page = usePage();
+const flash = computed(() => page.props.flash || {});
 
+// Props
 const props = defineProps({
     classes: Array,
     sessions: Array,
@@ -18,6 +21,7 @@ const props = defineProps({
     feeTypes: Array,
 });
 
+// Forms
 const filterForm = useForm({
     class_id: '',
     session_id: '',
@@ -28,54 +32,73 @@ const filterForm = useForm({
 const form = useForm({
     student_ids: [],
     fee_type_id: '',
-    status: 0,
+    status: 1,
 });
 
-const filteredStudents = ref([]);
-const isFiltering = ref(false);
-const flash = computed(() => usePage().props.flash || {});
+// State
+const students = ref([]);
+const loading = ref(false);
 
-watch(() => filterForm, async (newFilters) => {
-    isFiltering.value = true;
-    filteredStudents.value = [];
+// Load students when filters change
+watch(filterForm, async (newVal) => {
+    const { class_id, session_id, section_id, group_id } = newVal;
+
+    students.value = [];
     form.student_ids = [];
-    if (newFilters.class_id && newFilters.session_id && newFilters.section_id) {
-        try {
-            const response = await axios.get(route('get-students-by-class'), {
-                params: newFilters
-            });
-            filteredStudents.value = response.data;
-            form.student_ids = response.data.map(student => student.id);
-        } catch (error) {
-            console.error("Error fetching students:", error);
-            filteredStudents.value = [];
+
+    if (!class_id || !session_id || !section_id) return;
+
+    loading.value = true;
+
+    try {
+        const response = await axios.get(route('admin.students.active'), {
+            params: { class_id, session_id, section_id, group_id: group_id || null },
+        });
+
+        // Always ensure we have an array
+        students.value = response.data?.students || [];
+
+        if (students.value.length > 0) {
+            form.student_ids = students.value.map(s => s.id);
         }
+    } catch (error) {
+        console.error('Load failed:', error);
+        students.value = [];
+        Swal.fire('Error', 'Failed to load students', 'error');
+    } finally {
+        loading.value = false;
     }
-    isFiltering.value = false;
 }, { deep: true });
 
+// Select All / None
+const selectAll = () => form.student_ids = students.value.map(s => s.id);
+const deselectAll = () => form.student_ids = [];
+
+// Submit
 const submitBulkAssignment = () => {
-    // CRITICAL FIX: Merge filterForm data into the submission form payload
-    form.transform((data) => ({
+    if (!form.student_ids.length) {
+        return Swal.fire('Warning', 'Please select at least one student', 'warning');
+    }
+    if (!form.fee_type_id) {
+        return Swal.fire('Warning', 'Please select a fee type', 'warning');
+    }
+
+    form.transform(data => ({
         ...data,
-        class_id: filterForm.class_id,       
-        session_id: filterForm.session_id,  
-        section_id: filterForm.section_id,   
-        _token: csrfToken,
+        class_id: filterForm.class_id,
+        session_id: filterForm.session_id,
+        section_id: filterForm.section_id,
+        group_id: filterForm.group_id || null,
     })).post(route('bulk-store-assignments'), {
-        preserveScroll: true,
         onSuccess: () => {
+            Swal.fire('Success!', `Assigned to ${form.student_ids.length} students!`, 'success');
             form.reset();
             filterForm.reset();
-            filteredStudents.value = [];
+            students.value = [];
         },
-        onError: (errors) => {
-            console.error("Error creating bulk assignments:", errors);
-            // Optional: If you want to explicitly check for filter errors after submission:
-            if (errors.class_id) filterForm.errors.class_id = errors.class_id;
-            if (errors.session_id) filterForm.errors.session_id = errors.session_id;
-            if (errors.section_id) filterForm.errors.section_id = errors.section_id;
-        },
+        onError: () => {
+            Swal.fire('Failed', 'Some students already have this fee', 'error');
+        }
     });
 };
 </script>
@@ -85,96 +108,103 @@ const submitBulkAssignment = () => {
     <Head title="Bulk Student Fee Assignment" />
     <AuthenticatedLayout>
         <template #header>
-            <h2 class="font-semibold text-lg sm:text-xl md:text-2xl text-gray-800 leading-tight">Bulk Student Fee Assignment</h2>
+            <h2 class="font-semibold text-xl text-gray-800 leading-tight">
+                Bulk Student Fee Assignment
+            </h2>
         </template>
-        <div class="py-4 sm:py-6 lg:py-8">
+
+        <div class="py-6">
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div class="bg-white shadow-md rounded-lg p-4 sm:p-5 lg:p-6">
-                    <!-- Flash Message -->
-                    <div
-                        v-if="flash.message"
-                        :class="[
-                            'p-3 sm:p-4 mb-4 sm:mb-5 text-sm rounded-lg flex justify-between items-center',
-                            flash.type === 'success' || flash.type === 'warning' ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800',
-                        ]"
-                        role="alert"
-                    >
+                <div class="bg-white rounded-lg shadow p-6">
+
+                    <!-- Flash Message (Now Safe!) -->
+                    <div v-if="flash?.message" class="mb-5 p-4 rounded-lg flex justify-between items-center"
+                         :class="flash.type === 'success' ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'">
                         <span>{{ flash.message }}</span>
-                        <button @click="flash.message = null" class="text-gray-500 hover:text-gray-700 focus:outline-none">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                        <button @click="page.props.flash = null" class="text-gray-500 hover:text-gray-700">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
                         </button>
                     </div>
+
                     <form @submit.prevent="submitBulkAssignment">
-                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-6">
+                        <!-- Filters -->
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
                             <div>
-                                <InputLabel for="class_id" value="Class" class="form-label text-sm font-medium text-gray-700" />
-                                <select id="class_id" class="form-select w-full px-3 py-2 text-sm border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500" v-model="filterForm.class_id" required>
-                                    <option value="" disabled>-- Select Class --</option>
-                                    <option v-for="cls in classes" :key="cls.id" :value="cls.id">{{ cls.class_name }}</option>
+                                <InputLabel value="Class" />
+                                <select v-model="filterForm.class_id" class="form-select" required>
+                                    <option value="">-- Select Class --</option>
+                                    <option v-for="c in classes" :key="c.id" :value="c.id">{{ c.class_name }}</option>
                                 </select>
-                                <!-- Check both form and filterForm for errors on filters -->
-                                <InputError class="mt-1 text-xs text-red-600" :message="filterForm.errors.class_id || form.errors.class_id" />
                             </div>
                             <div>
-                                <InputLabel for="session_id" value="Session" class="form-label text-sm font-medium text-gray-700" />
-                                <select id="session_id" class="form-select w-full px-3 py-2 text-sm border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500" v-model="filterForm.session_id" required>
-                                    <option value="" disabled>-- Select Session --</option>
-                                    <option v-for="session in sessions" :key="session.id" :value="session.id">{{ session.name }}</option>
+                                <InputLabel value="Session" />
+                                <select v-model="filterForm.session_id" class="form-select" required>
+                                    <option value="">-- Select Session --</option>
+                                    <option v-for="s in sessions" :key="s.id" :value="s.id">{{ s.name }}</option>
                                 </select>
-                                <InputError class="mt-1 text-xs text-red-600" :message="filterForm.errors.session_id || form.errors.session_id" />
                             </div>
                             <div>
-                                <InputLabel for="section_id" value="Section" class="form-label text-sm font-medium text-gray-700" />
-                                <select id="section_id" class="form-select w-full px-3 py-2 text-sm border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500" v-model="filterForm.section_id" required>
-                                    <option value="" disabled>-- Select Section --</option>
-                                    <option v-for="section in sections" :key="section.id" :value="section.id">{{ section.name }}</option>
+                                <InputLabel value="Section" />
+                                <select v-model="filterForm.section_id" class="form-select" required>
+                                    <option value="">-- Select Section --</option>
+                                    <option v-for="s in sections" :key="s.id" :value="s.id">{{ s.name }}</option>
                                 </select>
-                                <InputError class="mt-1 text-xs text-red-600" :message="filterForm.errors.section_id || form.errors.section_id" />
                             </div>
                             <div>
-                                <InputLabel for="group_id" value="Group" class="form-label text-sm font-medium text-gray-700" />
-                                <select id="group_id" class="form-select w-full px-3 py-2 text-sm border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500" v-model="filterForm.group_id">
-                                    <option value="">-- No Group --</option>
-                                    <option v-for="group in groups" :key="group.id" :value="group.id">{{ group.name }}</option>
+                                <InputLabel value="Group" />
+                                <select v-model="filterForm.group_id" class="form-select">
+                                    <option value="">-- All Groups --</option>
+                                    <option v-for="g in groups" :key="g.id" :value="g.id">{{ g.name }}</option>
                                 </select>
-                                <InputError class="mt-1 text-xs text-red-600" :message="filterForm.errors.group_id" />
                             </div>
                         </div>
-                        <div v-if="filteredStudents.length > 0">
-                            <hr class="my-4 sm:my-6 border-gray-200">
-                            <h5 class="mb-3 text-base sm:text-lg font-semibold text-gray-900">Students in Selected Class ({{ filteredStudents.length }} found)</h5>
-                            <ul class="list-group mb-4 sm:mb-6 max-h-60 overflow-y-auto border border-gray-200 rounded-md">
-                                <li class="list-group-item flex justify-between items-center px-3 py-2 text-sm text-gray-700 bg-white hover:bg-gray-50 transition-colors" v-for="student in filteredStudents" :key="student.id">
-                                    <span>{{ student.name }} (Adm. No: {{ student.admission_number }})</span>
-                                </li>
-                            </ul>
-                            <div class="grid grid-cols-1 gap-3 sm:gap-4">
-                                <div>
-                                    <InputLabel for="fee_type_id" value="Fee Type" class="form-label text-sm font-medium text-gray-700" />
-                                    <select id="fee_type_id" class="form-select w-full px-3 py-2 text-sm border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500" v-model="form.fee_type_id" required>
-                                        <option value="" disabled>-- Select Fee Type --</option>
-                                        <option v-for="feeType in feeTypes" :key="feeType.id" :value="feeType.id">
-                                            {{ feeType.name }} ({{ feeType.frequency }})
-                                        </option>
-                                    </select>
-                                    <InputError class="mt-1 text-xs text-red-600" :message="form.errors.fee_type_id" />
+
+                        <!-- Students List -->
+                        <div v-if="loading" class="text-center py-8 text-gray-500">
+                            Loading students...
+                        </div>
+                        <div v-else-if="students.length === 0 && filterForm.class_id" class="text-center py-8 text-gray-500">
+                            No active students found
+                        </div>
+                        <div v-else-if="students.length > 0" class="mb-6">
+                            <div class="flex justify-between items-center mb-3">
+                                <h3 class="font-semibold">Students ({{ students.length }})</h3>
+                                <div class="space-x-3">
+                                    <button type="button" @click="selectAll" class="text-blue-600 text-sm">Select All</button>
+                                    <button type="button" @click="deselectAll" class="text-red-600 text-sm">Clear</button>
                                 </div>
                             </div>
-                            <div class="flex justify-end mt-4 sm:mt-6 gap-2 sm:gap-3">
-                                <Link :href="route('student-fee-assignments.index')" class="px-3 py-1.5 sm:px-4 sm:py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-colors text-sm font-medium">Cancel</Link>
-                                <PrimaryButton :class="{ 'opacity-75': form.processing }" :disabled="form.processing" class="px-3 py-1.5 sm:px-4 sm:py-2 text-sm font-medium">
-                                    Assign to All Students
-                                </PrimaryButton>
+                            <div class="border rounded-lg bg-gray-50 p-4 max-h-96 overflow-y-auto">
+                                <label v-for="student in students" :key="student.id"
+                                       class="flex items-center space-x-3 p-2 hover:bg-white rounded cursor-pointer">
+                                    <input type="checkbox" :value="student.id" v-model="form.student_ids"
+                                           class="rounded text-blue-600">
+                                    <span class="text-sm">{{ student.roll_number }} - {{ student.name }}</span>
+                                </label>
                             </div>
                         </div>
-                        <div v-else-if="isFiltering" class="text-center mt-5 sm:mt-6">
-                            <div class="spinner-border inline-block w-6 h-6 border-2 border-t-indigo-600 rounded-full animate-spin" role="status">
-                                <span class="visually-hidden">Loading...</span>
-                            </div>
+
+                        <!-- Fee Type -->
+                        <div class="mb-6">
+                            <InputLabel value="Fee Type" />
+                            <select v-model="form.fee_type_id" class="form-select" required>
+                                <option value="">-- Select Fee Type --</option>
+                                <option v-for="f in feeTypes" :key="f.id" :value="f.id">
+                                    {{ f.name }} ({{ f.amount }} BDT)
+                                </option>
+                            </select>
                         </div>
-                        <div v-else class="text-center mt-5 sm:mt-6 text-gray-500">
-                            <p class="text-base sm:text-lg font-medium">No students found</p>
-                            <p class="text-sm mt-1">Please select a class, session, and section to view students.</p>
+
+                        <!-- Buttons -->
+                        <div class="flex justify-end gap-3">
+                            <Link :href="route('student-fee-assignments.index')" class="btn btn-secondary">
+                                Cancel
+                            </Link>
+                            <PrimaryButton :disabled="form.processing || !form.student_ids.length">
+                                {{ form.processing ? 'Saving...' : `Assign to ${form.student_ids.length} Students` }}
+                            </PrimaryButton>
                         </div>
                     </form>
                 </div>
@@ -185,7 +215,7 @@ const submitBulkAssignment = () => {
 
 
 <style scoped>
-/* ... (your styles are unchanged) ... */
+
 :root {
     --primary-color: #4F46E5; /* Indigo-600 */
     --secondary-color: #10B981; /* Green-600 */

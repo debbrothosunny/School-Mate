@@ -170,7 +170,6 @@ const toggleSidebar = () => {
 
 // Route watchers
 const academicRoutes = [
-
     'sections.index', 'sections.create', 'sections.edit',
     'sessions.index', 'sessions.create', 'sessions.edit',
     'groups.index', 'groups.create', 'groups.edit',
@@ -220,7 +219,6 @@ watch(
     { immediate: true }
 );
 </script>
-
 
 <template>
     <!-- Main layout container -->
@@ -312,6 +310,7 @@ watch(
         <!-- Main content with sidebar -->
         <div class="flex min-h-screen">
             <!-- Sidebar -->
+            
             <aside v-if="isAdmin || isAccounts || isTeacher || isFrontDesk || isStudent" 
                    class="fixed inset-y-0 left-0 w-64 sm:w-56 lg:w-64 bg-white shadow-md transform md:static md:transform-none transition-transform duration-300 z-40 overflow-y-auto"
                    :class="{ '-translate-x-full': !showSidebar, 'translate-x-0': showSidebar }">
@@ -548,6 +547,7 @@ watch(
                     </div>
                 </div>
             </aside>
+
             <!-- Overlay for Mobile Sidebar -->
             <div v-if="showSidebar" class="fixed inset-0 bg-black bg-opacity-50 md:hidden z-30" @click="toggleSidebar"></div>
             <!-- Main Content -->

@@ -486,6 +486,9 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/admin/get-students-by-class', [FeeController::class, 'getStudentsByClass'])->name('get-students-by-class');
         Route::post('/admin/bulk-store-assignments', [FeeController::class, 'bulkStoreAssignments'])->name('bulk-store-assignments');
 
+        Route::get('/admin/students/active', [FeeController::class, 'getActiveStudents'])
+         ->name('admin.students.active');
+
         // Invoice Routes
         Route::get('/admin/invoices', [FeeController::class, 'invoiceIndex'])->name('admin.invoices.index');
         Route::get('/admin/invoices/create', [FeeController::class, 'invoiceCreate'])->name('admin.invoices.create');

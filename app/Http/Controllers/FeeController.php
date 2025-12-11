@@ -498,10 +498,25 @@ class FeeController extends Controller
         ]);
     }
 
+    public function getActiveStudents(Request $request)
+    {
+        $students = Student::where('status', 0)
+            ->when($request->class_id, fn($q) => $q->where('class_id', $request->class_id))
+            ->when($request->session_id, fn($q) => $q->where('session_id', $request->session_id))
+            ->when($request->section_id, fn($q) => $q->where('section_id', $request->section_id))
+            ->when($request->group_id, fn($q) => $q->where('group_id', $request->group_id))
+            ->select('id', 'name', 'roll_number', 'admission_number')
+            ->orderBy('roll_number')
+            ->get();
+
+        return response()->json([
+            'students' => $students  // ← This is required!
+        ]);
+    }
+
 
 
     // FeeType Functions 
-
 
     public function FeeTypeIndex()
     {
@@ -613,9 +628,6 @@ class FeeController extends Controller
             ]);
         }
     }
-
-
-
 
 
     // ==============================================================

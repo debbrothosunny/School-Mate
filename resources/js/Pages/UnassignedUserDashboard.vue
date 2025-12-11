@@ -19,7 +19,7 @@ defineProps({
 
 <template>
 
-    <Head title="My Dashboard" />
+    <Head title="My Dashboard"/>
 
     <AuthenticatedLayout>
 
@@ -28,8 +28,6 @@ defineProps({
             <h2 class="font-semibold text-xl text-gray-800 leading-tight">My Dashboard</h2>
 
         </template>
-
-
 
         <div class="py-12">
 
